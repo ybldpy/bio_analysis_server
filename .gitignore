@@ -1,0 +1,50 @@
+# --- OS 杂项 ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# --- 编译产物 ---
+/target/
+out/
+build/
+
+# --- 日志 / 临时 ---
+logs/
+*.log
+*.pid
+tmp/
+.temp/
+.cache/
+
+# --- 测试与覆盖率 ---
+surefire-reports/
+failsafe-reports/
+jacoco.exec
+jacoco-report/
+
+# --- IDE/编辑器 ---
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# --- 依赖/包装器 ---
+# Maven wrapper 建议提交，所以下面这行不要忽略 .mvn
+# .mvn/  <-- 不要加这行
+# 如果你误忽略了 wrapper，可去掉忽略并提交：
+#  .mvn/wrapper/maven-wrapper.jar 也建议纳入仓库
+
+# --- 环境/密钥（强烈建议忽略） ---
+.env
+.env.*
+!/.env.example
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+*.crt
+secrets*.json
+credentials*.json
