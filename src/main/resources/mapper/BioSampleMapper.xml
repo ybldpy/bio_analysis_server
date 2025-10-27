@@ -340,4 +340,11 @@
       pipeline_id = #{pipelineId,jdbcType=INTEGER}
     where sid = #{sid,jdbcType=INTEGER}
   </update>
+
+
+  <select id="lockRowByPipeline" parameterType="com.xjtlu.bio.entity.BioSample" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from bio_sample where pipeline_id = #{pipelineId} for update limit 1
+  </select>
 </mapper>

@@ -40,12 +40,21 @@ public class PipelineService {
         if(!this.isLegalPipelineType(pipelineType)){
             return new Result<Integer>(Result.BUSINESS_FAIL, -1, "未知分析流水线类型");
         }
-        return null;
 
-        
-    
+        BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
+        bioAnalysisPipeline.setPipelineType(pipelineType);
+        int res = analysisPipelineMapper.insertSelective(bioAnalysisPipeline);
+        if (res < 1) {
+            return new Result<Integer>(Result.INTERNAL_FAIL,-1 , "创建分析流水线失败");
+        }
+        return new Result<Integer>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(), null);
     }
 
+    @Transactional
+    public Result<Boolean> pipelineStart(int pid){
+        
+
+    }
 
 
 

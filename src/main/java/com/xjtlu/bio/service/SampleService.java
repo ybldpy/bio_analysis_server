@@ -4,10 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -15,10 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioSample;
-import com.xjtlu.bio.entity.BioSampleExample;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 
-import io.minio.MinioClient;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.InsufficientDataException;
 import io.minio.errors.InternalException;
@@ -41,9 +37,9 @@ public class SampleService {
     public static final int SAMPLE_TYPE_VIRUS_COVID = 2;
 
     private Set<String> bioSampleUploadStatusSet = ConcurrentHashMap.newKeySet();
-
-    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-    public Result<Integer> createSample(boolean isPair, String sampleName, int projectId, int sampleType) {
+    
+    @Transactional
+    public Result<Integer> createSample(boolean isPair, String sampleName, int projectId, int pipelineId,int sampleType) {
 
 
         BioSample bioSample = new BioSample();
@@ -51,11 +47,19 @@ public class SampleService {
         bioSample.setSampleName(sampleName);
         bioSample.setProjectId(projectId);
         bioSample.setSampleType(sampleType);
+        bioSample.setPipelineId(pipelineId);
+        BioSample previousSample = sampleMapper.lockRowByPipeline(bioSample);
+        if (previousSample != null) {
+            return new Result<Integer>(Result.DUPLICATE_OPERATION, -1, "不能重复绑定分析流水线");
+        }
+
+        
+
         int res = tryInsertion(bioSample);
         if (res == 1) {
-            return new Result<Integer>(0, bioSample.getSid(), null);
+            return new Result<Integer>(Result.SUCCESS, bioSample.getSid(), null);
         }
-        return new Result<Integer>(1, null, "样本名称已存在于该项目中");
+        return new Result<Integer>(Result.BUSINESS_FAIL, -1, "样本名称已存在于该项目中");
     }
 
     // @Transactional(rollbackFor = Exception.class, isolation =
@@ -86,6 +90,8 @@ public class SampleService {
                 | IOException e) {
             // TODO Auto-generated catch block
             return new Result<>(2, null, "内部错误_" + e.getMessage());
+        }finally{
+            bioSampleUploadStatusSet.remove(setUrl);
         }
 
         BioSample updateSample = new BioSample();
@@ -107,24 +113,6 @@ public class SampleService {
             }
         }
         return new Result<>(0, null, null);
-    }
-
-    private int insertNewSample(BioSample bioSample) {
-
-        return -1;
-
-        // List<BioSample> duplicateNameAndProjectSamples = null;
-        // for(;;){
-        // int res = tryInsertion(bioSample);
-        // if(res == 1){break;}
-        // if(res == -1){
-        // throw new RuntimeException("内部错误");
-        // }
-        // if(duplicateNameAndProjectSamples == null){
-
-        // }
-
-        // }
     }
 
     private int tryInsertion(BioSample bioSample) {

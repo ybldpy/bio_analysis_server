@@ -93,4 +93,6 @@ public interface BioSampleMapper {
      * @mbg.generated Mon Oct 27 20:17:16 GMT 2025
      */
     int updateByPrimaryKey(BioSample row);
+
+    BioSample lockRowByPipeline(BioSample row);
 }
