@@ -73,12 +73,12 @@ public class SampleService {
         BioSample bioSample = sampleMapper.selectByPrimaryKey(sid);
 
         if (bioSample == null) {
-            return new Result(1, null, "样本不存在");
+            return new Result<>(Result.BUSINESS_FAIL, null, "样本不存在");
         }
 
         String uploadSample = String.format("%d-%d", bioSample.getSid(), index);
-        if (!bioSample.getIsPair()&&!bioSampleUploadStatusSet.add(uploadSample)) {
-            return new Result(3, null, "重复操作");
+        if (!bioSampleUploadStatusSet.add(uploadSample)) {
+            return new Result<>(Result.DUPLICATE_OPERATION, null, "重复操作");
         }
 
         String setUrl = String.format("samples/%d/%d", bioSample.getSid(), index);

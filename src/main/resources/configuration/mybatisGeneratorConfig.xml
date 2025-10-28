@@ -5,7 +5,7 @@
   <!-- 数据库驱动 -->
   <context id="MySQLTables" targetRuntime="MyBatis3">
     <jdbcConnection driverClass="com.mysql.cj.jdbc.Driver"
-      connectionURL="jdbc:mysql://localhost:3306/bio?useSSL=false&amp;serverTimezone=UTC"
+      connectionURL="jdbc:mysql://localhost:20000/bio?useSSL=false&amp;serverTimezone=UTC"
       userId="bio_dev"
       password="062400" />
 
@@ -20,13 +20,13 @@
       targetProject="src/main/java" />
 
     <!-- 要生成的表 -->
-    <table schema="bio" tableName="bio_sample"
+    <!-- <table schema="bio" tableName="bio_sample"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true">
       <generatedKey column="sid" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
 
     <!-- <table tableName="bio_project" schema="bio"
@@ -36,16 +36,16 @@
       enableSelectByExample="true"
     >
       <generatedKey column="pid" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
-    <table tableName="bio_user" schema="bio"
+    <!-- <table tableName="bio_user" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="uid" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
 
     <table tableName="bio_pipeline_stage" schema="bio"
@@ -55,16 +55,16 @@
       enableSelectByExample="true"
     >
       <generatedKey column="stage_id" sqlStatement="JDBC" identity="true" />
-    </table> -->
+    </table>
 
 
-    <table tableName="bio_analysis_pipeline" schema="bio"
+    <!-- <table tableName="bio_analysis_pipeline" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="pipeline_id" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
   </context>
 </generatorConfiguration>
