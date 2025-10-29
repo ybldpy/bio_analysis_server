@@ -5,7 +5,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.xjtlu.bio.common.Result;
@@ -106,6 +105,9 @@ public class PipelineService {
 
 
     public void pipelineStageDone(int pid){
+
+
+        
     }
 
 
