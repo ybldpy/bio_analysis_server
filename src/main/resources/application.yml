@@ -3,7 +3,7 @@ spring:
         name: bio
 
     datasource:
-        url: jdbc:mysql://localhost:20000/bio
+        url: jdbc:mysql://localhost:3306/bio
         username: bio_dev
         password: '062400'
         driver-class-name: com.mysql.cj.jdbc.Driver
@@ -31,7 +31,17 @@ minio:
     password: minioadmin
     url: "http://localhost:9000"
 
-    expose-url: http://localhosts:10001
+    expose-url: http://localhosts:3306
     bucket: "bio-bucket"
+
+
+localStorage:
+    tmp: "/data/bioServer/tmp"
+
+
+refSeq:
+    virus: /data/refs/ncbi_dataset/data
+    virus-index: /data/refs/ncbi_dataset/data/assembly_data_report.jsonl
+
 
     

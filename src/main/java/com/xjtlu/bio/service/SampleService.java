@@ -39,7 +39,7 @@ public class SampleService {
     private Set<String> bioSampleUploadStatusSet = ConcurrentHashMap.newKeySet();
     
     @Transactional
-    public Result<Integer> createSample(boolean isPair, String sampleName, int projectId, int pipelineId,int sampleType) {
+    public Result<Long> createSample(boolean isPair, String sampleName, long projectId, long pipelineId,int sampleType) {
 
 
         BioSample bioSample = new BioSample();
@@ -48,23 +48,23 @@ public class SampleService {
         bioSample.setProjectId(projectId);
         bioSample.setSampleType(sampleType);
         bioSample.setPipelineId(pipelineId);
-        BioSample previousSample = sampleMapper.lockRowByPipeline(bioSample);
-        if (previousSample != null) {
-            return new Result<Integer>(Result.DUPLICATE_OPERATION, -1, "不能重复绑定分析流水线");
-        }
+        // BioSample previousSample = sampleMapper.lockRowByPipeline(bioSample);
+        // if (previousSample != null) {
+        //     return new Result<Integer>(Result.DUPLICATE_OPERATION, -1, "不能重复绑定分析流水线");
+        // }
 
         
 
         int res = tryInsertion(bioSample);
         if (res == 1) {
-            return new Result<Integer>(Result.SUCCESS, bioSample.getSid(), null);
+            return new Result<Long>(Result.SUCCESS, bioSample.getSid(), null);
         }
-        return new Result<Integer>(Result.BUSINESS_FAIL, -1, "样本名称已存在于该项目中");
+        return new Result<Long>(Result.BUSINESS_FAIL, -1l, "样本名称已存在于该项目中");
     }
 
     // @Transactional(rollbackFor = Exception.class, isolation =
     // org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-    public Result receiveSampleData(int sid, int index, InputStream datastream) {
+    public Result receiveSampleData(long sid, int index, InputStream datastream) {
 
 
         if (!minioService.isMinioOk()) {

@@ -12,13 +12,43 @@ public class Result<T>{
 
 
 
-    private int success;
+    public int getStatus() {
+        return status;
+    }
+
+
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
+
+    public T getData() {
+        return data;
+    }
+
+
+    public void setData(T data) {
+        this.data = data;
+    }
+
+
+    public String getFailMsg() {
+        return failMsg;
+    }
+
+
+    public void setFailMsg(String failMsg) {
+        this.failMsg = failMsg;
+    }
+
+
+    private int status;
     private T data;
     private String failMsg;
 
 
     public Result(int status, T data, String failDescrip) {
-        this.success = success;
+        this.status = status;
         this.data = data;
         this.failMsg = failDescrip;
     }

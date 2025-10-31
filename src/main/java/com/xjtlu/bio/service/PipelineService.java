@@ -1,11 +1,13 @@
 package com.xjtlu.bio.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
@@ -13,6 +15,7 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.entity.BioSampleExample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
+import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 
@@ -28,6 +31,8 @@ public class PipelineService {
 
     @Resource
     private BioPipelineStageMapper bioPipelineStageMapper;
+    @Resource
+    private BioAnalysisStageMapperExtension bioAnalysisStageMapperExtension;
 
     @Resource
     private BioSampleMapper bioSampleMapper;
@@ -35,38 +40,77 @@ public class PipelineService {
     @Resource
     private BioAnalysisPipelineMapper bioAnalysisPipelineMapper;
 
+    @Resource
+    private SampleService sampleService;
+
     private Set<Integer> bioAnalysisPipelineLockSet = ConcurrentHashMap.newKeySet();
 
 
     public static final int PIPELINE_VIRUS = 0;
     public static final int PIPELINE_VIRUS_COVID = 1;
     public static final int PIPELINE_VIRUS_BACKTERIA = 2;
-
-
     
- 
+    
 
     private boolean isLegalPipelineType(int pipelineType){
         return pipelineType == PIPELINE_VIRUS || pipelineType==PIPELINE_VIRUS_COVID || pipelineType == PIPELINE_VIRUS_BACKTERIA;
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public Result<Integer> createPipeline(int pipelineType){
-        if(!this.isLegalPipelineType(pipelineType)){
-            return new Result<Integer>(Result.BUSINESS_FAIL, -1, "未知分析流水线类型");
+
+
+    private Result<Long> createVirusPipeline(int type, String refSeqAccession, boolean sampleIsPair, int sampleName, int sampleProjectId, int sampleType, Map<String, Object> pipelineStageParams){
+        
+        BioAnalysisPipeline bAnalysisPipeline = new BioAnalysisPipeline();
+        bAnalysisPipeline.setPipelineType(type);
+        int res = this.bioAnalysisPipelineMapper.insertSelective(bAnalysisPipeline);
+        if(res <= 0){
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "内部错误");
         }
 
-        BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
-        bioAnalysisPipeline.setPipelineType(pipelineType);
-        int res = analysisPipelineMapper.insertSelective(bioAnalysisPipeline);
-        if (res < 1) {
-            return new Result<Integer>(Result.INTERNAL_FAIL,-1 , "创建分析流水线失败");
+        Result<Long> createSampleResult = sampleService.createSample(sampleIsPair, sampleName, sampleProjectId, bAnalysisPipeline.getPipelineId(), sampleType);
+        
+        int status = createSampleResult.getStatus();
+        if (status!=Result.SUCCESS) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return createSampleResult;
         }
-        return new Result<Integer>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(), null);
+
+        long sid = createSampleResult.getData();
+
+        List<BioPipelineStage> stages = createVirusPipelineStages(bAnalysisPipeline.getPipelineId(), sid, type, pipelineStageParams);
+
+        
+        
+        res = bioAnalysisStageMapperExtension.batchInsert(stages);
+        if(res != stages.size()){
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "内部错误");
+        }
+
+        return createSampleResult;
+    }
+
+    private List<BioPipelineStage> createVirusPipelineStages(long pid, long sid,int type, Map<String, Object> pipelineStageParams){
+
+
+        //todo 
+        return null;
     }
 
 
-    private static List<BioPipelineStage> buildPipelineStages(int pipelineType){
+
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Long> createPipeline(int pipelineType, String refSeqAccession, boolean sampleIsPair, int sampleName, int sampleProjectId, int sampleType, Map<String, Object> pipelineStageParams,Map<String, Object> parameters){
+
+        if(pipelineType == PIPELINE_VIRUS || pipelineType == PIPELINE_VIRUS_COVID){
+            return this.createVirusPipeline(pipelineType, refSeqAccession, sampleIsPair, sampleName, sampleProjectId, sampleType, parameters);
+        }
+        return null;
+    }
+
+
+    private static List<BioPipelineStage> buildPipelineStages(int pipelineType){\
 
     }
 
@@ -105,9 +149,7 @@ public class PipelineService {
 
 
     public void pipelineStageDone(int pid){
-
-
-        
+            
     }
 
 
