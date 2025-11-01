@@ -39,7 +39,7 @@ public class SampleService {
     private Set<String> bioSampleUploadStatusSet = ConcurrentHashMap.newKeySet();
     
     @Transactional
-    public Result<Long> createSample(boolean isPair, String sampleName, long projectId, long pipelineId,int sampleType) {
+    public Result<BioSample> createSample(boolean isPair, String sampleName, long projectId, long pipelineId,int sampleType) {
 
 
         BioSample bioSample = new BioSample();
@@ -52,14 +52,12 @@ public class SampleService {
         // if (previousSample != null) {
         //     return new Result<Integer>(Result.DUPLICATE_OPERATION, -1, "不能重复绑定分析流水线");
         // }
-
         
-
         int res = tryInsertion(bioSample);
         if (res == 1) {
-            return new Result<Long>(Result.SUCCESS, bioSample.getSid(), null);
+            return new Result<BioSample>(Result.SUCCESS, bioSample, null);
         }
-        return new Result<Long>(Result.BUSINESS_FAIL, -1l, "样本名称已存在于该项目中");
+        return new Result<BioSample>(Result.BUSINESS_FAIL, bioSample, "样本名称已存在于该项目中");
     }
 
     // @Transactional(rollbackFor = Exception.class, isolation =
