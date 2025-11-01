@@ -37,6 +37,7 @@ public class PipelineService {
     private BioPipelineStageMapper bioPipelineStageMapper;
     @Resource
     private BioAnalysisStageMapperExtension bioAnalysisStageMapperExtension;
+    
 
     @Resource
     private BioSampleMapper bioSampleMapper;
@@ -204,7 +205,7 @@ public class PipelineService {
 
         stages.add(consensus);
 
-        
+
 
         if (type != PIPELINE_VIRUS_COVID) {
             return stages;
