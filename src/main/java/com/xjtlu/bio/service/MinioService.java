@@ -8,6 +8,8 @@ import java.security.NoSuchAlgorithmException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import io.minio.GetObjectArgs;
+import io.minio.GetObjectResponse;
 import io.minio.MinioClient;
 import io.minio.ObjectWriteResponse;
 import io.minio.PutObjectArgs;
@@ -23,20 +25,19 @@ import jakarta.annotation.Resource;
 @Service
 public class MinioService {
 
-
     @Resource
     private MinioClient minioClient;
 
     @Value("${minio.bucket}")
     private String bucket;
 
-
-    public boolean isMinioOk(){
+    public boolean isMinioOk() {
         return minioClient != null;
     }
 
-
-    public void uploadObject(String objectName, InputStream datastream) throws InvalidKeyException, ErrorResponseException, InsufficientDataException, InternalException, InvalidResponseException, NoSuchAlgorithmException, ServerException, XmlParserException, IOException{
+    public void uploadObject(String objectName, InputStream datastream)
+            throws InvalidKeyException, ErrorResponseException, InsufficientDataException, InternalException,
+            InvalidResponseException, NoSuchAlgorithmException, ServerException, XmlParserException, IOException {
 
         PutObjectArgs putObjectArgs = PutObjectArgs.builder()
                 .bucket(bucket)
@@ -44,17 +45,19 @@ public class MinioService {
                 .stream(datastream, -1, 10485760)
                 .build();
         ObjectWriteResponse objectWriteResponse = minioClient.putObject(putObjectArgs);
-        
+
     }
 
-    public void removeObject(String objectName) throws InvalidKeyException, ErrorResponseException, InsufficientDataException, InternalException, InvalidResponseException, NoSuchAlgorithmException, ServerException, XmlParserException, IOException{
+    public void removeObject(String objectName)
+            throws InvalidKeyException, ErrorResponseException, InsufficientDataException, InternalException,
+            InvalidResponseException, NoSuchAlgorithmException, ServerException, XmlParserException, IOException {
         RemoveObjectArgs removeObjectArgs = RemoveObjectArgs.builder().bucket(bucket).object(objectName).build();
         minioClient.removeObject(removeObjectArgs);
     }
 
-    
-
-
-
+    public InputStream getObjectStream(String objectName) throws InvalidKeyException, ErrorResponseException, InsufficientDataException, InternalException, InvalidResponseException, NoSuchAlgorithmException, ServerException, XmlParserException, IllegalArgumentException, IOException {
+        return minioClient.getObject(
+                GetObjectArgs.builder().bucket(bucket).object(objectName).build()); // 调用方负责关闭
+    }
 
 }

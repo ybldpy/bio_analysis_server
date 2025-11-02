@@ -120,8 +120,15 @@ public class PipelineService {
 
         long sid = createSampleResult.getData().getSid();
 
-        List<BioPipelineStage> stages = createVirusPipelineStages(bAnalysisPipeline.getPipelineId(),
-                createSampleResult.getData(), type, pipelineStageParams);
+        List<BioPipelineStage> stages = null;
+        try {
+            stages = createVirusPipelineStages(bAnalysisPipeline.getPipelineId(),
+                    createSampleResult.getData(), type, pipelineStageParams);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<BioSample>(Result.INTERNAL_FAIL, null, "内部错误");
+        }
 
         res = bioAnalysisStageMapperExtension.batchInsert(stages);
         if (res != stages.size()) {
@@ -188,8 +195,6 @@ public class PipelineService {
         varient.setStageType(PIPELINE_STAGE_VARIANT_CALL);
         varient.setStatus(PIPELINE_STAGE_STATUS_PENDING);
 
-
-
         stages.add(varient);
 
         index++;
@@ -202,9 +207,7 @@ public class PipelineService {
         consensus.setParameters(jsonedParams);
         consensus.setStageType(PIPELINE_STAGE_VARIANT_CALL);
         consensus.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-
         stages.add(consensus);
-
 
 
         if (type != PIPELINE_VIRUS_COVID) {
@@ -222,7 +225,16 @@ public class PipelineService {
 
         index++;
 
+        BioPipelineStage depthConverage = new BioPipelineStage();
+        depthConverage.setStageName("深度分布图");
+        depthConverage.setPipelineId(pid);
+        depthConverage.setStageIndex(index);
+        depthConverage.setParameters(jsonedParams);
+        depthConverage.setStageType(PIPELINE_STAGE_DEPTH_COVERAGE);
+        depthConverage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+        stages.add(snp);
 
+        index++;
         
 
         return stages;
