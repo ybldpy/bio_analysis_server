@@ -63,6 +63,15 @@ public class PipelineService {
     public static final int PIPELINE_STAGE_STATUS_FINISHED = 3;
 
 
+    public static final String PIPELINE_STAGE_QC_INPUT_R1 = "r1";
+    public static final String PIPELINE_STAGE_QC_INPUT_R2 = "r2";
+
+    public static final String PIPELINE_STAGE_QC_OUTPUT_R1 = "trimmed_r1";
+    public static final String PIPELINE_STAGE_QC_OUTPUT_R2 = "trimmed_r2";
+    public static final String PIPELINE_STAGE_QC_OUTPUI_JSON = "qc_json";
+    public static final String PIPELINE_STAGE_QC_OUTPUT_HTML = "qc_html";
+
+
     public static final int PIPELINE_STAGE_QC = 0; // 质控 fastp
     public static final int PIPELINE_STAGE_TAXONOMY = 10; // 物种鉴定 Kraken2/Mash
 
