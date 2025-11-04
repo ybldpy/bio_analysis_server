@@ -38,14 +38,14 @@
       <generatedKey column="pid" sqlStatement="JDBC" identity="true" />
     </table>
 
-    <table tableName="bio_user" schema="bio"
+    <!-- <table tableName="bio_user" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="uid" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
 
     <table tableName="bio_pipeline_stage" schema="bio"
@@ -58,13 +58,13 @@
     </table>
 
 
-    <table tableName="bio_analysis_pipeline" schema="bio"
+    <!-- <table tableName="bio_analysis_pipeline" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="pipeline_id" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
   </context>
 </generatorConfiguration>

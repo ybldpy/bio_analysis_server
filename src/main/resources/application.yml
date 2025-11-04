@@ -45,8 +45,10 @@ refSeq:
 
 analysisPipeline:
     stage:
+        baseOutputPath: /pipeline
         qc:
             cmd: fastq
+        
 
 
     

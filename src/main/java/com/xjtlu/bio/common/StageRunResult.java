@@ -2,6 +2,8 @@ package com.xjtlu.bio.common;
 
 import java.util.Map;
 
+import com.xjtlu.bio.entity.BioPipelineStage;
+
 public class StageRunResult {
 
     private boolean success;
@@ -9,12 +11,15 @@ public class StageRunResult {
 
     private Map<String,String> outputPath;
 
+    private BioPipelineStage stage;
 
 
-    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath) {
+
+    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, BioPipelineStage stage) {
         this.success = success;
         this.failReason = failReason;
         this.outputPath = outputPath;
+        this.stage = stage;
     }
 
     public Map<String,String> getOutputPath(){
@@ -22,11 +27,23 @@ public class StageRunResult {
     }
 
 
-    public static StageRunResult OK(Map<String,String> outputPath){
-        return new StageRunResult(true, null,outputPath);
+    public void setOutputPath(Map<String, String> outputPath) {
+        this.outputPath = outputPath;
     }
-    public static StageRunResult fail(String failReason){
-        return new StageRunResult(false, failReason, null);
+
+    public BioPipelineStage getStage() {
+        return stage;
+    }
+
+    public void setStage(BioPipelineStage stage) {
+        this.stage = stage;
+    }
+
+    public static StageRunResult OK(Map<String,String> outputPath, BioPipelineStage stage){
+        return new StageRunResult(true, null,outputPath, stage);
+    }
+    public static StageRunResult fail(String failReason, BioPipelineStage stage){
+        return new StageRunResult(false, failReason, null, stage);
     }
 
     

@@ -1,5 +1,9 @@
 package com.xjtlu.bio.service;
 
+import java.io.File;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +12,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
@@ -15,8 +21,10 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.common.Result;
+import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioPipelineStage;
+import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.entity.BioSampleExample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
@@ -25,6 +33,13 @@ import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.utils.ParameterUtil;
 
+import io.minio.errors.ErrorResponseException;
+import io.minio.errors.InsufficientDataException;
+import io.minio.errors.InternalException;
+import io.minio.errors.InvalidResponseException;
+import io.minio.errors.ServerException;
+import io.minio.errors.XmlParserException;
+import io.minio.messages.DeleteError;
 import jakarta.annotation.Resource;
 
 @Service
@@ -47,6 +62,12 @@ public class PipelineService {
 
     @Resource
     private SampleService sampleService;
+
+    @Resource
+    private MinioService minioService;
+
+    @Value("${analysisPipeline.stage.baseOutputPath}")
+    private String stagesOutputBasePath;
 
     private Set<Integer> bioAnalysisPipelineLockSet = ConcurrentHashMap.newKeySet();
 
@@ -289,12 +310,135 @@ public class PipelineService {
         if (bioSample.getRead1Url() == null || (bioSample.getIsPair() && bioSample.getRead2Url() == null)) {
             return new Result<Boolean>(Result.BUSINESS_FAIL, false, "样本数据未完全上传");
         }
-
         List<BioPipelineStage> stages = buildPipelineStages(bioAnalysisPipeline.getPipelineType());
-
     }
 
-    public void pipelineStageDone(int pid) {
+
+    @Async
+    @Transactional
+    public void pipelineStageDone(StageRunResult stageRunResult) {
+        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+        if (!stageRunResult.isSuccess()) {
+            bioPipelineStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
+            BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
+            int res = this.bioPipelineStageMapper.updateByPrimaryKey(bioPipelineStage);
+            //assume success here;
+            return;
+        }
+
+        if (bioPipelineStage.getStageType() == PIPELINE_STAGE_QC) {
+            handleQcStage(stageRunResult);
+        }
+    }
+
+
+    private static void batchDeleteFileFromTmpPath(List<File> deleteFiles){
+        for(File f:deleteFiles){
+            if(f!=null){
+                f.delete();
+            }
+        }
+    }
+
+
+
+
+    
+
+
+    private List<DeleteError> batchDeleteFromStorage(List<String> deleteFiles){
+
+        List<DeleteError> deleteErrors = null;
+        
+        try {
+            deleteErrors = this.minioService.batchDelete(deleteFiles);
+        } catch (InvalidKeyException | ErrorResponseException | IllegalArgumentException | InsufficientDataException
+                | InternalException | InvalidResponseException | NoSuchAlgorithmException | ServerException
+                | XmlParserException | IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }finally{
+            return deleteErrors;
+        }
+    }
+
+    private void pushToScheduledDeleteService(List<String> deleteObjects){
+        //todo
+    }
+
+
+
+    //params[0]: local path
+    //params[1]: object name
+    private boolean batchUploadObjectsFromLocal(Map<String,String> params){
+
+        for(Map.Entry<String,String> entry: params.entrySet()){
+
+            String localPath = entry.getKey();
+            String objectName = entry.getValue();
+            try {
+                minioService.uploadObject(objectName, localPath);
+            } catch (InvalidKeyException | ErrorResponseException | InsufficientDataException | InternalException
+                    | InvalidResponseException | NoSuchAlgorithmException | ServerException | XmlParserException
+                    | IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        return true;
+
+    }
+    
+
+    private void handleQcStage(StageRunResult stageRunResult){
+
+        Map<String,String> outputPathMap = stageRunResult.getOutputPath();
+        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+        String qcR1Path = outputPathMap.get(PIPELINE_STAGE_QC_OUTPUT_R1);
+        String qcR2Path = outputPathMap.get(PIPELINE_STAGE_QC_OUTPUT_R2);
+        boolean hasR2 = qcR2Path !=null;
+
+        String qcJsonPath = outputPathMap.get(PIPELINE_STAGE_QC_OUTPUI_JSON);
+        String qcHTMLPath = outputPathMap.get(PIPELINE_STAGE_QC_OUTPUT_HTML);
+
+        String format = "%s/%d/%d/%s";
+        String r1OutputPath = String.format(format, this.stagesOutputBasePath, bioPipelineStage.getStageId(), bioPipelineStage.getStageIndex(), qcR1Path.substring(qcR1Path.lastIndexOf("/")+1));
+        String r2OutputPath = !hasR2?null:String.format(format, this.stagesOutputBasePath,bioPipelineStage.getStageId(), bioPipelineStage.getStageIndex(), qcR2Path.substring(qcR2Path.lastIndexOf("/")+1));
+        String jsonOutputPath = String.format(format, this.stagesOutputBasePath, bioPipelineStage.getStageId(), bioPipelineStage.getStageIndex(), "qc.json");
+        String htmlOutputPath = String.format(format, this.stagesOutputBasePath, bioPipelineStage.getStageId(),bioPipelineStage.getStageIndex(), "qc.html");
+
+        Map<String,String> params = new HashMap<>();
+        params.put(qcR1Path, r1OutputPath);
+        if (hasR2) {
+            params.put(qcR2Path, r2OutputPath);
+        }
+        params.put(qcJsonPath, jsonOutputPath);
+        params.put(qcHTMLPath, htmlOutputPath);
+        
+        boolean uploadSuccess = this.batchUploadObjectsFromLocal(params);
+        if (!uploadSuccess) {
+            //todo
+        }else {
+            outputPathMap.clear();
+            outputPathMap.put(PIPELINE_STAGE_QC_OUTPUT_R1, r1OutputPath);
+            outputPathMap.put(PIPELINE_STAGE_QC_OUTPUT_R2, r2OutputPath);
+            outputPathMap.put(PIPELINE_STAGE_QC_OUTPUI_JSON, jsonOutputPath);
+            outputPathMap.put(PIPELINE_STAGE_QC_OUTPUT_HTML, htmlOutputPath);
+            try {
+                String outputPathMapJson = this.jsonMapper.writeValueAsString(outputPathMap);
+                bioPipelineStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+                bioPipelineStage.setOutputUrl(outputPathMapJson);
+                this.bioPipelineStageMapper.updateByPrimaryKey(bioPipelineStage);
+            } catch (JsonProcessingException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+        }
+        
+
 
     }
 

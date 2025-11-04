@@ -22,6 +22,8 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.MinioService;
@@ -45,7 +47,7 @@ public class PipelineStageRunner implements Runnable {
     private MinioService minioService;
 
     private static final int taskBufferCapacity = 200;
-    private BlockingQueue<BioPipelineStage> buffer;
+    private BlockingQueue<BioPipelineStage> stageBuffer;
 
     private ObjectMapper objectMapper;
 
@@ -57,15 +59,21 @@ public class PipelineStageRunner implements Runnable {
     @Override
     public void run() {
         // TODO Auto-generated method stub
-
         while (true) {
             // todo
+            try {
+                BioPipelineStage bioPipelineStage = stageBuffer.take();
+                runStage(bioPipelineStage);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
 
     }
 
     public PipelineStageRunner() {
-        buffer = new LinkedBlockingQueue<>(taskBufferCapacity);
+        stageBuffer = new LinkedBlockingQueue<>(taskBufferCapacity);
     }
 
     @PostConstruct
@@ -177,7 +185,7 @@ public class PipelineStageRunner implements Runnable {
             outputUrlsMap = objectMapper.readValue(outputUrlsJson, Map.class);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
-            return StageRunResult.fail("解析输入参数错误");
+            return StageRunResult.fail("解析输入参数错误", bioPipelineStage);
         }
 
         String inputUrl1 = inputUrls.get("r1");
@@ -190,7 +198,7 @@ public class PipelineStageRunner implements Runnable {
         try {
             Files.createDirectories(outputDir);
         } catch (IOException e) {
-            return StageRunResult.fail("IO错误\n" + e.getMessage());
+            return StageRunResult.fail("IO错误\n" + e.getMessage(), bioPipelineStage);
         }
 
         Path trimmedR1Path = outputDir.resolve(appendSuffixBeforeExtensions(input1FileName, "_trimmed"));
@@ -213,7 +221,7 @@ public class PipelineStageRunner implements Runnable {
             // TODO Auto-generated catch block
             this.streamClose(input1Stream);
             this.streamClose(input2Stream);
-            return StageRunResult.fail("加载文件失败");
+            return StageRunResult.fail("加载文件失败",bioPipelineStage);
         }
 
         File inputFile1 = new File(
@@ -276,11 +284,11 @@ public class PipelineStageRunner implements Runnable {
         try {
             runResult = runSubProcess(cmd, outputDir);
         } catch (IOException | InterruptedException e) {
-            return StageRunResult.fail("QC 子进程异常: " + e.getMessage());
+            return StageRunResult.fail("QC 子进程异常: " + e.getMessage(),bioPipelineStage);
         }
 
         if (runResult != 0) {
-            return StageRunResult.fail("QC 退出码=" + runResult);
+            return StageRunResult.fail("QC 退出码=" + runResult,bioPipelineStage);
         }
 
         if(!Files.exists(trimmedR1Path) || (inputUrl2!=null && !Files.exists(trimmedR2Path)) || !Files.exists(outputQcJson)||!Files.exists(outputQcHtml)){
@@ -290,14 +298,14 @@ public class PipelineStageRunner implements Runnable {
             Files.delete(outputQcHtml);
             inputFile1.delete();
             inputFile2.delete();
-            return StageRunResult.fail("qc工具未产出结果");
+            return StageRunResult.fail("qc工具未产出结果",bioPipelineStage);
         }
 
         
 
         
         Map<String,String> outputPathMap = createQCOutputMap();
-        return StageRunResult.OK(outputPathMap);
+        return StageRunResult.OK(outputPathMap,bioPipelineStage);
 
     }
 
@@ -306,13 +314,22 @@ public class PipelineStageRunner implements Runnable {
         return null;
     }
 
+
+    private void notifyPipelineService(StageRunResult stageRunResult){
+        this.pipelineService.pipelineStageDone(stageRunResult);
+    }
+
     private void runStage(BioPipelineStage bPipelineStage) {
+        StageRunResult stageRunResult = null;
         if (bPipelineStage.getStageType() == PipelineService.PIPELINE_STAGE_QC) {
-            this.runQc(bPipelineStage);
+            stageRunResult = this.runQc(bPipelineStage);
         }
+
+
+        this.notifyPipelineService(stageRunResult);
     }
 
     public boolean addTask(BioPipelineStage bioPipelineStage) {
-        return buffer.offer(bioPipelineStage);
+        return stageBuffer.offer(bioPipelineStage);
     }
 }
