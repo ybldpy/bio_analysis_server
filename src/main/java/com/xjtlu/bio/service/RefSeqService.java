@@ -1,8 +1,8 @@
 package com.xjtlu.bio.service;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -29,6 +29,14 @@ public class RefSeqService {
 
     public RefSeqService(){
         
+    }
+
+
+
+
+    public File getRefSeqByAccession(String accession){
+        //todo
+        return null;
     }
 
 

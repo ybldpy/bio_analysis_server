@@ -126,7 +126,7 @@ public class SampleService {
         }
     }
 
-    public void testInsertDuplicate(String sampleName, int projectId) {
+    public void testInsertDuplicate(String sampleName, long projectId) {
         BioSample bioSample = new BioSample();
         bioSample.setSampleName(sampleName);
         bioSample.setProjectId(projectId);

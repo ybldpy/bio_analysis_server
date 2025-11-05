@@ -23,11 +23,14 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.MinioService;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.service.RefSeqService;
+import com.xjtlu.bio.service.StorageService;
+import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.utils.ParameterUtil;
 
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.InsufficientDataException;
@@ -44,7 +47,9 @@ public class PipelineStageRunner implements Runnable {
     @Resource
     private PipelineService pipelineService;
     @Resource
-    private MinioService minioService;
+    private StorageService storageService;
+    @Resource
+    private RefSeqService refSeqService;
 
     private static final int taskBufferCapacity = 200;
     private BlockingQueue<BioPipelineStage> stageBuffer;
@@ -52,6 +57,9 @@ public class PipelineStageRunner implements Runnable {
     private ObjectMapper objectMapper;
 
     private String stageResultTmpBasePath;
+    private String stageInputTmpBasePath;
+
+    public static final String PARSE_JSON_ERROR = "解析参数错误";
 
     @Value("${analysisPipeline.stage.qc.cmd}")
     private String qcCmd;
@@ -156,20 +164,15 @@ public class PipelineStageRunner implements Runnable {
 
     }
 
-
     // private void deleteTmpFiles(List<File> tmpFiles){
 
-    //     for(File f: tmpFiles){
-    //         if (f.exists()) {
-    //             f.delete();
-    //         }
-    //     }
-
-
-
+    // for(File f: tmpFiles){
+    // if (f.exists()) {
+    // f.delete();
+    // }
     // }
 
-    
+    // }
 
     private StageRunResult runQc(BioPipelineStage bioPipelineStage) {
 
@@ -178,7 +181,7 @@ public class PipelineStageRunner implements Runnable {
         Map<String, String> inputUrls = null;
         Map<String, String> outputUrlsMap = null;
 
-        ArrayList<File> toDeleteTmpFile = new ArrayList<>(); 
+        ArrayList<File> toDeleteTmpFile = new ArrayList<>();
 
         try {
             inputUrls = objectMapper.readValue(inputUrlsJson, Map.class);
@@ -208,56 +211,22 @@ public class PipelineStageRunner implements Runnable {
         Path outputQcJson = outputDir.resolve("qc_json.json");
         Path outputQcHtml = outputDir.resolve("qc_html.html");
 
-        InputStream input1Stream = null;
-        InputStream input2Stream = null;
-        try {
-            input1Stream = minioService.getObjectStream(inputUrl1);
-            if (StringUtils.isNotBlank(inputUrl2)) {
-                input2Stream = minioService.getObjectStream(inputUrl2);
-            }
-        } catch (InvalidKeyException | ErrorResponseException | InsufficientDataException | InternalException
-                | InvalidResponseException | NoSuchAlgorithmException | ServerException | XmlParserException
-                | IllegalArgumentException | IOException e) {
-            // TODO Auto-generated catch block
-            this.streamClose(input1Stream);
-            this.streamClose(input2Stream);
-            return StageRunResult.fail("加载文件失败",bioPipelineStage);
+        GetObjectResult objectResult = storageService.getObject(inputUrl1,
+                String.format("%s/%d/input/%s", stageResultTmpBasePath, bioPipelineStage.getStageId(), input1FileName));
+        if (objectResult.e() != null) {
+            return StageRunResult.fail(objectResult.e().getMessage(), bioPipelineStage);
         }
 
-        File inputFile1 = new File(
-                String.format("%s/%d/input/%s", stageResultTmpBasePath, bioPipelineStage.getStageId(), input1FileName));
-        File inputFile2 = input2Stream == null ? null
-                : new File(String.format("%s/%d/input/%s", stageResultTmpBasePath, bioPipelineStage.getStageId(),
-                        input2FileName));
-
-
-        
-        try {
-            FileUtils.copyInputStreamToFile(input1Stream, inputFile1);
-            if (inputFile2 != null) {
-                FileUtils.copyInputStreamToFile(input2Stream, inputFile2);
+        File inputFile1 = objectResult.objectFile();
+        File inputFile2 = null;
+        if (StringUtils.isNotBlank(inputUrl2)) {
+            GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, String.format("%s/%d/input/%s",
+                    stageResultTmpBasePath, bioPipelineStage.getStageId(), input2FileName));
+            if (null != r2ObjectGetResult.e()) {
+                inputFile1.delete();
+                return StageRunResult.fail(objectResult.e().getMessage(), bioPipelineStage);
             }
-        } catch (IOException ie) {
-
-            try {
-                FileUtils.delete(inputFile1);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
-            if (inputFile2 != null) {
-                try {
-                    FileUtils.delete(inputFile2);
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            }
-            return StageRunResult.fail("文件IO错误");
-        } finally {
-            this.streamClose(input1Stream);
-            this.streamClose(input2Stream);
+            inputFile2 = objectResult.objectFile();
         }
 
         List<String> cmd = new ArrayList<>();
@@ -284,38 +253,93 @@ public class PipelineStageRunner implements Runnable {
         try {
             runResult = runSubProcess(cmd, outputDir);
         } catch (IOException | InterruptedException e) {
-            return StageRunResult.fail("QC 子进程异常: " + e.getMessage(),bioPipelineStage);
+            return StageRunResult.fail("QC 子进程异常: " + e.getMessage(), bioPipelineStage);
         }
 
         if (runResult != 0) {
-            return StageRunResult.fail("QC 退出码=" + runResult,bioPipelineStage);
+            return StageRunResult.fail("QC 退出码=" + runResult, bioPipelineStage);
         }
 
-        if(!Files.exists(trimmedR1Path) || (inputUrl2!=null && !Files.exists(trimmedR2Path)) || !Files.exists(outputQcJson)||!Files.exists(outputQcHtml)){
+        if (!Files.exists(trimmedR1Path) || (inputUrl2 != null && !Files.exists(trimmedR2Path))
+                || !Files.exists(outputQcJson) || !Files.exists(outputQcHtml)) {
             Files.delete(trimmedR1Path);
             Files.delete(trimmedR2Path);
             Files.delete(outputQcJson);
             Files.delete(outputQcHtml);
             inputFile1.delete();
             inputFile2.delete();
-            return StageRunResult.fail("qc工具未产出结果",bioPipelineStage);
+            return StageRunResult.fail("qc工具未产出结果", bioPipelineStage);
         }
 
-        
-
-        
-        Map<String,String> outputPathMap = createQCOutputMap();
-        return StageRunResult.OK(outputPathMap,bioPipelineStage);
+        Map<String, String> outputPathMap = createQCOutputMap();
+        return StageRunResult.OK(outputPathMap, bioPipelineStage);
 
     }
 
-    private Map<String,String> createQCOutputMap(){
-        //todo
+    private File[] getSampleReadFiles(String r1Url, String r1TmpPath, String r2Url,String r2TmpPath){
+        
+        
+        GetObjectResult r1Result = storageService.getObject(r1Url,r1TmpPath);
+        GetObjectResult r2Result = null;
+        if(r2Url!=null){
+            r2Result = storageService.getObject(r2Url, r2TmpPath);
+        }
+        return new File[]{r1Result.objectFile(), r2Url!=null?r2Result.objectFile():null};
+
+    }
+
+    private StageRunResult runMapping(BioPipelineStage bioPipelineStage) {
+        String inputUrls = bioPipelineStage.getInputUrl();
+        Map<String, String> inputUrlJson = null;
+        Map<String, Object> params = null;
+        try {
+            inputUrlJson = objectMapper.readValue(inputUrls, Map.class);
+            params = objectMapper.readValue(bioPipelineStage.getParameters(), Map.class);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
+        }
+
+        String refSeqAccession = ParameterUtil.getStrFromMap("refSeq", params);
+        File refSeq = refSeqService.getRefSeqByAccession(refSeqAccession);
+        if (refSeq == null) {
+            return StageRunResult.fail("未找到参考基因组", bioPipelineStage);
+        }
+
+        String inputR1Url = inputUrlJson.get("r1");
+        String inputR2Url = inputUrlJson.get("r2");
+
+
+        
+        String tempFormat = "%s/%d/input/%s";
+        String r1TmpPath = String.format(tempFormat, this.stageInputTmpBasePath, bioPipelineStage.getStageId(), inputR1Url.substring(inputR1Url.lastIndexOf("/")+1));
+        String r2TmpPath = inputR2Url == null?null:String.format(tempFormat, String.format(tempFormat, this.stageInputTmpBasePath, bioPipelineStage.getStageId(), inputR2Url.substring(inputR2Url.lastIndexOf("/")+1)));
+        File[] readFiles = this.getSampleReadFiles(inputR1Url, r1TmpPath, inputR2Url, r2TmpPath);
+
+        if(readFiles[0] == null || (r2TmpPath!=null && readFiles[1]==null)){
+            return StageRunResult.fail("读取样本文件错误", bioPipelineStage);
+        }
+
+
+
+
+        
+
+        return null;
+
+    }
+
+    private StageRunResult runAssemly(BioPipelineStage bioPipelineStage) {
         return null;
     }
 
+    private Map<String, String> createQCOutputMap() {
+        // todo
+        return null;
+    }
 
-    private void notifyPipelineService(StageRunResult stageRunResult){
+    private void notifyPipelineService(StageRunResult stageRunResult) {
         this.pipelineService.pipelineStageDone(stageRunResult);
     }
 
@@ -324,7 +348,12 @@ public class PipelineStageRunner implements Runnable {
         if (bPipelineStage.getStageType() == PipelineService.PIPELINE_STAGE_QC) {
             stageRunResult = this.runQc(bPipelineStage);
         }
-
+        if (bPipelineStage.getStageType() == pipelineService.PIPELINE_STAGE_MAPPING) {
+            stageRunResult = this.runMapping(bPipelineStage);
+        }
+        if (bPipelineStage.getStageType() == pipelineService.PIPELINE_STAGE_ASSEMBLY) {
+            stageRunResult = this.runAssemly(bPipelineStage);
+        }
 
         this.notifyPipelineService(stageRunResult);
     }

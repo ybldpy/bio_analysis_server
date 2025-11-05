@@ -29,14 +29,14 @@
     </table>
 
 
-    <table tableName="bio_project" schema="bio"
+    <!-- <table tableName="bio_project" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="pid" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
     <!-- <table tableName="bio_user" schema="bio"
       enableCountByExample="true"
@@ -48,14 +48,14 @@
     </table> -->
 
 
-    <table tableName="bio_pipeline_stage" schema="bio"
+    <!-- <table tableName="bio_pipeline_stage" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="stage_id" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
 
     <!-- <table tableName="bio_analysis_pipeline" schema="bio"
