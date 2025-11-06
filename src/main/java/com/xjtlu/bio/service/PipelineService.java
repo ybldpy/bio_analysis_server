@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ibatis.javassist.tools.framedump;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -91,6 +92,9 @@ public class PipelineService {
     public static final String PIPELINE_STAGE_QC_OUTPUT_R2 = "trimmed_r2";
     public static final String PIPELINE_STAGE_QC_OUTPUI_JSON = "qc_json";
     public static final String PIPELINE_STAGE_QC_OUTPUT_HTML = "qc_html";
+
+    public static final String PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY = "bam";
+    public static final String PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY = "bamIndex";
 
 
     public static final int PIPELINE_STAGE_QC = 0; // 质控 fastp
