@@ -2,6 +2,7 @@ package com.xjtlu.bio.taskrunner;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -15,13 +16,13 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
 import jakarta.annotation.Resource;
 
-public abstract class AbstractPipelineStageExector implements PipelineStageExecutor{
-    
+public abstract class AbstractPipelineStageExector implements PipelineStageExecutor {
+
     @Resource
     protected PipelineService pipelineService;
     @Resource
     protected ObjectMapper objectMapper;
-    @Resource 
+    @Resource
     protected RefSeqService refSeqService;
 
     @Resource
@@ -33,10 +34,21 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     protected String stageInputTmpBasePath;
 
 
-    protected StageRunResult runException(BioPipelineStage bioPipelineStage, Exception e){
-        return runFail(bioPipelineStage, "异常\n"+e.getMessage());
+
+    protected boolean requireNonEmpty(Path p) throws IOException {
+       
+        if (!Files.exists(p)||Files.size(p) <= 0) {
+            return false;
+        }
+        return true;
+        
     }
-    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String msg){
+
+    protected StageRunResult runException(BioPipelineStage bioPipelineStage, Exception e) {
+        return runFail(bioPipelineStage, "异常\n" + e.getMessage());
+    }
+
+    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String msg) {
         return StageRunResult.fail(msg, bioPipelineStage);
     }
 
@@ -89,14 +101,11 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         return stem + suffix + ext;
     }
 
-
     public abstract int id();
 
-
-    protected StageRunResult parseError(BioPipelineStage bioPipelineStage){
+    protected StageRunResult parseError(BioPipelineStage bioPipelineStage) {
         return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
     }
-
 
     protected File[] moveSampleReadFilesToTmpPath(String r1Url, Path r1TmpPath, String r2Url, Path r2TmpPath) {
 
@@ -124,7 +133,7 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
     protected void deleteTmpFiles(List<File> tmpFiles) {
         for (File f : tmpFiles) {
-            if (f.exists()) {
+            if (f != null && f.exists()) {
                 f.delete();
             }
         }

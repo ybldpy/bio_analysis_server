@@ -84,6 +84,8 @@ public class PipelineService {
     public static final int PIPELINE_STAGE_STATUS_FAIL = 2;
     public static final int PIPELINE_STAGE_STATUS_FINISHED = 3;
 
+    public static final String PIPELINE_REFSEQ_ACCESSION_KEY = "refSeq";
+
 
     public static final String PIPELINE_STAGE_QC_INPUT_R1 = "r1";
     public static final String PIPELINE_STAGE_QC_INPUT_R2 = "r2";
@@ -95,6 +97,9 @@ public class PipelineService {
 
     public static final String PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY = "bam";
     public static final String PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY = "bamIndex";
+
+    public static final String PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY = "contigs";
+    public static final String PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY = "scaffold";
 
 
     public static final int PIPELINE_STAGE_QC = 0; // 质控 fastp
