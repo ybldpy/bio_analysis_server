@@ -3,11 +3,17 @@ package com.xjtlu.bio.service;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import org.springframework.stereotype.Service;
 
 @Service
 public class LocalStorageService implements StorageService{
+
+
+
+    private String base;
 
     @Override
     public PutResult putObject(String key, InputStream data) {
@@ -21,6 +27,8 @@ public class LocalStorageService implements StorageService{
         return null;
     }
 
+
+
     @Override
     public ObjectStat getObjectStream(String key) {
         // TODO Auto-generated method stub
@@ -30,7 +38,7 @@ public class LocalStorageService implements StorageService{
     @Override
     public boolean exists(String key) {
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'exists'");
+        return Files.exists(Paths.get(String.format("%s/%s", base, key)));
     }
 
     @Override

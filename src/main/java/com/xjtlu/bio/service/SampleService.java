@@ -10,9 +10,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioSample;
+import com.xjtlu.bio.entity.BioSampleExample;
+import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 
 import io.minio.errors.ErrorResponseException;
@@ -28,18 +31,21 @@ public class SampleService {
 
     @Resource
     private BioSampleMapper sampleMapper;
+    @Resource
+    private BioSampleExtensionMapper bioSampleExtensionMapper;
 
     @Resource
-    private MinioService minioService;
+    private StorageService storageService;
 
     public static final int SAMPLE_TYPE_VIRUS = 0;
     public static final int SAMPLE_TYPE_BACTERIA = 1;
     public static final int SAMPLE_TYPE_VIRUS_COVID = 2;
 
     private Set<String> bioSampleUploadStatusSet = ConcurrentHashMap.newKeySet();
+    private Set<String> bioSampleCreationSet = ConcurrentHashMap.newKeySet();
     
     @Transactional
-    public Result<BioSample> createSample(boolean isPair, String sampleName, long projectId, long pipelineId,int sampleType) {
+    public Result<BioSample> createSample(boolean isPair, String sampleName, long projectId, int sampleType) {
 
 
         BioSample bioSample = new BioSample();
@@ -47,27 +53,27 @@ public class SampleService {
         bioSample.setSampleName(sampleName);
         bioSample.setProjectId(projectId);
         bioSample.setSampleType(sampleType);
-        bioSample.setPipelineId(pipelineId);
-        // BioSample previousSample = sampleMapper.lockRowByPipeline(bioSample);
-        // if (previousSample != null) {
-        //     return new Result<Integer>(Result.DUPLICATE_OPERATION, -1, "不能重复绑定分析流水线");
-        // }
-        
-        int res = tryInsertion(bioSample);
+        bioSample.setSampleType(sampleType);
+
+        int res = 0;
+        try{
+            res = tryInsertion(bioSample);
+        }catch(DuplicateKeyException duplicateKeyException){
+            return new Result<BioSample>(Result.BUSINESS_FAIL, null, "样本名称重复");
+        }
+
         if (res == 1) {
             return new Result<BioSample>(Result.SUCCESS, bioSample, null);
         }
-        return new Result<BioSample>(Result.BUSINESS_FAIL, bioSample, "样本名称已存在于该项目中");
+        return new Result<BioSample>(Result.BUSINESS_FAIL, bioSample, "创建样本失败");
     }
 
-    // @Transactional(rollbackFor = Exception.class, isolation =
-    // org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+
+
+
+
     public Result receiveSampleData(long sid, int index, InputStream datastream) {
 
-
-        if (!minioService.isMinioOk()) {
-            return new Result<>(2, null, "内部错误");
-        }
         BioSample bioSample = sampleMapper.selectByPrimaryKey(sid);
 
         if (bioSample == null) {
@@ -115,15 +121,11 @@ public class SampleService {
 
     private int tryInsertion(BioSample bioSample) {
 
-        try {
-            sampleMapper.insertSelective(bioSample);
-            return 1;
-        } catch (DuplicateKeyException e) {
-            return 0;
-        } catch (Exception e) {
-            //todo: log
-            throw new RuntimeException("内部错误");
-        }
+         try {
+            return sampleMapper.insertSelective(bioSample);
+         }catch(DuplicateKeyException duplicateKeyException){
+            throw duplicateKeyException;
+         }
     }
 
     public void testInsertDuplicate(String sampleName, long projectId) {
