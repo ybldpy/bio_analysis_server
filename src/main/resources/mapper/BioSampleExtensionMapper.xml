@@ -16,7 +16,8 @@
         <result column="created_by" jdbcType="INTEGER" property="createdBy" />
         <result column="sample_type" jdbcType="INTEGER" property="sampleType" />
         <result column="pipeline_id" jdbcType="BIGINT" property="pipelineId" />
-        <result column="column_name" jdbcType="INTEGER" property="columnName" />
+        <result column="read1_upload_status" jdbcType="INTEGER" property="read1UploadStatus" />
+        <result column="read2_upload_status" jdbcType="INTEGER" property="read2UploadStatus" />
     </resultMap>
     <sql id="Example_Where_Clause">
         <!--
