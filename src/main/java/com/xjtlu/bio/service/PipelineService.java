@@ -176,6 +176,8 @@ public class PipelineService {
         return createSampleResult;
     }
 
+
+
     private List<BioPipelineStage> createVirusPipelineStages(long pid, BioSample bioSample, int type,
             Map<String, Object> pipelineStageParams) throws JsonProcessingException {
         ArrayList<BioPipelineStage> stages = new ArrayList<>(8);
@@ -279,35 +281,22 @@ public class PipelineService {
                 return null;
     }
 
-    private static List<BioPipelineStage> buildPipelineStages(int pipelineType) {
+    private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline) {
+        ArrayList<BioPipelineStage> bioPipelineStages = new ArrayList<>();
+        if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS) {
+            this.createVirusPipelineStages(PIPELINE_STAGE_AMR, bioSample, PIPELINE_STAGE_SEROTYPE, null)
+        }
 
     }
 
     @Transactional
-    public Result<Boolean> pipelineStart(int pid, int sid) {
-        if (!this.bioAnalysisPipelineLockSet.add(pid)) {
-            return new Result<Boolean>(Result.DUPLICATE_OPERATION, false, "流水线不能重复启动");
+    public Result<Boolean> pipelineStart(long pid) {
+        BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
+        bioPipelineStageExample.createCriteria().andPipelineIdEqualTo(pid);
+        List<BioPipelineStage> stages = this.bioPipelineStageMapper.selectByExample(bioPipelineStageExample);
+        if(stages == null || stages.isEmpty()){
+            return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未找到流水线");
         }
-        BioAnalysisPipeline bioAnalysisPipeline = this.bioAnalysisPipelineMapper.selectByPrimaryKey(pid);
-        if (bioAnalysisPipeline == null) {
-            return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未找到分析流水线");
-        }
-
-        BioSampleExample bioSampleExample = new BioSampleExample();
-        bioSampleExample.createCriteria().andSidEqualTo(sid).andPipelineIdEqualTo(pid);
-        List<BioSample> bioSamples = this.bioSampleMapper.selectByExample(bioSampleExample);
-        if (bioSamples == null || bioSamples.isEmpty()) {
-            return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未找到流水线对应样本");
-        }
-        if (bioSamples.size() > 1) {
-            return new Result<Boolean>(Result.BUSINESS_FAIL, false, "找到多条流水线对应样本");
-        }
-
-        BioSample bioSample = bioSamples.get(0);
-        if (bioSample.getRead1Url() == null || (bioSample.getIsPair() && bioSample.getRead2Url() == null)) {
-            return new Result<Boolean>(Result.BUSINESS_FAIL, false, "样本数据未完全上传");
-        }
-        List<BioPipelineStage> stages = buildPipelineStages(bioAnalysisPipeline.getPipelineType());
     }
 
     @Async

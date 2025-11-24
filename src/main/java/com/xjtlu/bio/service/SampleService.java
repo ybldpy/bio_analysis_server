@@ -1,9 +1,7 @@
 package com.xjtlu.bio.service;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,25 +9,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.ibatis.transaction.TransactionException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionManager;
+
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioSample;
-import com.xjtlu.bio.entity.BioSampleExample;
 import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.service.StorageService.PutResult;
-
-import io.minio.errors.ErrorResponseException;
-import io.minio.errors.InsufficientDataException;
-import io.minio.errors.InternalException;
-import io.minio.errors.InvalidResponseException;
-import io.minio.errors.ServerException;
-import io.minio.errors.XmlParserException;
 import jakarta.annotation.Resource;
 
 @Service
@@ -56,7 +45,7 @@ public class SampleService {
     public static final int SAMPLE_UPLOAD_STATUS_READY = 2;
     public static final int SAMPLE_UPLOAD_STATUS_ERROR = 3;
 
-    private Set<String> bioSampleUploadStatusSet = ConcurrentHashMap.newKeySet();
+    private Set<String> bioSampleOpeartion = ConcurrentHashMap.newKeySet();
     private Set<String> bioSampleCreationSet = ConcurrentHashMap.newKeySet();
 
     private static String substractPostfixFromFileName(String filename) {
@@ -113,9 +102,7 @@ public class SampleService {
         return new Result<BioSample>(Result.BUSINESS_FAIL, bioSample, "创建样本失败");
     }
 
-
-
-    private static void copyTo(BioSample origin, BioSample to){
+    private static void copyTo(BioSample origin, BioSample to) {
 
         to.setSid(origin.getSid());
         to.setSampleType(origin.getSampleType());
@@ -128,39 +115,52 @@ public class SampleService {
         to.setIsPair(origin.getIsPair());
         to.setPipelineId(origin.getPipelineId());
         to.setCreatedBy(origin.getCreatedBy());
-        
+
     }
 
+    public Result<Boolean> receiveSampleData(long sid, int index, InputStream datastream) {
 
-    public Result<Object> receiveSampleData(long sid, int index, InputStream datastream) {
-
-
+        String lockKey = sid + ":" + index;
 
         final BioSample bioSample = new BioSample();
-        try{
-            int statusCode = transactionTemplate.execute(status->{
+        try {
+            int statusCode = transactionTemplate.execute(status -> {
                 BioSample selectedBioSample = this.bioSampleExtensionMapper.selectByIdForUpdate(sid);
                 if (selectedBioSample == null) {
                     return -1;
                 }
-                if ((index == 0 && (selectedBioSample.getRead1UploadStatus()==SAMPLE_UPLOAD_STATUS_UPLOADING || selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY)) 
-                || (index == 1 && (selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING || selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))) {
+
+                // 这里是防止重复操作的
+                if ((index == 0 && (selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING
+                        || selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))
+                        || (index == 1 && (selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING
+                                || selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))) {
                     return 1;
                 }
-                
-                if(index == 0){
+
+
+                BioSample updateSample = new BioSample();
+                updateSample.setSid(sid);
+
+
+
+                if (index == 0) {
+                    updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                     selectedBioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                }else {
+                } else {
+
+                    updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                     selectedBioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                 }
                 int updateResult = 0;
 
-                try{
-                    updateResult = this.sampleMapper.updateByPrimaryKey(selectedBioSample);
-                }catch(Exception e){
-                    
+                try {
+                    updateResult = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
+                } catch (Exception e) {
+                    status.setRollbackOnly();
+                    return 2;
                 }
-                if(updateResult < 1){
+                if (updateResult < 1) {
                     status.setRollbackOnly();
                     return 2;
                 }
@@ -169,47 +169,74 @@ public class SampleService {
                 return 0;
             });
 
-            if(statusCode == -1){
-                return new Result<Object>(Result.BUSINESS_FAIL, null, "未找到对应样本");
+            if (statusCode == -1) {
+                return new Result<>(Result.BUSINESS_FAIL, false, "未找到对应样本");
             }
-            if(statusCode == 1){
-                return new Result<Object>(Result.DUPLICATE_OPERATION, null, "样本不能被重复上传");
+            if (statusCode == 1) {
+                return new Result<>(Result.DUPLICATE_OPERATION, false, "样本不能被重复上传");
             }
-            if(statusCode == 2){
-                return new Result<Object>(Result.INTERNAL_FAIL, null, "上传样本失败");
+            if (statusCode == 2) {
+                return new Result<>(Result.INTERNAL_FAIL, false, "上传样本失败");
             }
-        }catch(TransactionException transactionException){
-
+        } catch (TransactionException transactionException) {
+            return new Result<Boolean>(Result.INTERNAL_FAIL, false, "上传失败");
         }
 
-
-        String uploadToUrl = index == 0?bioSample.getRead1Url():bioSample.getRead2Url();
+        String uploadToUrl = index == 0 ? bioSample.getRead1Url() : bioSample.getRead2Url();
         PutResult putResult = this.storageService.putObject(uploadToUrl, datastream);
 
         if (!putResult.success()) {
 
-            if(index == 0){
+            if (index == 0) {
                 bioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_ERROR);
-            }else {
+            } else {
                 bioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_ERROR);
             }
 
             int updateResult = this.sampleMapper.updateByPrimaryKey(bioSample);
-            return new Result<Object>(Result.INTERNAL_FAIL, null, "上传失败");
+            return new Result<>(Result.INTERNAL_FAIL, false, "上传失败");
         }
 
-        transactionTemplate.execute(status->{
-            
+
+        
+        
+        BioSample updatedSample = transactionTemplate.execute(status -> {
+            BioSample curSample = this.bioSampleExtensionMapper.selectByIdForUpdate(sid);
+            BioSample updateSample = new BioSample();
+            updateSample.setSid(sid);
+            if (index == 0) {
+                updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+                curSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+            } else {
+                updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+                curSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+            }
+            int updateRes = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
+
+            if (updateRes < 1) {
+                // 代表更新失败, 依赖定时任务来更新状态吧
+                if(index == 0){
+                    curSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+                }else {
+                    curSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+                }
+            }
+            return curSample;
         });
 
+
+
+        boolean canStartPipeline = updatedSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY && (!updatedSample.getIsPair() || updatedSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY);
+
+
+        if(canStartPipeline){
+
+        }
+        return new Result<Boolean>(Result.SUCCESS, true, null);
     }
 
     private int tryInsertion(BioSample bioSample) {
-
-        try {
-            return sampleMapper.insertSelective(bioSample);
-        } catch (DuplicateKeyException duplicateKeyException) {
-            throw duplicateKeyException;
-        }
+        return sampleMapper.insertSelective(bioSample);
+        
     }
 }
