@@ -43,6 +43,121 @@ import io.minio.errors.XmlParserException;
 import io.minio.messages.DeleteError;
 import jakarta.annotation.Resource;
 
+private class BioPipelineStagesBuilder {
+
+    public static List<BioPipelineStage> buildVirusStages(long pid, BioSample bioSample, Map<String,Map<String,Object>> pipelineStageParam) throws JsonProcessingException{
+
+        ArrayList<BioPipelineStage> stages = new ArrayList<>(8);
+        String qcInputRead1 = bioSample.getRead1Url();
+        String qcInputRead2 = bioSample.getRead2Url();
+
+        Map<String, Object> stageParams = new HashMap<>();
+        String refSeqKey = "refSeq";
+        String refSeq = ParameterUtil.getStrFromMap(refSeqKey, pipelineStageParams);
+        stageParams.put(refSeqKey, refSeq);
+
+        int index = 0;
+        BioPipelineStage qc = new BioPipelineStage();
+        
+
+        Map<String,String> qcInputMap = new HashMap<>();
+
+        Map<String, Object> qcStageParams = pipelineStageParams.get("qc");
+
+        qcInputMap.put("r1", qcInputRead1);
+        qcInputMap.put("r2", qcInputRead2);
+        String qcInputMapStr = this.jsonMapper.writeValueAsString(qcInputMap);
+        qc.setStageIndex(index);
+        qc.setStageName("质控(QC)");
+        qc.setStageType(PIPELINE_STAGE_QC);
+        qc.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+        qc.setPipelineId(pid);
+        qc.setInputUrl(qcInputMapStr);
+        stages.add(qc);
+
+        index++;
+
+        BioPipelineStage assembly = new BioPipelineStage();
+
+        Map<String,Object> assemblyParams = pipelineStageParams.get("assembly");
+        String assemlyParamsStr = assemblyParams == null? null: this.jsonMapper.writeValueAsString(assemblyParams);
+        assembly.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+        assembly.setPipelineId(pid);
+        assembly.setStageIndex(index);
+        assembly.setParameters(assemlyParamsStr);
+
+        if(assemblyParams!=null)
+
+        String jsonedParams = jsonMapper.writeValueAsString(stageParams);
+        if (StringUtils.isBlank(refSeq)) {
+            assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
+            assembly.setStageName("组装");
+        } else {
+            assembly.setStageType(PIPELINE_STAGE_MAPPING);
+            assembly.setParameters(jsonedParams);
+            assembly.setStageName("参考");
+        }
+
+        stages.add(assembly);
+        index++;
+
+        if (refSeq == null && type != PIPELINE_VIRUS_COVID) {
+            return stages;
+        }
+
+        BioPipelineStage varient = new BioPipelineStage();
+        varient.setStageName("变异检测");
+        varient.setPipelineId(pid);
+        varient.setStageIndex(index);
+        varient.setParameters(jsonedParams);
+        varient.setStageType(PIPELINE_STAGE_VARIANT_CALL);
+        varient.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+
+        stages.add(varient);
+
+        index++;
+
+        BioPipelineStage consensus = new BioPipelineStage();
+        consensus.setStageName("生成一致性序列");
+        consensus.setPipelineId(pid);
+        consensus.setStageIndex(index);
+        consensus.setParameters(jsonedParams);
+        consensus.setStageType(PIPELINE_STAGE_VARIANT_CALL);
+        consensus.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+        stages.add(consensus);
+
+        if (type != PIPELINE_VIRUS_COVID) {
+            return stages;
+        }
+
+        BioPipelineStage snp = new BioPipelineStage();
+        snp.setStageName("SNP注释");
+        snp.setPipelineId(pid);
+        snp.setStageIndex(index);
+        snp.setParameters(jsonedParams);
+        snp.setStageType(PIPELINE_STAGE_SNP_CORE);
+        snp.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+        stages.add(snp);
+
+        index++;
+
+        BioPipelineStage depthConverage = new BioPipelineStage();
+        depthConverage.setStageName("深度分布图");
+        depthConverage.setPipelineId(pid);
+        depthConverage.setStageIndex(index);
+        depthConverage.setParameters(jsonedParams);
+        depthConverage.setStageType(PipelineService.PIPELINE_STAGE_DEPTH_COVERAGE);
+        depthConverage.setStatus(PipelineService.PIPELINE_STAGE_STATUS_PENDING);
+        stages.add(snp);
+
+        index++;
+        return stages;
+
+
+    }
+
+}
+
 @Service
 public class PipelineService {
 
@@ -176,115 +291,61 @@ public class PipelineService {
         return createSampleResult;
     }
 
-
-
     private List<BioPipelineStage> createVirusPipelineStages(long pid, BioSample bioSample, int type,
-            Map<String, Object> pipelineStageParams) throws JsonProcessingException {
-        ArrayList<BioPipelineStage> stages = new ArrayList<>(8);
-        String qcInputRead1 = bioSample.getRead1Url();
-        String qcInputRead2 = bioSample.getRead2Url();
+            Map<String, Map<String, Object>> pipelineStageParams) throws JsonProcessingException {
 
-        Map<String, Object> stageParams = new HashMap<>();
-        String refSeqKey = "refSeq";
-        String refSeq = ParameterUtil.getStrFromMap(refSeqKey, pipelineStageParams);
-        stageParams.put(refSeqKey, refSeq);
+    }
 
-        int index = 0;
-        BioPipelineStage qc = new BioPipelineStage();
-        qc.setStageIndex(index);
-        qc.setStageName("质控(QC)");
-        qc.setStageType(PIPELINE_STAGE_QC);
-        qc.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-        qc.setPipelineId(pid);
-        stages.add(qc);
-
-        index++;
-
-        BioPipelineStage assembly = new BioPipelineStage();
-        assembly.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-        assembly.setPipelineId(pid);
-        assembly.setStageIndex(index);
-
-        String jsonedParams = jsonMapper.writeValueAsString(stageParams);
-        if (StringUtils.isBlank(refSeq)) {
-            assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
-            assembly.setStageName("组装");
-        } else {
-            assembly.setStageType(PIPELINE_STAGE_MAPPING);
-
-            assembly.setParameters(jsonedParams);
-            assembly.setStageName("参考");
+    private int mapSampleTypeToPipelineType(int sampleType) {
+        if (sampleType == SampleService.SAMPLE_TYPE_VIRUS) {
+            return PIPELINE_VIRUS;
         }
-
-        stages.add(assembly);
-        index++;
-
-        if (refSeq == null && type != PIPELINE_VIRUS_COVID) {
-            return stages;
+        if (sampleType == SampleService.SAMPLE_TYPE_BACTERIA) {
+            return PIPELINE_VIRUS_BACKTERIA;
         }
-
-        BioPipelineStage varient = new BioPipelineStage();
-        varient.setStageName("变异检测");
-        varient.setPipelineId(pid);
-        varient.setStageIndex(index);
-        varient.setParameters(jsonedParams);
-        varient.setStageType(PIPELINE_STAGE_VARIANT_CALL);
-        varient.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-
-        stages.add(varient);
-
-        index++;
-
-        BioPipelineStage consensus = new BioPipelineStage();
-        consensus.setStageName("生成一致性序列");
-        consensus.setPipelineId(pid);
-        consensus.setStageIndex(index);
-        consensus.setParameters(jsonedParams);
-        consensus.setStageType(PIPELINE_STAGE_VARIANT_CALL);
-        consensus.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-        stages.add(consensus);
-
-        if (type != PIPELINE_VIRUS_COVID) {
-            return stages;
-        }
-
-        BioPipelineStage snp = new BioPipelineStage();
-        snp.setStageName("SNP注释");
-        snp.setPipelineId(pid);
-        snp.setStageIndex(index);
-        snp.setParameters(jsonedParams);
-        snp.setStageType(PIPELINE_STAGE_SNP_CORE);
-        snp.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-        stages.add(snp);
-
-        index++;
-
-        BioPipelineStage depthConverage = new BioPipelineStage();
-        depthConverage.setStageName("深度分布图");
-        depthConverage.setPipelineId(pid);
-        depthConverage.setStageIndex(index);
-        depthConverage.setParameters(jsonedParams);
-        depthConverage.setStageType(PIPELINE_STAGE_DEPTH_COVERAGE);
-        depthConverage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-        stages.add(snp);
-
-        index++;
-
-        return stages;
-
+        return PIPELINE_VIRUS_COVID;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Result<Long> createPipeline(int sampleType,boolean sampleIsPair,
-             Map<String, Object> pipelineStageParams) {
+    public Result<Long> createPipeline(BioSample bioSample,
+            Map<String, Object> pipelineStageParams) {
 
-                return null;
+        BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
+        bioAnalysisPipeline.setPipelineType(mapSampleTypeToPipelineType(bioSample.getSampleType()));
+        bioAnalysisPipeline.setSampleId(bioSample.getSid());
+        int insertRes = this.bioAnalysisPipelineMapper.insert(bioAnalysisPipeline);
+        if (insertRes < 1) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+        }
+
+        List<BioPipelineStage> stages = this.buildPipelineStages(bioSample, bioAnalysisPipeline.getPipelineId());
+        if (stages == null || stages.isEmpty()) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+        }
+
+        insertRes = this.bioAnalysisStageMapperExtension.batchInsert(stages);
+        if (insertRes != stages.size()) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+        }
+
+        return new Result<Long>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(), null);
     }
 
-    private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline) {
-        ArrayList<BioPipelineStage> bioPipelineStages = new ArrayList<>();
+    private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline,
+            Map<String, Object> pipelineParams) {
+
         if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS) {
-            this.createVirusPipelineStages(PIPELINE_STAGE_AMR, bioSample, PIPELINE_STAGE_SEROTYPE, null)
+            try {
+                List<BioPipelineStage> stages = this.createVirusPipelineStages(bioAnalysisPipeline.getPipelineId(),
+                        bioSample, bioAnalysisPipeline.getPipelineType(), pipelineParams);
+                return stages;
+            } catch (JsonProcessingException e) {
+                // TODO Auto-generated catch block
+                return null;
+            }
         }
 
     }
@@ -294,7 +355,7 @@ public class PipelineService {
         BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
         bioPipelineStageExample.createCriteria().andPipelineIdEqualTo(pid);
         List<BioPipelineStage> stages = this.bioPipelineStageMapper.selectByExample(bioPipelineStageExample);
-        if(stages == null || stages.isEmpty()){
+        if (stages == null || stages.isEmpty()) {
             return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未找到流水线");
         }
     }

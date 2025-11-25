@@ -58,13 +58,13 @@
     </table> -->
 
 
-    <!-- <table tableName="bio_analysis_pipeline" schema="bio"
+    <table tableName="bio_analysis_pipeline" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="pipeline_id" sqlStatement="JDBC" identity="true" />
-    </table> -->
+    </table>
   </context>
 </generatorConfiguration>

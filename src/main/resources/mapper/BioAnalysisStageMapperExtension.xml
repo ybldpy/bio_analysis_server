@@ -85,4 +85,14 @@
       </trim>
     </foreach>
   </insert>
+    <!-- selectByIdForUpdate -->
+    <select id="selectByIdForUpdate"
+        parameterType="long"
+        resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM your_table_name
+        WHERE your_condition = #{yourParameter}
+    </select>
+
 </mapper>
