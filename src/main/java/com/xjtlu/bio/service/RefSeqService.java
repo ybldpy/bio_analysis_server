@@ -18,6 +18,11 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xjtlu.bio.entity.BioRefseqMeta;
+import com.xjtlu.bio.entity.BioRefseqMetaExample;
+import com.xjtlu.bio.mapper.BioRefseqMetaMapper;
+
+import jakarta.annotation.Resource;
 
 @Service
 public class RefSeqService {
@@ -27,6 +32,10 @@ public class RefSeqService {
 
     @Value("${refSeq.virus-index}")
     private String virusIndexPath;
+
+
+    @Resource
+    private BioRefseqMetaMapper refseqMetaMapper;
 
     private String refSeqServiceTmpPath;
 
@@ -104,42 +113,26 @@ public class RefSeqService {
         
     }
 
-    public File getRefSeqByAccession(String accession) {
+    public File getRefSeqByRefSeqIf(long refId) throws Exception{
         // todo
-        return null;
-    }
+        BioRefseqMeta bioRefseqMeta = null;
 
-    private void loadVirusIndex() throws FileNotFoundException {
-
-        FileInputStream fileInputStream = new FileInputStream(this.virusIndexPath);
-        Scanner sc = new Scanner(fileInputStream, "UTF-8");
-        ObjectMapper mapper = new ObjectMapper();
-
-        while (sc.hasNextLine()) {
-            String row = sc.nextLine();
-            if (row.isEmpty()) {
-                continue;
-            }
-            try {
-                Map m = mapper.readValue(row, Map.class);
-                Object accessionObj = m.get(ACCESSION_KEY);
-                if (accessionObj != null && accessionObj.getClass().equals(String.class)) {
-                    String accession = (String) accessionObj;
-                    virusIndex.put(accession, m);
-                }
-
-            } catch (JsonProcessingException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
+        
+        bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refId);
+        
+        if(bioRefseqMeta == null){
+            return null;
         }
 
+        String refPath = bioRefseqMeta.getPath();
+
+        File f = new File(virusPath + "/"+refPath);
+        return f.exists()?f:null;
     }
 
-    private void init() {
-        this.loadVirusIndex();
-    }
+    
+
+
 
     private String queryRefSeqPath(String queryRefSeqAccession) {
         Object o = virusIndex.get(queryRefSeqAccession);

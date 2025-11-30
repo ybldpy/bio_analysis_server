@@ -20,13 +20,13 @@
       targetProject="src/main/java" />
 
     <!-- 要生成的表 -->
-    <table schema="bio" tableName="bio_sample"
+    <!-- <table schema="bio" tableName="bio_sample"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true">
       <generatedKey column="sid" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
 
 
     <!-- <table tableName="bio_project" schema="bio"
@@ -58,13 +58,24 @@
     </table> -->
 
 
-    <table tableName="bio_analysis_pipeline" schema="bio"
+    <!-- <table tableName="bio_analysis_pipeline" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="pipeline_id" sqlStatement="JDBC" identity="true" />
-    </table>
+    </table> -->
+
+    <table tableName="bio_refseq_meta"
+      schema="bio"
+      enableCountByExample="true"
+      enableDeleteByExample="true"
+      enableUpdateByExample="true"
+      enableSelectByExample="true"
+    >
+    <generatedKey column="refseq_id" sqlStatement="JDBC" identity="true"/>
+  
+  </table>
   </context>
 </generatorConfiguration>

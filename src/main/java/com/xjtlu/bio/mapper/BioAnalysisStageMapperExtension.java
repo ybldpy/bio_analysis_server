@@ -11,4 +11,8 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 public interface BioAnalysisStageMapperExtension {
     public int batchInsert(List<BioPipelineStage> stages);
 
+    public BioPipelineStage selectByIdForUpdate(Long stageId);
+
+    public int updateStatusTo(Long stageId, Integer from, Integer to);
+
 }

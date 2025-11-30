@@ -15,7 +15,11 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.xjtlu.bio.common.Result;
+import com.xjtlu.bio.entity.BioAnalysisPipeline;
+import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
+import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioSample;
+import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.service.StorageService.PutResult;
@@ -32,6 +36,7 @@ public class SampleService {
     private PipelineService pipelineService;
     @Resource
     private TransactionTemplate transactionTemplate;
+    
 
     @Resource
     private StorageService storageService;
@@ -91,7 +96,7 @@ public class SampleService {
 
         res = 0;
         if (res == 1) {
-            Result<Long> createPipelineResult = pipelineService.createPipeline(sampleType, isPair, pipelineStageParams);
+            Result<Long> createPipelineResult = pipelineService.createPipeline(bioSample, pipelineStageParams);
             if (createPipelineResult.getStatus() != Result.SUCCESS) {
                 // do rollback
                 TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
@@ -230,7 +235,7 @@ public class SampleService {
 
 
         if(canStartPipeline){
-
+            this.pipelineService.pipelineStart(sid);
         }
         return new Result<Boolean>(Result.SUCCESS, true, null);
     }

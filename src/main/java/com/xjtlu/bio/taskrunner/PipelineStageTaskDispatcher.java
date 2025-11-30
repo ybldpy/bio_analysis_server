@@ -33,6 +33,10 @@ public class PipelineStageTaskDispatcher implements Runnable {
             // todo
             try {
                 BioPipelineStage bioPipelineStage = stageBuffer.take();
+                int updateRes = this.pipelineService.updateRunning(bioPipelineStage.getStageId());
+                if(updateRes!=0){
+                    continue;
+                }
                 runStage(bioPipelineStage);
             } catch (InterruptedException e) {
                 // TODO Auto-generated catch block
@@ -61,6 +65,9 @@ public class PipelineStageTaskDispatcher implements Runnable {
         StageRunResult stageRunResult = executor.execute(bPipelineStage);
         notifyPipelineService(stageRunResult);
     }
+
+
+    
 
     public boolean addTask(BioPipelineStage bioPipelineStage) {
         return stageBuffer.offer(bioPipelineStage);
