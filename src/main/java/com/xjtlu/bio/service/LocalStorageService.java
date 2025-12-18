@@ -47,4 +47,10 @@ public class LocalStorageService implements StorageService{
         throw new UnsupportedOperationException("Unimplemented method 'delete'");
     }
 
+    @Override
+    public PutResult putObject(String key, InputStream data, PutOptions opts) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'putObject'");
+    }
+
 }

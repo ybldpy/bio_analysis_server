@@ -34,7 +34,7 @@ public class UserService {
         }
     }
 
-    public Result userRegister(String username, String password) {
+    public Result<Object> userRegister(String username, String password) {
         String insertFailedMsg = "用户注册失败";
         BioUser user = new BioUser();
         user.setName(username);

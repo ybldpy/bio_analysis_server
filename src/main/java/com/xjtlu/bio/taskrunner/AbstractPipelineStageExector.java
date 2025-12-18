@@ -55,6 +55,9 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         return StageRunResult.fail(msg, bioPipelineStage);
     }
 
+
+    
+
     protected static String appendSuffixBeforeExtensions(String fileName, String suffix) {
         if (fileName == null || fileName.isEmpty())
             return fileName;

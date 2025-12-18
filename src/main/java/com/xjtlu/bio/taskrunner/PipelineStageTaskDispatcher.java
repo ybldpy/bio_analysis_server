@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.apache.catalina.Pipeline;
 import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.common.StageRunResult;
@@ -21,6 +22,10 @@ public class PipelineStageTaskDispatcher implements Runnable {
     private static final int taskBufferCapacity = 200;
     private BlockingQueue<BioPipelineStage> stageBuffer;
 
+
+
+    private int concurrentNum;
+
     @Resource
     private PipelineService pipelineService;
     @Resource
@@ -33,8 +38,8 @@ public class PipelineStageTaskDispatcher implements Runnable {
             // todo
             try {
                 BioPipelineStage bioPipelineStage = stageBuffer.take();
-                int updateRes = this.pipelineService.updateRunning(bioPipelineStage.getStageId());
-                if(updateRes!=0){
+                int updateRes = this.pipelineService.updateStageFromOldToNew(bioPipelineStage.getStageId(), PipelineService.PIPELINE_STAGE_STATUS_QUEUING, PipelineService.PIPELINE_STAGE_STATUS_RUNNING);
+                if(updateRes!=1){
                     continue;
                 }
                 runStage(bioPipelineStage);
@@ -51,10 +56,9 @@ public class PipelineStageTaskDispatcher implements Runnable {
 
     @PostConstruct
     public void init() {
-
-
-        new Thread(this).start();
-        new Thread(this).start();
+        for(int i = 0;i<this.concurrentNum;i++){
+            new Thread(this).start();
+        }
     }
     private void notifyPipelineService(StageRunResult stageRunResult) {
         this.pipelineService.pipelineStageDone(stageRunResult);
