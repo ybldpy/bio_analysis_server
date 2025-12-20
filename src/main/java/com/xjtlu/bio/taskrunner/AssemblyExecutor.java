@@ -125,7 +125,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
                 outputMap.put(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, scaffolds.toString());
             }
         }catch(IOException e){
-            
+            //if error happen here, just ingore. The callback will know it and handle
         }
 
         return StageRunResult.OK(outputMap, bioPipelineStage);

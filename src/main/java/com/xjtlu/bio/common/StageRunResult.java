@@ -3,6 +3,7 @@ package com.xjtlu.bio.common;
 import java.util.Map;
 
 import com.xjtlu.bio.entity.BioPipelineStage;
+import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 
 public class StageRunResult {
 
@@ -11,6 +12,15 @@ public class StageRunResult {
 
     private Map<String,String> outputPath;
 
+    private StageOutput stageOutput;
+
+    public StageOutput getStageOutput() {
+        return stageOutput;
+    }
+
+    public void setStageOutput(StageOutput stageOutput) {
+        this.stageOutput = stageOutput;
+    }
     private BioPipelineStage stage;
 
 
