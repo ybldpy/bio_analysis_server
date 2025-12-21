@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.entity.BioRefseqMeta;
 import com.xjtlu.bio.entity.BioRefseqMetaExample;
+import com.xjtlu.bio.entity.RefSeqMeta;
 import com.xjtlu.bio.mapper.BioRefseqMetaMapper;
 
 import jakarta.annotation.Resource;
@@ -109,8 +110,13 @@ public class RefSeqService {
     }
 
     public File getRefSeqIndex(String refSeqAccession) {
+        return null;
+    }
 
-        
+
+    public boolean exist(long refId){
+        BioRefseqMeta refseqMeta = refseqMetaMapper.selectByPrimaryKey(refId);
+        return refseqMeta!=null;
     }
 
     public File getRefSeqByRefSeqIf(long refId) throws Exception{
