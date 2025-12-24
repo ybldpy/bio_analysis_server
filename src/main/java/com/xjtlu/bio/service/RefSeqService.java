@@ -1,27 +1,22 @@
 package com.xjtlu.bio.service;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.channels.FileLock;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
+
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.entity.BioRefseqMeta;
-import com.xjtlu.bio.entity.BioRefseqMetaExample;
-import com.xjtlu.bio.entity.RefSeqMeta;
 import com.xjtlu.bio.mapper.BioRefseqMetaMapper;
+import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
 import jakarta.annotation.Resource;
 
@@ -34,6 +29,18 @@ public class RefSeqService {
     @Value("${refSeq.virus-index}")
     private String virusIndexPath;
 
+
+    public final static int VIRUS_TYPE = 1;
+    public final static int BACTERIA_TYPE = 2;
+
+
+    
+
+
+    @Resource
+    private StorageService storageService;
+
+    private final String nonInnerRefseqDir;
 
     @Resource
     private BioRefseqMetaMapper refseqMetaMapper;
@@ -48,24 +55,32 @@ public class RefSeqService {
 
     private static final String ACCESSION_KEY = "accession";
 
-    public RefSeqService() {
 
+
+
+
+    public boolean deleteRefSeq(String outterRefseqObjName) {
+
+
+        String refseqObjNameInFlatFormat = outterRefseqObjName.replaceAll("/", "_");
+        try {
+            Files.delete(Paths.get(this.nonInnerRefseqDir, refseqObjNameInFlatFormat));
+            return true;
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return false;
+        }
     }
 
-    public File buildRefSeqIndex(String refSeqAccession) {
-        File f = this.getRefSeqIndex(refSeqAccession);
-        if (f == null || !f.exists()) {
-            return null;
-        }
+    public File buildRefSeqIndex(String outputPath, File refseq) {
+        
+        Path refSeqIndexTmpDir = Paths.get(this.refSeqServiceTmpPath, String.valueOf(System.currentTimeMillis()));
+        Path refseqLink = null;
 
-        File fai = new File(this.refSeqIndexDir + "/" + refSeqAccession + "fa.fai");
-        if (fai.exists() && fai.length() > 0) {
-            return fai;
-        }
-
-        Path refSeqTmpDir = Paths.get(this.refSeqServiceTmpPath);
         try {
-            Files.createDirectories(refSeqTmpDir);
+            Files.createDirectories(refSeqIndexTmpDir);
+            refseqLink = Files.createSymbolicLink(refSeqIndexTmpDir.resolve(refSeqIndexTmpDir.resolve(refseq.getName())), refseq.toPath());
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -75,22 +90,29 @@ public class RefSeqService {
         List<String> cmd = new ArrayList<>();
         cmd.add(samtools);
         cmd.add("faidx");
-        cmd.add(f.getAbsolutePath());
-
+        cmd.add(refseqLink.toAbsolutePath().toString());
+        
         ProcessBuilder pb = new ProcessBuilder(cmd);
         // 让进程在参考文件所在目录跑，确保产物落同目录（更直观）
-        pb.directory(f.getParentFile());
+        pb.directory(refSeqIndexTmpDir.toFile());
         pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
         pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
         try {
             Process p = pb.start();
             int code = p.waitFor();
-            if (code != 0) {
+            
+            if (code == 0) {
                 // 有些版本会无视工作目录，兜底再检查一次默认位置
-                if (fai.exists() && fai.length() > 0)
-                    return fai;
-                return null;
+                Path indexFilePath = Path.of(refseqLink.toString()+".fai");
+                
+                if (!Files.exists(indexFilePath) || Files.size(indexFilePath) == 0){
+                    return null;
+                }
+                
+                Files.move(indexFilePath, Path.of(outputPath), java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                refSeqIndexTmpDir.toFile().delete();
+                return new File(outputPath);
             }
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException)
@@ -98,31 +120,76 @@ public class RefSeqService {
             return null;
         }
 
-        // 校验 .fai 是否生成
-        if (!fai.exists() || fai.length() == 0)
-            return null;
-
-        // 若参考是 .gz，可以顺带看下 .gzi（可选，不强制）
-        // File gzi = new File(f.getAbsolutePath() + ".gzi");
-
-        return fai;
-
-    }
-
-    public File getRefSeqIndex(String refSeqAccession) {
         return null;
     }
 
+
+
+    public File getRefSeqIndex(long refseqId) {
+
+        if(Files.exists(Path.of(this.refSeqIndexDir + "/inner/" + refseqId+".fai"))){
+            return Paths.get(this.refSeqIndexDir, "inner", String.valueOf(refseqId)+".fai").toFile();
+        }
+
+        BioRefseqMeta refseqMeta = refseqMetaMapper.selectByPrimaryKey(refseqId);
+        if(refseqMeta == null){
+            return null;
+        }
+        String refseqPath = refseqMeta.getPath();
+        File refseqFile = new File(refseqPath);
+
+        if(!refseqFile.exists() || refseqFile.length() <=0){
+            return null;
+        }
+        return this.buildRefSeqIndex(
+            Paths.get(this.refSeqIndexDir, "inner", String.valueOf(refseqId)+".fai").toString(),
+            refseqFile
+        );
+    }
+
+
+    public File getRefSeqIndex(String outterRefSeqObjectName){
+
+        String objectNameInFlatFormat = outterRefSeqObjectName.replaceAll("/", "_");
+
+        Path refseqIndexPath = Paths.get(
+            this.refSeqIndexDir, 
+            "non_inner", 
+            objectNameInFlatFormat,
+            "refseq.fai"
+        );
+        
+        if(Files.exists(refseqIndexPath) && refseqIndexPath.toFile().length() > 0){
+            return refseqIndexPath.toFile();
+        }
+
+        Path outterRefSeqObjectPath = Paths.get(
+            this.refSeqServiceTmpPath,
+            outterRefSeqObjectName.substring(outterRefSeqObjectName.lastIndexOf("/")+1)
+        );
+        GetObjectResult getObjectResult = this.storageService.getObject(outterRefSeqObjectName, outterRefSeqObjectPath.toString());
+
+        if(getObjectResult.e()!=null || !getObjectResult.success()){
+            getObjectResult.objectFile().delete();
+            return null;
+        }
+
+        File refseqIndex = this.buildRefSeqIndex(
+            refseqIndexPath.toString(),
+            getObjectResult.objectFile()
+        );
+        getObjectResult.objectFile().delete();
+        return refseqIndex;
+    }
 
     public boolean exist(long refId){
         BioRefseqMeta refseqMeta = refseqMetaMapper.selectByPrimaryKey(refId);
         return refseqMeta!=null;
     }
 
-    public File getRefSeqByRefSeqIf(long refId) throws Exception{
+    public File getRefSeqByRefSeqId(long refId) throws Exception{
         // todo
         BioRefseqMeta bioRefseqMeta = null;
-
         
         bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refId);
         
@@ -134,6 +201,46 @@ public class RefSeqService {
 
         File f = new File(virusPath + "/"+refPath);
         return f.exists()?f:null;
+    }
+
+
+    public File getRefseq(String refseqObjName){
+        String refseqObjNameInFlat = refseqObjName.replaceAll("/", "_");
+        Path storePath = Paths.get(this.nonInnerRefseqDir, refseqObjNameInFlat);
+        if(Files.exists(storePath)){
+            return storePath.toFile();
+        }
+        GetObjectResult getObjectResult = this.storageService.getObject(refseqObjName, storePath.toString());
+        if(!getObjectResult.success()){
+            return null;
+        }
+
+        return storePath.toFile();
+        
+    }
+
+
+    public File getRefseq(long refseqId){
+        
+        BioRefseqMeta bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refseqId);
+
+        if(bioRefseqMeta == null){return null;}
+
+        String path = bioRefseqMeta.getPath();
+        int refseqType = bioRefseqMeta.getOrgType();
+
+        if(refseqType == VIRUS_TYPE){
+            File f = new File(this.virusPath + "/" + path);
+            if(f.exists() && f.length() > 0){
+                return f;
+            }
+            return null;
+        }else if(refseqType == BACTERIA_TYPE){
+            //todo
+            return null;
+        }
+
+        return null;
     }
 
     

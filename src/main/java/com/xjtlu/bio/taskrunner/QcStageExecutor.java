@@ -1,6 +1,5 @@
 package com.xjtlu.bio.taskrunner;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,22 +17,17 @@ import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
-
-
+import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
 
 @Component
-public class QcStageExecutor extends AbstractPipelineStageExector{
+public class QcStageExecutor extends AbstractPipelineStageExector {
 
-
-    private String qcCmd; 
-
-    
-
+    private String qcCmd;
 
     @Override
     public StageRunResult execute(BioPipelineStage bioPipelineStage) {
         // TODO Auto-generated method stub
-         String inputUrlsJson = bioPipelineStage.getInputUrl();
+        String inputUrlsJson = bioPipelineStage.getInputUrl();
         String outputUrlsJson = bioPipelineStage.getOutputUrl();
         Map<String, String> inputUrls = null;
         Map<String, String> outputUrlsMap = null;
@@ -53,7 +47,8 @@ public class QcStageExecutor extends AbstractPipelineStageExector{
         String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get("r2") : null;
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
-        Path outputDir = Paths.get(String.format("%s/%d/output/qc", stageResultTmpBasePath, bioPipelineStage.getStageId()));
+        Path outputDir = Paths
+                .get(String.format("%s/%d/output/qc", stageResultTmpBasePath, bioPipelineStage.getStageId()));
 
         try {
             Files.createDirectories(outputDir);
@@ -119,24 +114,46 @@ public class QcStageExecutor extends AbstractPipelineStageExector{
 
         if (!Files.exists(trimmedR1Path) || (inputUrl2 != null && !Files.exists(trimmedR2Path))
                 || !Files.exists(outputQcJson) || !Files.exists(outputQcHtml)) {
-            Files.delete(trimmedR1Path);
-            Files.delete(trimmedR2Path);
-            Files.delete(outputQcJson);
-            Files.delete(outputQcHtml);
+            try {
+                Files.delete(trimmedR1Path);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            try {
+                Files.delete(trimmedR2Path);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            try {
+                Files.delete(outputQcJson);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            try {
+                Files.delete(outputQcHtml);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
             inputFile1.delete();
             inputFile2.delete();
             return StageRunResult.fail("qc工具未产出结果", bioPipelineStage);
         }
 
-        Map<String, String> outputPathMap = createQCOutputMap();
-        return StageRunResult.OK(outputPathMap, bioPipelineStage);        
+        return StageRunResult.OK(
+                new QCStageOutput(trimmedR1Path.toAbsolutePath().toString(), trimmedR2Path.toAbsolutePath().toString(),
+                        outputQcJson.toAbsolutePath().toString(),
+                        outputQcHtml.toAbsolutePath().toString()),
+                bioPipelineStage);
     }
 
     private Map<String, String> createQCOutputMap() {
         // todo
         return null;
     }
-
 
     @Override
     public int id() {

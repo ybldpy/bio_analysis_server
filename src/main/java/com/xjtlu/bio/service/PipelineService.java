@@ -38,6 +38,7 @@ import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.taskrunner.PipelineStageTaskDispatcher;
 import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
+import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
@@ -460,13 +461,15 @@ public class PipelineService {
         }else if (stageType == PIPELINE_STAGE_ASSEMBLY) {
             handleAssemblyDone(stageRunResult);
         }else if (stageType == PIPELINE_STAGE_MAPPING) {
-            
+            handleMappingStageDone(stageRunResult);
         }else if (stageType == PIPELINE_STAGE_VARIANT_CALL) {
-            
+            handleVarientStageDone(stageRunResult);
         }else if (stageType == PIPELINE_STAGE_DEPTH_COVERAGE) {
             
         }else if (stageType == PIPELINE_STAGE_SNP_SINGLE) {
             
+        }else if(stageType == PIPELINE_STAGE_CONSENSUS){
+            handleConsensusStageDone(stageRunResult);
         }
     }
 
@@ -477,6 +480,7 @@ public class PipelineService {
     
     // params[1]: object name
     private boolean batchUploadObjectsFromLocal(Map<String, String> params) {
+        //todo
         return false;
     }
 
@@ -510,6 +514,48 @@ public class PipelineService {
         updateStage.setEndTime(new Date());
 
         return this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_RUNNING);
+    }
+
+
+    private void handleConsensusStageDone(StageRunResult stageRunResult){
+        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+        ConsensusStageOutput consensusStageOutput = (ConsensusStageOutput)stageRunResult.getStageOutput();
+
+        String consesusOutputObjName = String.format(
+            stageOutputFormat,
+            bioPipelineStage.getStageId(),
+            bioPipelineStage.getStageName(),
+            consensusStageOutput.getConsensusFa().substring(consensusStageOutput.getConsensusFa().lastIndexOf("/")+1)
+        );
+
+        boolean uploadRes = this.batchUploadObjectsFromLocal(consesusOutputObjName, consensusStageOutput.getConsensusFa());
+        if(!uploadRes){
+            try {
+                Files.delete(Path.of(consensusStageOutput.getConsensusFa()));
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+            BioPipelineStage updateStage = new BioPipelineStage();
+            updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
+            this.updateStageFromStatus(updateStage, bioPipelineStage.getPipelineId(), PIPELINE_STAGE_STATUS_RUNNING);
+            return;
+        }
+
+        BioPipelineStage updateStage = new BioPipelineStage();
+        updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+        updateStage.setEndTime(new Date());
+        this.updateStageFromStatus(updateStage, bioPipelineStage.getPipelineId(), PIPELINE_STAGE_STATUS_RUNNING);
+
+        try {
+            Files.delete(Path.of(consensusStageOutput.getConsensusFa()));
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+
     }
 
 
@@ -599,7 +645,7 @@ public class PipelineService {
 
 
 
-    private void handleMappingStageDone(StageRunResult stageRunResult){
+    private void handleMappingStageDone(StageRunResult stageRunResult) {
         MappingStageOutput mappingStageOutput = (MappingStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
@@ -651,7 +697,13 @@ public class PipelineService {
             BioPipelineStage updateVarientStage = new BioPipelineStage();
             HashMap<String,Object> inputMap = new HashMap<>();
             inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamIndexObjectName);
-            String serializedInputUrl = this.jsonMapper.writeValueAsString(inputMap);
+            String serializedInputUrl = null;
+            try {
+                serializedInputUrl = this.jsonMapper.writeValueAsString(inputMap);
+            } catch (JsonProcessingException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
             updateVarientStage.setInputUrl(serializedInputUrl);
             varientStage.setInputUrl(serializedInputUrl);
             
@@ -717,7 +769,13 @@ public class PipelineService {
         outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY, contigOutputKey);
         outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, hasScaffold?scaffoldOuputKey:null);
 
-        String serializedOutputPath = this.jsonMapper.writeValueAsString(outputPathMap);
+        String serializedOutputPath = null;
+        try {
+            serializedOutputPath = this.jsonMapper.writeValueAsString(outputPathMap);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
 
         BioPipelineStage updateStage = new BioPipelineStage();
@@ -749,7 +807,13 @@ public class PipelineService {
             
             HashMap<String,String> mappingStageParamMap = new HashMap<>();
             mappingStageParamMap.put(PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY, contigOutputKey);
-            String serializedMappingStageParameters = this.jsonMapper.writeValueAsString(mappingStageParamMap);
+            String serializedMappingStageParameters = null;
+            try {
+                serializedMappingStageParameters = this.jsonMapper.writeValueAsString(mappingStageParamMap);
+            } catch (JsonProcessingException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
             updateMappingStage.setParameters(serializedMappingStageParameters);
             this.updateStageFromStatus(updateMappingStage, mappingStage.getStageId(), PIPELINE_STAGE_STATUS_PENDING);
             return;

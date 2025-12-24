@@ -1,6 +1,6 @@
 package com.xjtlu.bio.taskrunner.stageOutput;
 
-public class VariantStageOutput {
+public class VariantStageOutput implements StageOutput{
 
 
     public VariantStageOutput(String vcfGz, String vcfTbi) {

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 
 public class ConsensusExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor{
 
@@ -24,6 +25,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         // TODO Auto-generated method stub
         String inputUrls = bioPipelineStage.getInputUrl();
         Map<String,String> inputUrlMap = null;
+        Map<String,Object> paramsMap = null;
         
         try {
             inputUrlMap = this.objectMapper.readValue(inputUrls,Map.class);
@@ -103,7 +105,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         
 
 
-        return StageRunResult.OK(null, bioPipelineStage);
+        return StageRunResult.OK(new ConsensusStageOutput(consensusPath.toAbsolutePath().toString()), bioPipelineStage);
     }
 
     @Override

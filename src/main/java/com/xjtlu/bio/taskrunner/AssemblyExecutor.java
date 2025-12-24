@@ -16,6 +16,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 
 @Component
 public class AssemblyExecutor extends AbstractPipelineStageExector {
@@ -120,15 +121,19 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
 
 
 
+
+        boolean hasScaffold = true;
         try{
             if(this.requireNonEmpty(scaffolds)){
                 outputMap.put(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, scaffolds.toString());
+            }else {
+                hasScaffold = false;
             }
         }catch(IOException e){
             //if error happen here, just ingore. The callback will know it and handle
         }
 
-        return StageRunResult.OK(outputMap, bioPipelineStage);
+        return StageRunResult.OK(new AssemblyStageOutput(contigs.toAbsolutePath().toString(), hasScaffold? scaffolds.toAbsolutePath().toString():null), bioPipelineStage);
         
     }
 

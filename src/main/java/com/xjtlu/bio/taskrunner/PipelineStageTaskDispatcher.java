@@ -3,8 +3,6 @@ package com.xjtlu.bio.taskrunner;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import org.apache.catalina.Pipeline;
 import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.common.StageRunResult;

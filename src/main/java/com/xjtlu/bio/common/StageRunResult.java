@@ -52,6 +52,12 @@ public class StageRunResult {
     public static StageRunResult OK(Map<String,String> outputPath, BioPipelineStage stage){
         return new StageRunResult(true, null,outputPath, stage);
     }
+
+    public static StageRunResult OK(StageOutput stageOutput, BioPipelineStage stage){
+        StageRunResult stageRunResult = new StageRunResult(true, null, null, stage);
+        stageRunResult.setStageOutput(stageOutput);
+        return stageRunResult;
+    }
     public static StageRunResult fail(String failReason, BioPipelineStage stage){
         return new StageRunResult(false, failReason, null, stage);
     }

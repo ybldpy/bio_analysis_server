@@ -11,19 +11,25 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.catalina.Pipeline;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.utils.ParameterUtil;
+import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
+import com.xjtlu.bio.service.StorageService.GetObjectResult;
+
 
 @Component
 public class MappingStageExecutor extends AbstractPipelineStageExector{
 
     private String mappingTools;
     private String samTools;
+
+
+    
 
     @Override
     public int id() {
@@ -64,14 +70,45 @@ public class MappingStageExecutor extends AbstractPipelineStageExector{
             return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
         }
 
-        String refSeqAccession = ParameterUtil.getStrFromMap("refSeq", params);
-        File refSeq = refSeqService.getRefSeqByAccession(refSeqAccession);
-        if (refSeq == null) {
+        Map<String,Object> refSeqConfig = (Map)params.get("refseqConfig");
+        Object isInnerObj = refSeqConfig.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+        Object refseqObj = refSeqConfig.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+
+        if (refSeqConfig == null || isInnerObj == null || !(isInnerObj instanceof Boolean) || refseqObj==null || (!(refseqObj instanceof Integer) && !(refseqObj instanceof Long) && !(refseqObj instanceof String))) {
             return StageRunResult.fail("未找到参考基因组", bioPipelineStage);
         }
 
-        String inputR1Url = inputUrlJson.get("r1");
-        String inputR2Url = inputUrlJson.get("r2");
+        boolean isInnerRefseq = (Boolean) isInnerObj;
+        String outterRefseqObjName = null;
+
+        File refSeq = null;
+        if(isInnerRefseq){
+            try {
+                long refId = (refseqObj instanceof Integer)?(long)((Integer)refseqObj):((Long)refseqObj);
+                refSeq = refSeqService.getRefseq(refId);
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }else {
+
+            String refseqObjectName = (String) refseqObj;
+            outterRefseqObjName = refseqObjectName;
+            refSeq = refSeqService.getRefseq(refseqObjectName);
+        }
+
+
+        if(refSeq == null){
+            if(isInnerRefseq){
+                refSeqService.deleteRefSeq(outterRefseqObjName);
+            }
+            return StageRunResult.fail("参考基因组加载失败", bioPipelineStage);
+        }
+
+
+
+        String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
+        String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY);
 
 
         String tempFormat = "%s/%d/input/%s";
@@ -205,12 +242,12 @@ public class MappingStageExecutor extends AbstractPipelineStageExector{
         }
 
 
-        HashMap<String,String> outputMap = new HashMap<>();
+        // HashMap<String,String> outputMap = new HashMap<>();
 
-        outputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY, bamSortedTmp.toString());
-        outputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexTmp.toString());
+        // outputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY, bamSortedTmp.toString());
+        // outputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexTmp.toString());
 
-        StageRunResult stageRunResult = StageRunResult.OK(outputMap, bioPipelineStage);
+        StageRunResult stageRunResult = StageRunResult.OK(new MappingStageOutput(bamSortedTmp.toString(), bamIndexTmp.toString()), bioPipelineStage);
 
         return stageRunResult;
     }

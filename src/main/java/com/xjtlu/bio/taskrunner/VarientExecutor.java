@@ -17,6 +17,7 @@ import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 
 
 @Component
@@ -31,13 +32,18 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         // TODO Auto-generated method stub
         String inputUrls = bioPipelineStage.getInputUrl();
         Map<String, String> inputUrlMap = null;
+        Map<String,Object> params = null;
         try {
             inputUrlMap = this.objectMapper.readValue(inputUrls, Map.class);
+            params = this.objectMapper.readValue(bioPipelineStage.getParameters(), Map.class);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
             return this.parseError(bioPipelineStage);
         }
+
+
+        
 
         String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY);
         String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY);
@@ -204,7 +210,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         this.deleteTmpFiles(List.of(inputTempDir.toFile(), bcfRaw.toFile()));
 
         
-        return StageRunResult.OK(out, bioPipelineStage);
+        return StageRunResult.OK(new VariantStageOutput(vcfGz.toAbsolutePath().toString(), vcfTbi.toAbsolutePath().toString()), bioPipelineStage);
 
 
     }

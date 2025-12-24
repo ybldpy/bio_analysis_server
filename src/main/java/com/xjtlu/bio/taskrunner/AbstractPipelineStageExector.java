@@ -6,8 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
+
+import org.springframework.util.ObjectUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.common.StageRunResult;
@@ -111,6 +114,18 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
     protected StageRunResult parseError(BioPipelineStage bioPipelineStage) {
         return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
+    }
+
+
+    protected Object substractRefseqFromMap(Map<String,Object> params){
+        Object refseq = params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+        Object isInnerRefseq = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+
+        if(refseq == null){return null;}
+        if(isInnerRefseq == null && !(refseq instanceof Integer)){
+            return null;
+        }
+        
     }
 
     protected File[] moveSampleReadFilesToTmpPath(String r1Url, Path r1TmpPath, String r2Url, Path r2TmpPath) {
