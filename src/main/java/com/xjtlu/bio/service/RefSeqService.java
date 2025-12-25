@@ -158,27 +158,35 @@ public class RefSeqService {
             objectNameInFlatFormat,
             "refseq.fai"
         );
+
+
         
         if(Files.exists(refseqIndexPath) && refseqIndexPath.toFile().length() > 0){
             return refseqIndexPath.toFile();
         }
 
-        Path outterRefSeqObjectPath = Paths.get(
-            this.refSeqServiceTmpPath,
-            outterRefSeqObjectName.substring(outterRefSeqObjectName.lastIndexOf("/")+1)
+        Path outterRefSeqObjectLocalPath = Paths.get(
+            this.nonInnerRefseqDir, 
+            objectNameInFlatFormat
         );
-        GetObjectResult getObjectResult = this.storageService.getObject(outterRefSeqObjectName, outterRefSeqObjectPath.toString());
 
-        if(getObjectResult.e()!=null || !getObjectResult.success()){
-            getObjectResult.objectFile().delete();
+        if(!Files.exists(outterRefSeqObjectLocalPath)){
+            return null;
+        }
+
+        Path outterRefSeqObjectPath = null;
+        try {
+            outterRefSeqObjectPath = Files.createSymbolicLink(refseqIndexPath, outterRefSeqObjectLocalPath);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
             return null;
         }
 
         File refseqIndex = this.buildRefSeqIndex(
             refseqIndexPath.toString(),
-            getObjectResult.objectFile()
+            outterRefSeqObjectPath.toFile()
         );
-        getObjectResult.objectFile().delete();
         return refseqIndex;
     }
 

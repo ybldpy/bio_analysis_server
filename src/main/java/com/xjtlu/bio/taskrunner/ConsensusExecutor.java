@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 
 public class ConsensusExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor{
@@ -29,6 +30,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         
         try {
             inputUrlMap = this.objectMapper.readValue(inputUrls,Map.class);
+            paramsMap = this.objectMapper.readValue(bioPipelineStage.getParameters(), Map.class);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
@@ -36,22 +38,27 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         }
 
 
-        String refSeq = inputUrlMap.get(PipelineService.PIPELINE_REFSEQ_ACCESSION_KEY);
-        File refSeqFile = this.refSeqService.getRefSeqByAccession(refSeq);
-        if (refSeqFile==null || !refSeqFile.exists()) {
+        RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(paramsMap);
+
+
+        if (refSeqConfig == null) {
             return this.runFail(bioPipelineStage, "未找到参考基因文件");
         }
 
-        File refSeqIndexFile = this.refSeqService.getRefSeqIndex(refSeq);
+        File refseqFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefseq(refSeqConfig.getRefseqId()):this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+
+
+        if(refseqFile == null){
+            
+        }
+        File refSeqIndexFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
         if (refSeqIndexFile==null || !refSeqIndexFile.exists()) {
             return this.runFail(bioPipelineStage, "未找到参考基因文件");
         }
 
-        refSeqIndexFile = this.refSeqService.buildRefSeqIndex(refSeq);
         if (refSeqIndexFile == null || !refSeqIndexFile.exists()) {
             return this.runFail(bioPipelineStage, "生成参考基因文件索引时错误");
         }
-
 
         Path inputTmpDir = Paths.get(String.format("%s/%d", this.stageInputTmpBasePath, bioPipelineStage.getStageId()));
         Path resultDir = Paths.get(String.format("%s/%d", this.stageResultTmpBasePath, bioPipelineStage.getStageId()));
@@ -92,8 +99,9 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
             if (code != 0 || !requireNonEmpty(consensusPath)) {
                 this.deleteTmpFiles(List.of(inputTmpDir.toFile()));
                 return this.runFail(bioPipelineStage, "bcftools consensus 运行失败，exitCode=" + code);
+            }else {
+                this.deleteTmpFiles(List.of(inputTmpDir.toFile()));
             }
-                         // 校验产物
         } catch (Exception e) {
             this.deleteTmpFiles(List.of(inputTmpDir.toFile(), resultDir.toFile()));
             return this.runException(bioPipelineStage, e);

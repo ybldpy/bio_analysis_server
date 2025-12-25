@@ -14,6 +14,8 @@ public class StageRunResult {
 
     private StageOutput stageOutput;
 
+    
+
     public StageOutput getStageOutput() {
         return stageOutput;
     }

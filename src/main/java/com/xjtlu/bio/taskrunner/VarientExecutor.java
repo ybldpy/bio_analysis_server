@@ -43,18 +43,18 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         }
 
 
-        
+
 
         String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY);
         String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY);
-        String refSeqAccession = inputUrlMap.get(PipelineService.PIPELINE_REFSEQ_ACCESSION_KEY);
+        File refSeq = this.getRefSeqFromParams(params);
 
-        File refSeq = refSeqService.getRefSeqByAccession(refSeqAccession);
 
-        if (refSeq == null || !refSeq.exists()) {
-            return this.runFail(bioPipelineStage, "未找到参考基因组文件");
+        if(refSeq == null){
+            return StageRunResult.fail("未能加载参考基因文件", bioPipelineStage);
         }
 
+        
         Path inputTempDir = Paths
                 .get(String.format("%s/%d", this.stageInputTmpBasePath, bioPipelineStage.getStageId()));
 
@@ -72,7 +72,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         Path refSeqIndex = inputTempDir.resolve("refFa.fai");
 
         // 先用 samtools 生成参考索引
-        File refSeqIndexFile = this.refSeqService.getRefSeqIndex(refSeqAccession);
+        File refSeqIndexFile = this.refSeqService.getRefSeqIndex(isInnerRefSeq?(Integer)refseqRefence);
         if (refSeqIndexFile == null || !refSeqIndexFile.exists()) {
             refSeqIndexFile = this.refSeqService.buildRefSeqIndex(refSeqAccession);
         }

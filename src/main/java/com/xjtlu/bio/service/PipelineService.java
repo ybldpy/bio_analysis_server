@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
+import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioSample;
@@ -45,10 +46,7 @@ import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.utils.ParameterUtil;
 
-
 import jakarta.annotation.Resource;
-
-
 
 class BioPipelineStagesBuilder {
 
@@ -62,35 +60,40 @@ class BioPipelineStagesBuilder {
         return (Map) obj;
     }
 
-
-    public static List<BioPipelineStage> buildBacteriaStages(){
-        //todo
+    public static List<BioPipelineStage> buildBacteriaStages() {
+        // todo
         return null;
     }
 
-
-
-    public static List<BioPipelineStage> buildVirusStages(long pid, int pipelineType, BioSample bioSample, Map<String,Object> pipelineStageParams) throws JsonProcessingException{
+    public static List<BioPipelineStage> buildVirusStages(long pid, int pipelineType, BioSample bioSample,
+            Map<String, Object> pipelineStageParams) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(8);
         String qcInputRead1 = bioSample.getRead1Url();
         String qcInputRead2 = bioSample.getRead2Url();
 
-    
         String refSeqKey = "refSeq";
-        String refSeq = ParameterUtil.getStrFromMap(refSeqKey, pipelineStageParams);
+        Object refseqObj = pipelineStageParams.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+        long refseqId = -1;
 
+        if(refseqObj!=null){
+            refseqId = refseqObj instanceof Integer? (Integer) refseqObj: refseqObj instanceof Long? (Long)refseqObj:-1;
+        }
+
+        HashMap<String,Object> refseqConfig = new HashMap<>();
+        if(refseqId>=0){
+            refseqConfig.put(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY, refseqId);
+            refseqConfig.put(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER, true);
+        }
 
 
         int index = 0;
         BioPipelineStage qc = new BioPipelineStage();
-        
 
-        Map<String,String> qcInputMap = new HashMap<>();
+        Map<String, String> qcInputMap = new HashMap<>();
 
-
-        qcInputMap.put("r1", qcInputRead1);
-        qcInputMap.put("r2", qcInputRead2);
+        qcInputMap.put(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY, qcInputRead1);
+        qcInputMap.put(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY, qcInputRead2);
         String qcInputMapStr = null;
         qc.setStageIndex(index);
         qc.setStageName("质控(QC)");
@@ -102,42 +105,51 @@ class BioPipelineStagesBuilder {
 
         index++;
 
-        BioPipelineStage assembly = new BioPipelineStage();
+        if (refseqId == -1) {
 
-        Map<String,Object> assemblyParams = substractStageParams("assembly", pipelineStageParams);
-        String assemlyParamsStr = assemblyParams == null? null: objectMapper.writeValueAsString(assemblyParams);
-        assembly.setStatus(PipelineService.PIPELINE_STAGE_STATUS_PENDING);
-        assembly.setPipelineId(pid);
-        assembly.setStageIndex(index);
-        assembly.setParameters(assemlyParamsStr);
+            BioPipelineStage assembly = new BioPipelineStage();
 
-    
-        if (StringUtils.isBlank(refSeq)) {
+            Map<String, Object> assemblyParams = substractStageParams("assembly", pipelineStageParams);
+            String assemlyParamsStr = assemblyParams == null ? "{}" : objectMapper.writeValueAsString(assemblyParams);
+            assembly.setStatus(PipelineService.PIPELINE_STAGE_STATUS_PENDING);
+            assembly.setPipelineId(pid);
+            assembly.setStageIndex(index);
+            assembly.setParameters(assemlyParamsStr);
+
             assembly.setStageType(PipelineService.PIPELINE_STAGE_ASSEMBLY);
             assembly.setStageName("组装");
-        } else {
-            assembly.setStageType(PipelineService.PIPELINE_STAGE_MAPPING);
-            assemblyParams.put("refSeq", refSeq);
-            assembly.setParameters(objectMapper.writeValueAsString(assemlyParamsStr));
-            assembly.setStageName("参考");
+            stages.add(assembly);
+            index++;
         }
 
-        stages.add(assembly);
+        BioPipelineStage mappingStage = new BioPipelineStage();
+        mappingStage.setStatus(PipelineService.PIPELINE_STAGE_STATUS_PENDING);
+        mappingStage.setPipelineId(pid);
+        mappingStage.setStageIndex(index);
+        mappingStage.setStageType(PipelineService.PIPELINE_STAGE_MAPPING);
+        mappingStage.setStageName(PipelineService.PIPELINE_STAGE_NAME_MAPPING);
+        
+
+        if(refseqId == -1){
+            mappingStage.setParameters("{}");
+        }else {
+            Map<String,Object> mappingParams = substractStageParams("mapping", pipelineStageParams);
+            mappingParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
+            mappingStage.setParameters(objectMapper.writeValueAsString(mappingParams));
+        }
+
+        stages.add(mappingStage);
         index++;
 
-        if (refSeq == null && pipelineType != PipelineService.PIPELINE_VIRUS_COVID) {
-            return stages;
-        }
+        
 
-
-
-        Map<String,Object> varientStageParams = substractStageParams("varient", pipelineStageParams);
-        varientStageParams.put("refSeq", refSeq);
+        Map<String, Object> varientStageParams = substractStageParams("varient", pipelineStageParams);
+        varientStageParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
         BioPipelineStage varient = new BioPipelineStage();
         varient.setStageName(PipelineService.PIPELINE_STAGE_NAME_VARIANT);
         varient.setPipelineId(pid);
         varient.setStageIndex(index);
-        
+
         varient.setParameters(objectMapper.writeValueAsString(varientStageParams));
         varient.setStageType(PipelineService.PIPELINE_STAGE_VARIANT_CALL);
         varient.setStatus(PipelineService.PIPELINE_STAGE_STATUS_PENDING);
@@ -147,8 +159,8 @@ class BioPipelineStagesBuilder {
         index++;
 
         BioPipelineStage consensus = new BioPipelineStage();
-        Map<String,Object> consesusParams = substractStageParams("consensus", pipelineStageParams);
-        consesusParams.put("refSeq", refSeq);
+        Map<String, Object> consesusParams = substractStageParams("consensus", pipelineStageParams);
+        consesusParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
         consensus.setStageName("生成一致性序列");
         consensus.setPipelineId(pid);
         consensus.setStageIndex(index);
@@ -161,9 +173,8 @@ class BioPipelineStagesBuilder {
             return stages;
         }
 
-
-        Map<String,Object> snpParams = substractStageParams("snp", pipelineStageParams);
-        snpParams.put("refSeq", refSeq);
+        Map<String, Object> snpParams = substractStageParams("snp", pipelineStageParams);
+        snpParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);;
         BioPipelineStage snp = new BioPipelineStage();
         snp.setStageName("SNP注释");
         snp.setPipelineId(pid);
@@ -176,8 +187,8 @@ class BioPipelineStagesBuilder {
         index++;
 
         BioPipelineStage depthConverage = new BioPipelineStage();
-        Map<String,Object> depthParams = substractStageParams("depth", pipelineStageParams);
-        depthParams.put("refSeq",refSeq);
+        Map<String, Object> depthParams = substractStageParams("depth", pipelineStageParams);
+        depthParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);;
         depthConverage.setStageName("深度分布图");
         depthConverage.setPipelineId(pid);
         depthConverage.setStageIndex(index);
@@ -187,7 +198,6 @@ class BioPipelineStagesBuilder {
         stages.add(snp);
         index++;
         return stages;
-
 
     }
 
@@ -243,12 +253,10 @@ public class PipelineService {
     public static final String PIPELINE_STAGE_NAME_MAPPING = "有参比对 (Mapping)";
     public static final String PIPELINE_STAGE_NAME_VARIANT = "变异检测 (Variant calling)";
 
-
     public static final String PIPELINE_STAGE_INPUT_READ1_KEY = "r1";
     public static final String PIPELINE_STAGE_INPUT_READ2_KEY = "r2";
 
-    
-
+    public static final String PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG = "refseq_config";
     public static final String PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY = "refseq";
     public static final String PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER = "inner";
 
@@ -323,8 +331,6 @@ public class PipelineService {
     public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP
     public static final int PIPELINE_STAGE_SNP_CORE = 71; // 多样本核心SNP/建树
 
-
-
     public static final String stageOutputFormat = "stageOutput/%d/%d/%s";
 
     private boolean isLegalPipelineType(int pipelineType) {
@@ -332,32 +338,30 @@ public class PipelineService {
                 || pipelineType == PIPELINE_VIRUS_BACKTERIA;
     }
 
-    
     // 0: success
-    //-1: error
+    // -1: error
     @Transactional(rollbackFor = Exception.class)
-    public int updateStageFromOldToNew(long stageId, int oldStatus, int newStatus){
-        try{
+    public int updateStageFromOldToNew(long stageId, int oldStatus, int newStatus) {
+        try {
             // 0: running
             // 1: success
             return this.bioAnalysisStageMapperExtension.updateStatusTo(stageId, oldStatus, newStatus);
-        }catch(Exception e){
-            //represent error
+        } catch (Exception e) {
+            // represent error
             return -1;
         }
 
     }
 
-    public int updateStageFromStatus(BioPipelineStage bioPipelineStage, long updateStageId,int status){
+    public int updateStageFromStatus(BioPipelineStage bioPipelineStage, long updateStageId, int status) {
         BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
         bioPipelineStageExample.createCriteria().andStageIdEqualTo(updateStageId).andStatusEqualTo(status);
-        try{
+        try {
             return this.bioPipelineStageMapper.updateByExampleSelective(bioPipelineStage, bioPipelineStageExample);
-        }catch(Exception e){
+        } catch (Exception e) {
             return -1;
         }
     }
-
 
     private int mapSampleTypeToPipelineType(int sampleType) {
         if (sampleType == SampleService.SAMPLE_TYPE_VIRUS) {
@@ -400,48 +404,59 @@ public class PipelineService {
     private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline,
             Map<String, Object> pipelineParams) {
 
-        if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {
+        if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS
+                || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {
             try {
-                List<BioPipelineStage> stages = BioPipelineStagesBuilder.buildVirusStages(bioAnalysisPipeline.getPipelineId(), bioAnalysisPipeline.getPipelineType(), bioSample, pipelineParams);
+                List<BioPipelineStage> stages = BioPipelineStagesBuilder.buildVirusStages(
+                        bioAnalysisPipeline.getPipelineId(), bioAnalysisPipeline.getPipelineType(), bioSample,
+                        pipelineParams);
                 return stages;
             } catch (JsonProcessingException e) {
                 // TODO Auto-generated catch block
                 return null;
             }
-        }else {
+        } else {
             return null;
         }
 
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Result<Boolean> pipelineStart(long runSampleId) {
+    public Result<Boolean> pipelineStart(long sampleId) {
 
 
-        
-        BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
-        bioPipelineStageExample.createCriteria().andPipelineIdEqualTo().andStageIndexEqualTo(0);
-        List<BioPipelineStage> stages = this.bioPipelineStageMapper.selectByExample(bioPipelineStageExample);
+        BioAnalysisPipelineExample pipelineExample = new BioAnalysisPipelineExample();
+        pipelineExample.createCriteria().andSampleIdEqualTo(sampleId);
+        List<BioAnalysisPipeline> pipelines = this.analysisPipelineMapper.selectByExample(pipelineExample);
+        if (pipelines == null || pipelines.isEmpty()) {
+            return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未找到流水线");
+        }
+
+        long pipelineId = pipelines.get(0).getPipelineId();
+
+        BioPipelineStageExample firStageExample = new BioPipelineStageExample();
+        firStageExample.createCriteria().andPipelineIdEqualTo(pipelineId).andStageIndexEqualTo(0);
+
+
+
+        List<BioPipelineStage> stages = this.bioPipelineStageMapper.selectByExample(firStageExample);
         if (stages == null || stages.isEmpty()) {
             return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未找到流水线");
         }
         BioPipelineStage firstStage = stages.get(0);
         BioPipelineStage updatedFirstStage = new BioPipelineStage();
         updatedFirstStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-        updatedFirstStage.setStageId(firstStage.getStageId());
-        int updateRes = this.bioPipelineStageMapper.updateByPrimaryKeySelective(updatedFirstStage);
-        if(updateRes < 1){
+        int updateRes = this.updateStageFromStatus(updatedFirstStage, firstStage.getStageId(), PIPELINE_STAGE_STATUS_PENDING);
+        if (updateRes < 0) {
             return new Result<Boolean>(Result.INTERNAL_FAIL, false, "流水线启动失败");
         }
 
-
-        boolean addRes = this.pipelineStageTaskDispatcher.addTask(firstStage);
-        
+        if(updateRes == 0){
+            return new Result<Boolean>( Result.DUPLICATE_OPERATION,true, "流水线已经启动");
+        }
 
         return new Result<Boolean>(Result.SUCCESS, true, null);
     }
-
-
 
     @Async
     public void pipelineStageDone(StageRunResult stageRunResult) {
@@ -449,56 +464,48 @@ public class PipelineService {
         if (!stageRunResult.isSuccess()) {
             BioPipelineStage updateStage = new BioPipelineStage();
             updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
-            int res = this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_RUNNING);
+            int res = this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(),
+                    PIPELINE_STAGE_STATUS_RUNNING);
             // assume success here;
             return;
         }
 
-
         int stageType = bioPipelineStage.getStageType();
         if (stageType == PIPELINE_STAGE_QC) {
             handleQcStageDone(stageRunResult);
-        }else if (stageType == PIPELINE_STAGE_ASSEMBLY) {
+        } else if (stageType == PIPELINE_STAGE_ASSEMBLY) {
             handleAssemblyDone(stageRunResult);
-        }else if (stageType == PIPELINE_STAGE_MAPPING) {
+        } else if (stageType == PIPELINE_STAGE_MAPPING) {
             handleMappingStageDone(stageRunResult);
-        }else if (stageType == PIPELINE_STAGE_VARIANT_CALL) {
+        } else if (stageType == PIPELINE_STAGE_VARIANT_CALL) {
             handleVarientStageDone(stageRunResult);
-        }else if (stageType == PIPELINE_STAGE_DEPTH_COVERAGE) {
-            
-        }else if (stageType == PIPELINE_STAGE_SNP_SINGLE) {
-            
-        }else if(stageType == PIPELINE_STAGE_CONSENSUS){
+        } else if (stageType == PIPELINE_STAGE_DEPTH_COVERAGE) {
+
+        } else if (stageType == PIPELINE_STAGE_SNP_SINGLE) {
+
+        } else if (stageType == PIPELINE_STAGE_CONSENSUS) {
             handleConsensusStageDone(stageRunResult);
         }
     }
 
-
-
-
-
-    
     // params[1]: object name
     private boolean batchUploadObjectsFromLocal(Map<String, String> params) {
-        //todo
+        // todo
         return false;
     }
 
-
-
-    private boolean batchUploadObjectsFromLocal(String... objectNamesAndPaths){
-        HashMap<String,String> params = new HashMap<>();
-        for(int i = 0;i<objectNamesAndPaths.length;i+=2){
-            params.put(objectNamesAndPaths[i], objectNamesAndPaths[i+1]);
+    private boolean batchUploadObjectsFromLocal(String... objectNamesAndPaths) {
+        HashMap<String, String> params = new HashMap<>();
+        for (int i = 0; i < objectNamesAndPaths.length; i += 2) {
+            params.put(objectNamesAndPaths[i], objectNamesAndPaths[i + 1]);
         }
         return this.batchUploadObjectsFromLocal(params);
     }
 
-
-    private void handleUnsuccessUpload(BioPipelineStage bioPipelineStage, String... toDeleteFiles) throws IOException{
+    private void handleUnsuccessUpload(BioPipelineStage bioPipelineStage, String... toDeleteFiles) throws IOException {
 
         BioPipelineStage updateStage = new BioPipelineStage();
-        for(String path: toDeleteFiles){
+        for (String path : toDeleteFiles) {
             Files.delete(Path.of(path));
         }
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
@@ -506,8 +513,7 @@ public class PipelineService {
 
     }
 
-
-    private int markStageFinish(BioPipelineStage bioPipelineStage, String outputUrl){
+    private int markStageFinish(BioPipelineStage bioPipelineStage, String outputUrl) {
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         updateStage.setOutputUrl(outputUrl);
@@ -516,20 +522,20 @@ public class PipelineService {
         return this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_RUNNING);
     }
 
-
-    private void handleConsensusStageDone(StageRunResult stageRunResult){
+    private void handleConsensusStageDone(StageRunResult stageRunResult) {
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
-        ConsensusStageOutput consensusStageOutput = (ConsensusStageOutput)stageRunResult.getStageOutput();
+        ConsensusStageOutput consensusStageOutput = (ConsensusStageOutput) stageRunResult.getStageOutput();
 
         String consesusOutputObjName = String.format(
-            stageOutputFormat,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            consensusStageOutput.getConsensusFa().substring(consensusStageOutput.getConsensusFa().lastIndexOf("/")+1)
-        );
+                stageOutputFormat,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                consensusStageOutput.getConsensusFa()
+                        .substring(consensusStageOutput.getConsensusFa().lastIndexOf("/") + 1));
 
-        boolean uploadRes = this.batchUploadObjectsFromLocal(consesusOutputObjName, consensusStageOutput.getConsensusFa());
-        if(!uploadRes){
+        boolean uploadRes = this.batchUploadObjectsFromLocal(consesusOutputObjName,
+                consensusStageOutput.getConsensusFa());
+        if (!uploadRes) {
             try {
                 Files.delete(Path.of(consensusStageOutput.getConsensusFa()));
             } catch (IOException e) {
@@ -555,39 +561,35 @@ public class PipelineService {
             e.printStackTrace();
         }
 
-
     }
 
-
-    private void handleVarientStageDone(StageRunResult stageRunResult){
+    private void handleVarientStageDone(StageRunResult stageRunResult) {
 
         VariantStageOutput variantStageOutput = (VariantStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
         String vcfGzObjctName = String.format(
-            stageOutputFormat,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            variantStageOutput.getVcfGz().substring(variantStageOutput.getVcfGz().lastIndexOf("/")+1)
-        );
+                stageOutputFormat,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                variantStageOutput.getVcfGz().substring(variantStageOutput.getVcfGz().lastIndexOf("/") + 1));
 
         String vcfTbiObjectName = String.format(
-            stageOutputFormat,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            variantStageOutput.getVcfTbi().substring(variantStageOutput.getVcfTbi().lastIndexOf("/")+1)
-        );
+                stageOutputFormat,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                variantStageOutput.getVcfTbi().substring(variantStageOutput.getVcfTbi().lastIndexOf("/") + 1));
 
         boolean uploadSuccess = this.batchUploadObjectsFromLocal(
-            vcfGzObjctName,
-            variantStageOutput.getVcfGz(),
-            vcfTbiObjectName,
-            variantStageOutput.getVcfTbi()
-        );
+                vcfGzObjctName,
+                variantStageOutput.getVcfGz(),
+                vcfTbiObjectName,
+                variantStageOutput.getVcfTbi());
 
-        if(!uploadSuccess){
+        if (!uploadSuccess) {
             try {
-                this.handleUnsuccessUpload(bioPipelineStage,variantStageOutput.getVcfGz(), variantStageOutput.getVcfTbi());
+                this.handleUnsuccessUpload(bioPipelineStage, variantStageOutput.getVcfGz(),
+                        variantStageOutput.getVcfTbi());
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -595,25 +597,23 @@ public class PipelineService {
             return;
         }
 
-
         String outputUrl = String.format(
-            "{\"%s\": \"%s\", \"%s\":\"%s\"}",
-            PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ,
-            vcfGzObjctName,
-            PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI,
-            vcfTbiObjectName
-        );
+                "{\"%s\": \"%s\", \"%s\":\"%s\"}",
+                PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ,
+                vcfGzObjctName,
+                PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI,
+                vcfTbiObjectName);
 
         int updateRes = this.markStageFinish(bioPipelineStage, outputUrl);
 
-        if (updateRes!=1) {
+        if (updateRes != 1) {
             return;
         }
 
         BioPipelineStageExample consensusStageExample = new BioPipelineStageExample();
         consensusStageExample.createCriteria()
-        .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
-        .andStageTypeEqualTo(PIPELINE_STAGE_CONSENSUS);
+                .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
+                .andStageTypeEqualTo(PIPELINE_STAGE_CONSENSUS);
 
         List<BioPipelineStage> consensusStageList = this.bioPipelineStageMapper.selectByExample(consensusStageExample);
 
@@ -623,8 +623,7 @@ public class PipelineService {
 
         BioPipelineStage consensusStage = consensusStageList.get(0);
         String inputUrl = String.format(
-            "{}"
-        );
+                "{}");
 
         BioPipelineStage updateConsensusStage = new BioPipelineStage();
 
@@ -636,41 +635,40 @@ public class PipelineService {
         updateConsensusStage.setParameters(bioPipelineStage.getParameters());
         updateConsensusStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
 
-        int res = this.updateStageFromStatus(updateConsensusStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_PENDING);
-        if(res==1){
+        int res = this.updateStageFromStatus(updateConsensusStage, bioPipelineStage.getStageId(),
+                PIPELINE_STAGE_STATUS_PENDING);
+        if (res == 1) {
             this.pipelineStageTaskDispatcher.addTask(updateConsensusStage);
         }
 
     }
-
-
 
     private void handleMappingStageDone(StageRunResult stageRunResult) {
         MappingStageOutput mappingStageOutput = (MappingStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
         String bamObjectName = String.format(
-            stageOutputFormat,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            mappingStageOutput.getBamPath().substring(mappingStageOutput.getBamPath().lastIndexOf("/")+1)
-        );
+                stageOutputFormat,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                mappingStageOutput.getBamPath().substring(mappingStageOutput.getBamPath().lastIndexOf("/") + 1));
 
         String bamIndexObjectName = String.format(
-            stageOutputFormat,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            mappingStageOutput.getBamIndexPath().substring(mappingStageOutput.getBamIndexPath().lastIndexOf("/")+1)
-        );
+                stageOutputFormat,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                mappingStageOutput.getBamIndexPath()
+                        .substring(mappingStageOutput.getBamIndexPath().lastIndexOf("/") + 1));
 
-        HashMap<String,String> outputStoreMap = new HashMap<>();
+        HashMap<String, String> outputStoreMap = new HashMap<>();
         outputStoreMap.put(bamObjectName, mappingStageOutput.getBamPath());
         outputStoreMap.put(bamIndexObjectName, mappingStageOutput.getBamIndexPath());
 
         boolean storeSuccss = this.batchUploadObjectsFromLocal(outputStoreMap);
-        if(!storeSuccss){
+        if (!storeSuccss) {
             try {
-                this.handleUnsuccessUpload(bioPipelineStage, mappingStageOutput.getBamPath(), mappingStageOutput.getBamIndexPath());
+                this.handleUnsuccessUpload(bioPipelineStage, mappingStageOutput.getBamPath(),
+                        mappingStageOutput.getBamIndexPath());
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -680,22 +678,22 @@ public class PipelineService {
 
         BioPipelineStageExample nextStagesExample = new BioPipelineStageExample();
         nextStagesExample.createCriteria()
-        .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
-        .andStageIndexGreaterThanOrEqualTo(bioPipelineStage.getStageIndex()+1);
+                .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
+                .andStageIndexGreaterThanOrEqualTo(bioPipelineStage.getStageIndex() + 1);
 
         List<BioPipelineStage> nextStages = this.bioPipelineStageMapper.selectByExample(nextStagesExample);
-        
-        if(nextStages==null || nextStages.isEmpty()){
+
+        if (nextStages == null || nextStages.isEmpty()) {
             return;
         }
 
+        // 这里主要是用来看是否后续阶段。
+        BioPipelineStage varientStage = nextStages.stream()
+                .filter(stage -> stage.getStageType() == PIPELINE_STAGE_VARIANT_CALL).findFirst().orElse(null);
 
-        //这里主要是用来看是否后续阶段。
-        BioPipelineStage varientStage = nextStages.stream().filter(stage->stage.getStageType() == PIPELINE_STAGE_VARIANT_CALL).findFirst().orElse(null);
-
-        if (varientStage!=null) {
+        if (varientStage != null) {
             BioPipelineStage updateVarientStage = new BioPipelineStage();
-            HashMap<String,Object> inputMap = new HashMap<>();
+            HashMap<String, Object> inputMap = new HashMap<>();
             inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamIndexObjectName);
             String serializedInputUrl = null;
             try {
@@ -706,47 +704,44 @@ public class PipelineService {
             }
             updateVarientStage.setInputUrl(serializedInputUrl);
             varientStage.setInputUrl(serializedInputUrl);
-            
+
             updateVarientStage.setParameters(bioPipelineStage.getParameters());
             varientStage.setParameters(updateVarientStage.getParameters());
             updateVarientStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
             varientStage.setStatus(updateVarientStage.getStatus());
 
-            int updateRes = this.updateStageFromStatus(updateVarientStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_PENDING);
-            if(updateRes!=1){
+            int updateRes = this.updateStageFromStatus(updateVarientStage, bioPipelineStage.getStageId(),
+                    PIPELINE_STAGE_STATUS_PENDING);
+            if (updateRes != 1) {
                 return;
             }
             this.pipelineStageTaskDispatcher.addTask(varientStage);
             return;
         }
 
-        //bacterial part. do it later
+        // bacterial part. do it later
 
     }
 
-
-
-    private void handleAssemblyDone(StageRunResult stageRunResult){
+    private void handleAssemblyDone(StageRunResult stageRunResult) {
         AssemblyStageOutput assemblyStageOutput = (AssemblyStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
         String format = "stageOutput/%d/%s/%s";
         String contigOutputKey = String.format(
-            format,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            "contigs.fasta"
-        );
-        
+                format,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                "contigs.fasta");
+
         String scaffoldOuputKey = String.format(
-            format,
-            bioPipelineStage.getStageId(),
-            bioPipelineStage.getStageName(),
-            "scaffold.fasta"
-        );
+                format,
+                bioPipelineStage.getStageId(),
+                bioPipelineStage.getStageName(),
+                "scaffold.fasta");
 
-        HashMap<String,String> outputMap = new HashMap<>();
+        HashMap<String, String> outputMap = new HashMap<>();
 
-        boolean hasScaffold = assemblyStageOutput.getScaffoldPath()!=null;
+        boolean hasScaffold = assemblyStageOutput.getScaffoldPath() != null;
 
         outputMap.put(contigOutputKey, assemblyStageOutput.getContigPath());
         if (hasScaffold) {
@@ -754,9 +749,10 @@ public class PipelineService {
         }
         boolean success = this.batchUploadObjectsFromLocal(outputMap);
 
-        if(!success){
+        if (!success) {
             try {
-                this.handleUnsuccessUpload(bioPipelineStage, assemblyStageOutput.getContigPath(), assemblyStageOutput.getScaffoldPath());
+                this.handleUnsuccessUpload(bioPipelineStage, assemblyStageOutput.getContigPath(),
+                        assemblyStageOutput.getScaffoldPath());
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -764,10 +760,9 @@ public class PipelineService {
             return;
         }
 
-
-        HashMap<String,String> outputPathMap = new HashMap<>();
+        HashMap<String, String> outputPathMap = new HashMap<>();
         outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY, contigOutputKey);
-        outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, hasScaffold?scaffoldOuputKey:null);
+        outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, hasScaffold ? scaffoldOuputKey : null);
 
         String serializedOutputPath = null;
         try {
@@ -777,35 +772,33 @@ public class PipelineService {
             e.printStackTrace();
         }
 
-
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setOutputUrl(serializedOutputPath);
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         updateStage.setEndTime(new Date());
 
-        int updateRes = this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_RUNNING);
-        if (updateRes!=1) {
+        int updateRes = this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(),
+                PIPELINE_STAGE_STATUS_RUNNING);
+        if (updateRes != 1) {
             return;
         }
 
         BioPipelineStageExample nextStagesExample = new BioPipelineStageExample();
-        nextStagesExample.createCriteria().
-        andPipelineIdEqualTo(bioPipelineStage.getPipelineId()).
-        andStageIndexGreaterThanOrEqualTo(bioPipelineStage.getStageIndex()+1);
-
-
+        nextStagesExample.createCriteria().andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
+                .andStageIndexGreaterThanOrEqualTo(bioPipelineStage.getStageIndex() + 1);
 
         List<BioPipelineStage> nextStages = this.bioPipelineStageMapper.selectByExample(nextStagesExample);
-        if(nextStages==null || nextStages.isEmpty()){
+        if (nextStages == null || nextStages.isEmpty()) {
             return;
         }
 
-        BioPipelineStage mappingStage = nextStages.stream().filter(stage->stage.getStageType() == PIPELINE_STAGE_MAPPING).findFirst().orElse(null);
+        BioPipelineStage mappingStage = nextStages.stream()
+                .filter(stage -> stage.getStageType() == PIPELINE_STAGE_MAPPING).findFirst().orElse(null);
         if (mappingStage != null) {
             BioPipelineStage updateMappingStage = new BioPipelineStage();
             updateMappingStage.setInputUrl(bioPipelineStage.getInputUrl());
-            
-            HashMap<String,String> mappingStageParamMap = new HashMap<>();
+
+            HashMap<String, String> mappingStageParamMap = new HashMap<>();
             mappingStageParamMap.put(PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY, contigOutputKey);
             String serializedMappingStageParameters = null;
             try {
@@ -819,10 +812,7 @@ public class PipelineService {
             return;
         }
 
-        //todo: bacteria part. do it later
-
-
-
+        // todo: bacteria part. do it later
 
     }
 
@@ -871,33 +861,36 @@ public class PipelineService {
                 updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
                 updateStage.setOutputUrl(outputPathMapJson);
                 updateStage.setEndTime(new Date());
-                int updateRes = this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(), PIPELINE_STAGE_STATUS_RUNNING);
-                if(updateRes!=1){return;}
-
-                BioPipelineStageExample nextStageExample = new BioPipelineStageExample();
-                nextStageExample.createCriteria().andPipelineIdEqualTo(bioPipelineStage.getPipelineId()).andStageIndexEqualTo(bioPipelineStage.getStageIndex()+1);
-                List<BioPipelineStage> nextStages = this.bioPipelineStageMapper.selectByExample(nextStageExample);
-                if(nextStages == null || nextStages.isEmpty()){
+                int updateRes = this.updateStageFromStatus(updateStage, bioPipelineStage.getStageId(),
+                        PIPELINE_STAGE_STATUS_RUNNING);
+                if (updateRes != 1) {
                     return;
                 }
 
+                BioPipelineStageExample nextStageExample = new BioPipelineStageExample();
+                nextStageExample.createCriteria().andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
+                        .andStageIndexEqualTo(bioPipelineStage.getStageIndex() + 1);
+                List<BioPipelineStage> nextStages = this.bioPipelineStageMapper.selectByExample(nextStageExample);
+                if (nextStages == null || nextStages.isEmpty()) {
+                    return;
+                }
 
-                
                 BioPipelineStage nextStage = nextStages.get(0);
                 BioPipelineStage updateNextStage = new BioPipelineStage();
                 updateNextStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
                 nextStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-                if(nextStage.getStageType() == PIPELINE_STAGE_ASSEMBLY){
+                if (nextStage.getStageType() == PIPELINE_STAGE_ASSEMBLY) {
                     HashMap<String, String> inputMap = new HashMap<>();
                     inputMap.put("r1", r1OutputPath);
                     inputMap.put("r2", r2OutputPath);
                     String assemblyInput = this.jsonMapper.writeValueAsString(inputMap);
                     updateNextStage.setInputUrl(assemblyInput);
-                    nextStage.setInputUrl(assemblyInput);  
+                    nextStage.setInputUrl(assemblyInput);
                 }
 
-                updateRes = this.updateStageFromStatus(updateNextStage, nextStage.getStageId(), PIPELINE_STAGE_STATUS_PENDING);  
-                if(updateRes!=1){
+                updateRes = this.updateStageFromStatus(updateNextStage, nextStage.getStageId(),
+                        PIPELINE_STAGE_STATUS_PENDING);
+                if (updateRes != 1) {
                     return;
                 }
 

@@ -4,13 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
 
-import org.springframework.util.ObjectUtils;
+import org.apache.commons.io.FileUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.common.StageRunResult;
@@ -19,6 +16,7 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.RefSeqService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 
 import jakarta.annotation.Resource;
 
@@ -116,6 +114,50 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
     }
 
+    protected static boolean isMap(Object obj){
+        return (obj != null) && obj instanceof Map;
+    }
+
+
+    protected RefSeqConfig getRefSeqConfigFromParams(Map<String,Object> params){
+
+        Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+        if(!isMap(refseqConfigObj)){
+            return null;
+        }
+
+        Map<String,Object> refseqConfig = (Map)refseqConfigObj;
+
+        Object refseq = refseqConfig.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+        Object isInnerRefseq = refseqConfig.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+
+        if(refseq == null){return null;}
+        if(isInnerRefseq == null && !(refseq instanceof Integer)){
+            return null;
+        }
+
+        if(isInnerRefseq!=null && !(isInnerRefseq instanceof Boolean)){
+            return null;
+        }
+
+        boolean isInner = (Boolean) isInnerRefseq;
+
+        if(isInner && !(refseq instanceof Integer)){
+            return null;
+        }
+        if(!isInner && !(refseq instanceof String)){
+            return null;
+        }
+
+        if(isInner){
+            return new RefSeqConfig(true, null, (Integer)refseq);
+        }
+
+
+        return new RefSeqConfig(false, (String) refseq, -1);
+        
+    }
+
 
     protected Object substractRefseqFromMap(Map<String,Object> params){
         Object refseq = params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
@@ -125,7 +167,9 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         if(isInnerRefseq == null && !(refseq instanceof Integer)){
             return null;
         }
-        
+
+        return refseq;
+
     }
 
     protected File[] moveSampleReadFilesToTmpPath(String r1Url, Path r1TmpPath, String r2Url, Path r2TmpPath) {
@@ -155,7 +199,15 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     protected void deleteTmpFiles(List<File> tmpFiles) {
         for (File f : tmpFiles) {
             if (f != null && f.exists()) {
-                f.delete();
+                if(f.isDirectory()){
+                    try {
+                        FileUtils.deleteDirectory(f);
+                    } catch (IOException e) {
+
+                    }
+                }else {
+                    f.delete();
+                }
             }
         }
     }

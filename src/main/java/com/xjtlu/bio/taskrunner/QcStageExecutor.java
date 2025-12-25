@@ -28,23 +28,18 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
     public StageRunResult execute(BioPipelineStage bioPipelineStage) {
         // TODO Auto-generated method stub
         String inputUrlsJson = bioPipelineStage.getInputUrl();
-        String outputUrlsJson = bioPipelineStage.getOutputUrl();
         Map<String, String> inputUrls = null;
-        Map<String, String> outputUrlsMap = null;
-
-        ArrayList<File> toDeleteTmpFile = new ArrayList<>();
 
         try {
             inputUrls = objectMapper.readValue(inputUrlsJson, Map.class);
-            outputUrlsMap = objectMapper.readValue(outputUrlsJson, Map.class);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             return StageRunResult.fail("解析输入参数错误", bioPipelineStage);
         }
 
-        String inputUrl1 = inputUrls.get("r1");
+        String inputUrl1 = inputUrls.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
         String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
-        String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get("r2") : null;
+        String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get(pipelineService.PIPELINE_STAGE_INPUT_READ2_KEY) : null;
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
         Path outputDir = Paths
@@ -148,11 +143,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
                         outputQcJson.toAbsolutePath().toString(),
                         outputQcHtml.toAbsolutePath().toString()),
                 bioPipelineStage);
-    }
-
-    private Map<String, String> createQCOutputMap() {
-        // todo
-        return null;
     }
 
     @Override

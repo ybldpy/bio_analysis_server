@@ -70,42 +70,14 @@ public class MappingStageExecutor extends AbstractPipelineStageExector{
             return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
         }
 
-        Map<String,Object> refSeqConfig = (Map)params.get("refseqConfig");
-        Object isInnerObj = refSeqConfig.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
-        Object refseqObj = refSeqConfig.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
 
-        if (refSeqConfig == null || isInnerObj == null || !(isInnerObj instanceof Boolean) || refseqObj==null || (!(refseqObj instanceof Integer) && !(refseqObj instanceof Long) && !(refseqObj instanceof String))) {
-            return StageRunResult.fail("未找到参考基因组", bioPipelineStage);
-        }
-
-        boolean isInnerRefseq = (Boolean) isInnerObj;
-        String outterRefseqObjName = null;
-
-        File refSeq = null;
-        if(isInnerRefseq){
-            try {
-                long refId = (refseqObj instanceof Integer)?(long)((Integer)refseqObj):((Long)refseqObj);
-                refSeq = refSeqService.getRefseq(refId);
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }else {
-
-            String refseqObjectName = (String) refseqObj;
-            outterRefseqObjName = refseqObjectName;
-            refSeq = refSeqService.getRefseq(refseqObjectName);
-        }
+        
+        File refSeq = this.getRefSeqFromParams(params);
 
 
         if(refSeq == null){
-            if(isInnerRefseq){
-                refSeqService.deleteRefSeq(outterRefseqObjName);
-            }
             return StageRunResult.fail("参考基因组加载失败", bioPipelineStage);
         }
-
-
 
         String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
         String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY);
