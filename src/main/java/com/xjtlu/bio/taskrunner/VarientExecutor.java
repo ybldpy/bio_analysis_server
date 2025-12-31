@@ -4,9 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,15 +15,25 @@ import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 
 
 @Component
 public class VarientExecutor extends AbstractPipelineStageExector {
 
+    private final QcStageExecutor qcStageExecutor;
+
 
     private String bcftools;
     private String samtools;
+
+
+    VarientExecutor(QcStageExecutor qcStageExecutor) {
+        this.qcStageExecutor = qcStageExecutor;
+    }
+
+
 
     @Override
     public StageRunResult execute(BioPipelineStage bioPipelineStage) {
@@ -42,40 +50,54 @@ public class VarientExecutor extends AbstractPipelineStageExector {
             return this.parseError(bioPipelineStage);
         }
 
+        RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(params);
+        if(refSeqConfig == null){
+            return StageRunResult.fail("未能加载参考基因文件",bioPipelineStage, null);
+        }
 
-
+        File refseq = null;
+        if(refSeqConfig.getRefseqId()>=0){
+            refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqId());
+        }else {
+            refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+        }
 
         String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY);
         String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY);
-        File refSeq = this.getRefSeqFromParams(params);
+
+        Path inputTempDir = this.stageInputPath(bioPipelineStage);
 
 
-        if(refSeq == null){
-            return StageRunResult.fail("未能加载参考基因文件", bioPipelineStage);
+        // 结果目录
+        Path workDir = this.workDirPath(bioPipelineStage);
+        try {
+            Files.createDirectories(workDir);
+        } catch (IOException e) {
+            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
+            return StageRunResult.fail("创建目录失败", bioPipelineStage, e);
         }
 
-        
-        Path inputTempDir = Paths
-                .get(String.format("%s/%d", this.stageInputTmpBasePath, bioPipelineStage.getStageId()));
-
         try {
-            Files.createDirectories(inputTempDir, null);
+            Files.createDirectories(inputTempDir);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
             return this.runException(bioPipelineStage, e);
         }
 
+        Path refSeqFileLink = null;
+        try {
+            refSeqFileLink = Files.createSymbolicLink(inputTempDir.resolve(refseq.getName()), refseq.toPath());
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
         Path bam = inputTempDir.resolve("aln.bam");
         Path bai = inputTempDir.resolve("aln.bam.bai");
 
-        Path refSeqIndex = inputTempDir.resolve("refFa.fai");
-
         // 先用 samtools 生成参考索引
-        File refSeqIndexFile = this.refSeqService.getRefSeqIndex(isInnerRefSeq?(Integer)refseqRefence);
-        if (refSeqIndexFile == null || !refSeqIndexFile.exists()) {
-            refSeqIndexFile = this.refSeqService.buildRefSeqIndex(refSeqAccession);
-        }
+        File refSeqIndexFile = refSeqConfig.getRefseqId()>=0?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
 
         if (refSeqIndexFile == null || !refSeqIndexFile.exists() || refSeqIndexFile.length() < 1) {
             try {
@@ -87,26 +109,24 @@ public class VarientExecutor extends AbstractPipelineStageExector {
             return this.runFail(bioPipelineStage, "生成参考索引失败");
         }
 
+        Path refSeqIndexFileLinkPath = null;
+
+        try {
+            refSeqIndexFileLinkPath = Files.createSymbolicLink(inputTempDir.resolve(refseq.getName()+".fai"), refSeqIndexFile.toPath());
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            return this.runFail(bioPipelineStage, "加载参考基因组索引失败", e, inputTempDir, workDir);
+        }
+
         GetObjectResult bamFileGetResult = this.storageService.getObject(bamPath, bam.toString());
-        if (bamFileGetResult.e() != null) {
+        if (!bamFileGetResult.success()) {
             this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return this.runException(bioPipelineStage, bamFileGetResult.e());
+            return StageRunResult.fail("bam文件加载失败", bioPipelineStage, bamFileGetResult.e());
         }
 
         GetObjectResult baiFileGetResult = this.storageService.getObject(bamIndexPath, bai.toString());
-        if (baiFileGetResult.e() != null) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return this.runException(bioPipelineStage, baiFileGetResult.e());
-        }
-
-        // 结果目录
-        Path workDir = Paths
-                .get(String.format("%s/%d", this.stageResultTmpBasePath, bioPipelineStage.getStageId()));
-        try {
-            Files.createDirectories(workDir);
-        } catch (IOException e) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return this.runException(bioPipelineStage, e);
+        if (!baiFileGetResult.success()) {
+            return this.runFail(bioPipelineStage, "加载bai文件失败", baiFileGetResult.e(), inputTempDir, workDir);
         }
 
         // 工具路径与参数
@@ -118,7 +138,6 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         Path bcfRaw = workDir.resolve("raw.bcf");
         Path vcfGz = workDir.resolve("variants.vcf.gz");
         Path vcfTbi = workDir.resolve("variants.vcf.gz.tbi");
-        Path depthTsv = workDir.resolve("depth.tsv");
 
         // ---------- 1) mpileup: BAM -> BCF ----------
         // -Ou 输出未压缩 BCF 到 stdout（这里我们直接 -o 写文件，避免管道）
@@ -126,7 +145,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add(bcftools);
         cmd.add("mpileup");
         cmd.add("-f");
-        cmd.add(refSeq.getAbsolutePath());
+        cmd.add(refSeqFileLink.toString());
         cmd.add("-q");
         cmd.add("20"); // 最小比对质量
         cmd.add("-Q");
@@ -141,15 +160,14 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add(bcfRaw.toString()); // 直接落盘
         cmd.add(bam.toString());
 
-        try {
-            int c1 = this.runSubProcess(cmd, workDir);
-            if (c1 != 0||!requireNonEmpty(depthTsv)) {
-                this.deleteTmpFiles(List.of(inputTempDir.toFile(), workDir.toFile()));
-                return this.runFail(bioPipelineStage, "bcftools mpileup 运行失败，exitCode=" + c1);
-            }
-        } catch (Exception e) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return this.runException(bioPipelineStage, e);
+        ExecuteResult executeResult = execute(cmd, workDir);
+        if(!executeResult.success()){
+            return this.runFail(bioPipelineStage, "生成bcf.gz失败", executeResult.ex, inputTempDir, workDir);
+        }
+
+        List<StageOutputValidationResult> errorOutputValidationResults = validateOutputFiles(bcfRaw);
+        if(!errorOutputValidationResults.isEmpty()){
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
         }
 
         // ---------- 2) call: BCF -> VCF.GZ ----------
@@ -166,16 +184,17 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add(vcfGz.toString());
         cmd.add(bcfRaw.toString());
 
-        try {
-            int c2 = this.runSubProcess(cmd, workDir);
-            if (c2 != 0 || !requireNonEmpty(vcfGz)) {
-                this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-                return this.runFail(bioPipelineStage, "bcftools call 运行失败，exitCode=" + c2);
-            }
-        } catch (Exception e) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile(),workDir.toFile()));
-            return this.runException(bioPipelineStage, e);
+        executeResult = execute(cmd, workDir);
+
+        if(!executeResult.success()){
+            return this.runFail(bioPipelineStage, "生成VCF.gz失败", executeResult.ex, inputTempDir, workDir);
         }
+
+        errorOutputValidationResults = validateOutputFiles(vcfGz);
+        if(!errorOutputValidationResults.isEmpty()){
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
+        }
+
 
         // ---------- 3) index: VCF.GZ -> TBI ----------
         cmd = new ArrayList<>();
@@ -184,40 +203,17 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add("-t"); // 生成 TBI
         cmd.add("--threads");
         cmd.add(String.valueOf(threads));
-        cmd.add(vcfGz.toString());
+        cmd.add(vcfTbi.toString());
 
-        try {
-            int c3 = this.runSubProcess(cmd, workDir);
-            if (c3 != 0||!this.requireNonEmpty(vcfTbi)) {
-                this.deleteTmpFiles(List.of(inputTempDir.toFile(), workDir.toFile()));
-                return this.runFail(bioPipelineStage, "bcftools index 运行失败，exitCode=" + c3);
-            }
-            
-        } catch (Exception e) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return this.runException(bioPipelineStage, e);
+        executeResult = execute(cmd, workDir);
+        if(!executeResult.success()){
+            return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
         }
-
-
-        // 清理：本地输入缓存与中间 bcf（可选保留以便复现）
-        // this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-        // try { Files.deleteIfExists(bcfRaw); } catch (IOException ignore) {}
-
-        // ---------- 输出组装 ----------
-        Map<String, String> out = new HashMap<>();
-        out.put(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ, vcfGz.toString());
-        out.put(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI, vcfTbi.toString());
-        this.deleteTmpFiles(List.of(inputTempDir.toFile(), bcfRaw.toFile()));
-
-        
-        return StageRunResult.OK(new VariantStageOutput(vcfGz.toAbsolutePath().toString(), vcfTbi.toAbsolutePath().toString()), bioPipelineStage);
-
-
-    }
-
-    private File createRefSeqIndex(Path refSeqIndexPath, File refSeq) {
-        List<String> cmd = new ArrayList<>();
-        return null;
+        errorOutputValidationResults = validateOutputFiles(vcfTbi);
+        if(!errorOutputValidationResults.isEmpty()){
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
+        }
+        return ok(bioPipelineStage,new VariantStageOutput(vcfGz.toAbsolutePath().toString(), vcfTbi.toAbsolutePath().toString()), inputTempDir);
     }
 
     @Override

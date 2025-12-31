@@ -40,7 +40,7 @@ public class RefSeqService {
     @Resource
     private StorageService storageService;
 
-    private final String nonInnerRefseqDir;
+    private String nonInnerRefseqDir;
 
     @Resource
     private BioRefseqMetaMapper refseqMetaMapper;

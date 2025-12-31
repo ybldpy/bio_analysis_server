@@ -2,8 +2,13 @@ package com.xjtlu.bio.taskrunner;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,10 +22,43 @@ import com.xjtlu.bio.service.RefSeqService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
+import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 
 import jakarta.annotation.Resource;
 
 public abstract class AbstractPipelineStageExector implements PipelineStageExecutor {
+
+    protected static class StageOutputValidationResult {
+
+        public final Path path;
+        /** true 表示产物不可用：不存在 或 size<=0 */
+        public final boolean empty;
+        /** 检查过程中发生的 IO 异常；没有则为 null */
+        public final IOException ioException;
+
+        public StageOutputValidationResult(Path path, boolean empty, IOException ioException) {
+            this.path = path;
+            this.empty = empty;
+            this.ioException = ioException;
+        }
+
+        public boolean hasIoError() {
+            return ioException != null;
+        }
+    }
+
+    protected static class ExecuteResult{
+        public final int runCode;
+        public final Exception ex;
+        public ExecuteResult(int runCode, Exception ex) {
+            this.runCode = runCode;
+            this.ex = ex;
+        }
+
+        public boolean success(){
+            return runCode == 0 && ex == null;
+        }
+    }
 
     @Resource
     protected PipelineService pipelineService;
@@ -37,27 +75,93 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     protected String stageResultTmpBasePath;
     protected String stageInputTmpBasePath;
 
+    protected static final String ERROR_LOAD_REFSEQ = "加载参考基因组失败";
 
+    protected static boolean requireNonEmpty(Path p) throws IOException {
 
-    protected boolean requireNonEmpty(Path p) throws IOException {
-       
-        if (!Files.exists(p)||Files.size(p) <= 0) {
+        if (!Files.exists(p) || Files.size(p) <= 0) {
             return false;
         }
         return true;
-        
     }
 
     protected StageRunResult runException(BioPipelineStage bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());
     }
 
+    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String errorMsg, Exception e) {
+        return StageRunResult.fail(errorMsg, bioPipelineStage, e);
+    }
+
     protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String msg) {
-        return StageRunResult.fail(msg, bioPipelineStage);
+        return runFail(bioPipelineStage, msg, null);
+    }
+
+    public Path stageInputPath(BioPipelineStage bioPipelineStage) {
+        return Paths.get(this.stageInputTmpBasePath, String.valueOf(bioPipelineStage.getStageId()));
+    }
+
+    protected static List<StageOutputValidationResult> validateOutputFiles(Path... paths) {
+        ArrayList<StageOutputValidationResult> errorValidationResults = new ArrayList<>();
+        for (Path p : paths) {
+            try {
+                if (!requireNonEmpty(p)) {
+                    errorValidationResults.add(new StageOutputValidationResult(p, true, null));
+                }
+            } catch (IOException e) {
+                errorValidationResults.add(new StageOutputValidationResult(p, true, e));
+            }
+        }
+
+        return errorValidationResults;
+
+    }
+
+    protected static String createStageOutputValidationErrorMessge(List<StageOutputValidationResult> errors) {
+
+        StringBuilder sb = new StringBuilder(512);
+        sb.append("=== STAGE_OUTPUT_VALIDATION_FAILED ===\n");
+        sb.append("timestamp=").append(java.time.OffsetDateTime.now()).append('\n');
+
+        int count = (errors == null) ? 0 : errors.size();
+        sb.append("errorCount=").append(count).append('\n');
+
+        if (count == 0) {
+            sb.append("reason=errors list is null/empty (no details)\n");
+            sb.append("====================================\n");
+            return sb.toString();
+        }
+
+        int i = 1;
+        for (StageOutputValidationResult r : errors) {
+            sb.append("[").append(i++).append("] ");
+
+            Path p = (r == null) ? null : r.path;
+            boolean empty = (r != null) && r.empty;
+            IOException ioe = (r == null) ? null : r.ioException;
+
+            sb.append("path=").append(p == null ? "<null>" : p.toAbsolutePath())
+                    .append(" empty=").append(empty);
+
+            if (ioe != null) {
+                sb.append(" ioEx=").append(ioe.getClass().getSimpleName())
+                        .append(" msg=").append(ioe.getMessage()==null?"<null>": ioe.getMessage().replace("\n", " ").replace("\r", " ").replace("\t", " "));
+            }
+
+            sb.append('\n');
+        }
+
+        sb.append("hint=check subprocess exitCode and stderr/stdout logs for root cause\n");
+        sb.append("====================================\n");
+        return sb.toString();
+
     }
 
 
-    
+    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String errorMessge, Exception e,Path inputDir, Path workDir){
+        this.deleteTmpFiles(List.of(inputDir.toFile(), workDir.toFile()));
+        return this.runFail(bioPipelineStage, errorMessge,e);
+    }
 
     protected static String appendSuffixBeforeExtensions(String fileName, String suffix) {
         if (fileName == null || fileName.isEmpty())
@@ -111,60 +215,85 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     public abstract int id();
 
     protected StageRunResult parseError(BioPipelineStage bioPipelineStage) {
-        return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
+        return runFail(bioPipelineStage, PARSE_JSON_ERROR);
     }
 
-    protected static boolean isMap(Object obj){
+    protected static boolean isMap(Object obj) {
         return (obj != null) && obj instanceof Map;
     }
 
+    protected Map<String, GetObjectResult> loadInput(Map<String, Path> objectAndWriteToPath) {
 
-    protected RefSeqConfig getRefSeqConfigFromParams(Map<String,Object> params){
+        HashMap<String, GetObjectResult> inputMap = new HashMap<>();
+        for (Map.Entry<String, Path> item : objectAndWriteToPath.entrySet()) {
+            GetObjectResult getObjectResult = this.storageService.getObject(item.getKey(), item.getValue().toString());
+            inputMap.put(item.getKey(), getObjectResult);
+            if (!getObjectResult.success()) {
+                break;
+            }
+        }
+        return inputMap;
+    }
+
+    protected String findFailedLoadingObject(Map<String, GetObjectResult> getResultMap) {
+
+        for (Map.Entry<String, GetObjectResult> item : getResultMap.entrySet()) {
+            if (!item.getValue().success()) {
+                return item.getKey();
+            }
+        }
+
+        return null;
+    }
+
+    protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
 
         Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
-        if(!isMap(refseqConfigObj)){
+        if (!isMap(refseqConfigObj)) {
             return null;
         }
 
-        Map<String,Object> refseqConfig = (Map)refseqConfigObj;
+        Map<String, Object> refseqConfig = (Map) refseqConfigObj;
 
         Object refseq = refseqConfig.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
         Object isInnerRefseq = refseqConfig.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
 
-        if(refseq == null){return null;}
-        if(isInnerRefseq == null && !(refseq instanceof Integer)){
+        if (refseq == null) {
+            return null;
+        }
+        if (isInnerRefseq == null && !(refseq instanceof Integer)) {
             return null;
         }
 
-        if(isInnerRefseq!=null && !(isInnerRefseq instanceof Boolean)){
+        if (isInnerRefseq != null && !(isInnerRefseq instanceof Boolean)) {
             return null;
         }
 
         boolean isInner = (Boolean) isInnerRefseq;
 
-        if(isInner && !(refseq instanceof Integer)){
+        if (isInner && !(refseq instanceof Integer)) {
             return null;
         }
-        if(!isInner && !(refseq instanceof String)){
+        if (!isInner && !(refseq instanceof String)) {
             return null;
         }
 
-        if(isInner){
-            return new RefSeqConfig(true, null, (Integer)refseq);
+        if (isInner) {
+            return new RefSeqConfig(true, null, (Integer) refseq);
         }
-
 
         return new RefSeqConfig(false, (String) refseq, -1);
-        
+
     }
 
-
-    protected Object substractRefseqFromMap(Map<String,Object> params){
+    protected Object substractRefseqFromMap(Map<String, Object> params) {
         Object refseq = params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
         Object isInnerRefseq = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
 
-        if(refseq == null){return null;}
-        if(isInnerRefseq == null && !(refseq instanceof Integer)){
+        if (refseq == null) {
+            return null;
+        }
+        if (isInnerRefseq == null && !(refseq instanceof Integer)) {
             return null;
         }
 
@@ -196,21 +325,47 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
     }
 
+    public Path workDirPath(BioPipelineStage bioPipelineStage) {
+        return Paths.get(this.stageResultTmpBasePath, String.valueOf(bioPipelineStage.getStageId()));
+    }
+
+    protected StageRunResult ok(BioPipelineStage bioPipelineStage, StageOutput stageOutput, Path deleteDir){
+        this.deleteTmpFiles(List.of(deleteDir.toFile()));
+        return StageRunResult.OK(stageOutput, bioPipelineStage);
+    }
+
+
+    protected ExecuteResult execute(List<String> cmd, Path workDir){
+
+        int runCode = -1;
+        Exception runEx = null;
+        try {
+            runCode = runSubProcess(cmd, workDir);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            runEx = e;
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            Thread.currentThread().interrupt();
+            runEx = e;
+        }
+        return new ExecuteResult(runCode, runEx);
+    }
+
     protected void deleteTmpFiles(List<File> tmpFiles) {
         for (File f : tmpFiles) {
             if (f != null && f.exists()) {
-                if(f.isDirectory()){
+                if (f.isDirectory()) {
                     try {
                         FileUtils.deleteDirectory(f);
                     } catch (IOException e) {
 
                     }
-                }else {
+                } else {
                     f.delete();
                 }
             }
         }
     }
 
-    
 }

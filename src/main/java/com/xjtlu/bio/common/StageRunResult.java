@@ -1,5 +1,7 @@
 package com.xjtlu.bio.common;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Map;
 
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -14,7 +16,19 @@ public class StageRunResult {
 
     private StageOutput stageOutput;
 
+    private Exception e;
+
     
+
+    
+
+    public Exception getE() {
+        return e;
+    }
+
+    public void setE(Exception e) {
+        this.e = e;
+    }
 
     public StageOutput getStageOutput() {
         return stageOutput;
@@ -27,11 +41,12 @@ public class StageRunResult {
 
 
 
-    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, BioPipelineStage stage) {
+    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, BioPipelineStage stage, Exception e) {
         this.success = success;
         this.failReason = failReason;
         this.outputPath = outputPath;
         this.stage = stage;
+        this.e = e;
     }
 
     public Map<String,String> getOutputPath(){
@@ -52,16 +67,53 @@ public class StageRunResult {
     }
 
     public static StageRunResult OK(Map<String,String> outputPath, BioPipelineStage stage){
-        return new StageRunResult(true, null,outputPath, stage);
+        return new StageRunResult(true, null,outputPath, stage,null);
     }
 
     public static StageRunResult OK(StageOutput stageOutput, BioPipelineStage stage){
-        StageRunResult stageRunResult = new StageRunResult(true, null, null, stage);
+        StageRunResult stageRunResult = new StageRunResult(true, null, null, stage, null);
         stageRunResult.setStageOutput(stageOutput);
         return stageRunResult;
     }
-    public static StageRunResult fail(String failReason, BioPipelineStage stage){
-        return new StageRunResult(false, failReason, null, stage);
+    public static StageRunResult fail(String failReason, BioPipelineStage stage,Exception e){
+        return new StageRunResult(false, failReason, null, stage, e);
+    }
+
+
+    public String getErrorLog(){
+
+                StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+
+        if (e != null) {
+            e.printStackTrace(pw);
+        }
+
+        String stackTrace = sw.toString();
+        // 防止异常栈过长，DB/前端不好处理
+        int maxLen = 6000;
+        if (stackTrace.length() > maxLen) {
+            stackTrace = stackTrace.substring(0, maxLen) + "\n...truncated";
+        }
+
+        String errorLog = String.format(
+                "PipelineId=%d, StageId=%d, StageIndex=%d, StageName=%s, StageType=%d\n" +
+                        "Message=%s\n" +
+                        "Exception=%s\n" +
+                        "StackTrace:\n%s",
+                stage.getPipelineId(),
+                stage.getStageId(),
+                stage.getStageIndex(),
+                stage.getStageName(),
+                stage.getStageType(),
+                this.failReason,
+                e == null ? "N/A" : e.getClass().getName(),
+                stackTrace);
+
+
+        return errorLog;
+
+
     }
 
     

@@ -9,18 +9,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.stereotype.Component;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 
+
+@Component
 public class ConsensusExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor{
 
 
-
     private String bcftools;
+
+
     @Override
     public StageRunResult execute(BioPipelineStage bioPipelineStage) {
         // TODO Auto-generated method stub
@@ -49,19 +55,16 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
 
 
         if(refseqFile == null){
-            
+            return this.runFail(bioPipelineStage, "未找到参考基因文件");
         }
         File refSeqIndexFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
         if (refSeqIndexFile==null || !refSeqIndexFile.exists()) {
-            return this.runFail(bioPipelineStage, "未找到参考基因文件");
+            return this.runFail(bioPipelineStage, "未找到参考基因索引文件");
         }
 
-        if (refSeqIndexFile == null || !refSeqIndexFile.exists()) {
-            return this.runFail(bioPipelineStage, "生成参考基因文件索引时错误");
-        }
 
-        Path inputTmpDir = Paths.get(String.format("%s/%d", this.stageInputTmpBasePath, bioPipelineStage.getStageId()));
-        Path resultDir = Paths.get(String.format("%s/%d", this.stageResultTmpBasePath, bioPipelineStage.getStageId()));
+        Path inputTmpDir = this.stageInputPath(bioPipelineStage);
+        Path resultDir = this.workDirPath(bioPipelineStage);
         try {
             Files.createDirectories(inputTmpDir);
             Files.createDirectories(resultDir);
@@ -78,6 +81,13 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         Path vcfTbiTmpPath = inputTmpDir.resolve("vcf.tbi");
 
         
+        Map<String, GetObjectResult> getResults = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
+        String objectFailLoad = findFailedLoadingObject(getResults);
+        if(objectFailLoad!=null){
+            this.deleteTmpFiles(List.of(inputTmpDir.toFile(), resultDir.toFile()));
+            return this.runFail(bioPipelineStage, "加载文件"+objectFailLoad+"失败", getResults.get(objectFailLoad).e());
+        }
+
         
         String consensus = "consensus";
         Path consensusPath = resultDir.resolve("consensus.fa");
@@ -85,7 +95,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
             this.bcftools,
             consensus,
             "-f",
-            refSeqFile.getAbsolutePath(),
+            refseqFile.getAbsolutePath(),
             "-H",
             String.valueOf(1), 
             "-o",
@@ -94,25 +104,27 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         );
 
 
+
+        boolean runFail = false;
+        Exception runFailException = null;
         try {
             int code = this.runSubProcess(cmd, resultDir);
-            if (code != 0 || !requireNonEmpty(consensusPath)) {
-                this.deleteTmpFiles(List.of(inputTmpDir.toFile()));
-                return this.runFail(bioPipelineStage, "bcftools consensus 运行失败，exitCode=" + code);
-            }else {
-                this.deleteTmpFiles(List.of(inputTmpDir.toFile()));
-            }
+            if(code!=0){runFail = true;}
         } catch (Exception e) {
-            this.deleteTmpFiles(List.of(inputTmpDir.toFile(), resultDir.toFile()));
-            return this.runException(bioPipelineStage, e);
+            runFail = true;
+            runFailException = e;
         }
 
-        // 8) 组织输出
-        Map<String,String> out = new HashMap<>();
-        out.put(PipelineService.PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA, consensusPath.toAbsolutePath().toString());
+        if (runFail) {
+            return this.runFail(bioPipelineStage, "运行consensus tool失败", runFailException, inputTmpDir, resultDir);
+        }
+
+        List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(consensusPath);
+        if(!errOutputValidationResults.isEmpty()){
+            this.deleteTmpFiles(List.of(inputTmpDir.toFile(), resultDir.toFile()));
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
+        }
         
-
-
         return StageRunResult.OK(new ConsensusStageOutput(consensusPath.toAbsolutePath().toString()), bioPipelineStage);
     }
 

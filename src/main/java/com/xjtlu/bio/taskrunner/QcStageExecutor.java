@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
@@ -34,21 +35,28 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
             inputUrls = objectMapper.readValue(inputUrlsJson, Map.class);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
-            return StageRunResult.fail("解析输入参数错误", bioPipelineStage);
+            return StageRunResult.fail("解析输入参数错误", bioPipelineStage, e);
         }
 
         String inputUrl1 = inputUrls.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
         String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
-        String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get(pipelineService.PIPELINE_STAGE_INPUT_READ2_KEY) : null;
+        String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY) : null;
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
-        Path outputDir = Paths
-                .get(String.format("%s/%d/output/qc", stageResultTmpBasePath, bioPipelineStage.getStageId()));
+        Path outputDir = workDirPath(bioPipelineStage);
+
+        Path inputDir = stageInputPath(bioPipelineStage);
+
+        try{
+            Files.createDirectories(inputDir);
+        }catch(IOException e){
+            return StageRunResult.fail("IO错误", bioPipelineStage, e);
+        }
 
         try {
             Files.createDirectories(outputDir);
         } catch (IOException e) {
-            return StageRunResult.fail("IO错误\n" + e.getMessage(), bioPipelineStage);
+            return StageRunResult.fail("IO错误", bioPipelineStage, e);
         }
 
         Path trimmedR1Path = outputDir.resolve(appendSuffixBeforeExtensions(input1FileName, "_trimmed"));
@@ -59,21 +67,20 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
         Path outputQcHtml = outputDir.resolve("qc_html.html");
 
         GetObjectResult objectResult = storageService.getObject(inputUrl1,
-                String.format("%s/%d/input/%s", stageResultTmpBasePath, bioPipelineStage.getStageId(), input1FileName));
-        if (objectResult.e() != null) {
-            return StageRunResult.fail(objectResult.e().getMessage(), bioPipelineStage);
+                inputDir.resolve(input1FileName).toString());
+        if (!objectResult.success()) {
+            return StageRunResult.fail("加载read1失败", bioPipelineStage,objectResult.e());
         }
 
         File inputFile1 = objectResult.objectFile();
         File inputFile2 = null;
         if (StringUtils.isNotBlank(inputUrl2)) {
-            GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, String.format("%s/%d/input/%s",
-                    stageResultTmpBasePath, bioPipelineStage.getStageId(), input2FileName));
-            if (null != r2ObjectGetResult.e()) {
-                inputFile1.delete();
-                return StageRunResult.fail(objectResult.e().getMessage(), bioPipelineStage);
+            GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, inputDir.resolve(input2FileName).toString());
+            if (!r2ObjectGetResult.success()) {
+                this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
+                return StageRunResult.fail("加载read2失败", bioPipelineStage, r2ObjectGetResult.e());
             }
-            inputFile2 = objectResult.objectFile();
+            inputFile2 = r2ObjectGetResult.objectFile();
         }
 
         List<String> cmd = new ArrayList<>();
@@ -96,46 +103,29 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
                 "--html", outputQcHtml.toString(),
                 "--thread", String.valueOf(Math.max(2, Runtime.getRuntime().availableProcessors() / 4))));
 
-        int runResult = -1;
+        int runResult = 0;
+        Exception runException = null;
         try {
             runResult = runSubProcess(cmd, outputDir);
         } catch (IOException | InterruptedException e) {
-            return StageRunResult.fail("QC 子进程异常: " + e.getMessage(), bioPipelineStage);
+            runResult = -1;
+            runException = e;
         }
 
-        if (runResult != 0) {
-            return StageRunResult.fail("QC 退出码=" + runResult, bioPipelineStage);
+        if(runResult!=0){
+            return this.runFail(bioPipelineStage, "运行qc tool失败", runException, inputDir, outputDir);
         }
 
-        if (!Files.exists(trimmedR1Path) || (inputUrl2 != null && !Files.exists(trimmedR2Path))
-                || !Files.exists(outputQcJson) || !Files.exists(outputQcHtml)) {
-            try {
-                Files.delete(trimmedR1Path);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            try {
-                Files.delete(trimmedR2Path);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            try {
-                Files.delete(outputQcJson);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            try {
-                Files.delete(outputQcHtml);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            inputFile1.delete();
-            inputFile2.delete();
-            return StageRunResult.fail("qc工具未产出结果", bioPipelineStage);
+        List<StageOutputValidationResult> errStageOutputValidationResults = null;
+        if(inputUrl2 == null){
+            errStageOutputValidationResults = validateOutputFiles(trimmedR1Path, outputQcJson, outputQcHtml);
+        }else {
+            errStageOutputValidationResults = validateOutputFiles(trimmedR1Path, trimmedR2Path, outputQcJson, outputQcHtml);
+        }
+
+        if(!errStageOutputValidationResults.isEmpty()){
+            this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errStageOutputValidationResults));
         }
 
         return StageRunResult.OK(

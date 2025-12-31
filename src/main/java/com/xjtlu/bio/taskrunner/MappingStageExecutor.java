@@ -1,6 +1,5 @@
 package com.xjtlu.bio.taskrunner;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,24 +11,23 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.catalina.Pipeline;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
-
 @Component
-public class MappingStageExecutor extends AbstractPipelineStageExector{
+public class MappingStageExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor {
 
     private String mappingTools;
     private String samTools;
-
-
-    
 
     @Override
     public int id() {
@@ -37,24 +35,6 @@ public class MappingStageExecutor extends AbstractPipelineStageExector{
         return PipelineService.PIPELINE_STAGE_MAPPING;
     }
 
-
-    private boolean runSamTool(List<String> cmd, Path workDir){
-    
-        try {
-            int runCode = this.runSubProcess(cmd, workDir);
-        } catch (IOException | InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-
-    }
-
-
-    
-
-    
     @Override
     public StageRunResult execute(BioPipelineStage bioPipelineStage) {
         // TODO Auto-generated method stub
@@ -67,136 +47,84 @@ public class MappingStageExecutor extends AbstractPipelineStageExector{
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-            return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage);
+            return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage, null);
         }
 
+        RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(params);
 
-        
-        File refSeq = this.getRefSeqFromParams(params);
+        if (refSeqConfig == null) {
+            return StageRunResult.fail("未能加载参考基因", bioPipelineStage, null);
+        }
 
+        File refSeq = refSeqConfig.getRefseqId() >= 0 ? this.refSeqService.getRefseq(refSeqConfig.getRefseqId())
+                : this.refSeqService.getRefseq((String) refSeqConfig.getRefseqObjectName());
 
-        if(refSeq == null){
-            return StageRunResult.fail("参考基因组加载失败", bioPipelineStage);
+        if (refSeq == null) {
+            return StageRunResult.fail("参考基因组加载失败", bioPipelineStage, null);
         }
 
         String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
         String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY);
 
-
-        String tempFormat = "%s/%d/input/%s";
-        Path inputTmpPath = Paths.get(String.format(tempFormat, this.stageInputTmpBasePath, bioPipelineStage.getStageId()));
+        Path inputTmpPath = this.stageInputPath(bioPipelineStage);
         File inputTmpDir = inputTmpPath.toFile();
+
         if (!inputTmpDir.exists()) {
             try {
-                Files.createDirectories(inputTmpPath);
+                FileUtils.createParentDirectories(inputTmpDir);
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
-                return StageRunResult.fail("创建临时目录出错", bioPipelineStage);
+                return StageRunResult.fail("创建临时目录出错", bioPipelineStage, null);
             }
         }
 
-
-
-        
-
-        
-        Path r1TmpPath = inputTmpPath.resolve(inputR1Url.substring(inputR1Url.lastIndexOf("/") + 1));
-        Path r2TmpPath = inputR2Url == null ? null: inputTmpPath.resolve(inputR2Url.substring(inputR2Url.lastIndexOf("/") + 1));
-        File[] readFiles = this.moveSampleReadFilesToTmpPath(inputR1Url, r1TmpPath, inputR2Url, r2TmpPath);
-
-        if (readFiles[0] == null || (r2TmpPath != null && readFiles[1] == null)) {
-            return StageRunResult.fail("读取样本文件错误", bioPipelineStage);
+        Path workDir = this.workDirPath(bioPipelineStage);
+        try {
+            FileUtils.createParentDirectories(workDir.toFile());
+        } catch (IOException e) {
+            return this.runFail(bioPipelineStage, "创建临时目录出错", e);
         }
 
-        Path workDir = Paths.get(String.format("%s/%d/output/mapping", this.stageResultTmpBasePath, bioPipelineStage.getStageId()));
-        Path samTmp = workDir.resolve("aln.sam");
-        Path bamTmp = workDir.resolve("aln.bam"); // view 输出的 BAM（未排序）
+        Path r1TmpPath = inputTmpPath.resolve(inputR1Url.substring(inputR1Url.lastIndexOf("/") + 1));
+        Path r2TmpPath = inputR2Url == null ? null
+                : inputTmpPath.resolve(inputR2Url.substring(inputR2Url.lastIndexOf("/") + 1));
+
+        Map<String, Path> loadMap = new HashMap<>();
+        loadMap.put(inputR1Url, r1TmpPath);
+        if (r2TmpPath != null) {
+            loadMap.put(inputR2Url, r2TmpPath);
+        }
+        Map<String, GetObjectResult> r1AndR2GetResult = this.loadInput(loadMap);
+
+        String errorLoadingInput = this.findFailedLoadingObject(r1AndR2GetResult);
+        if (errorLoadingInput != null) {
+            this.deleteTmpFiles(List.of(inputTmpDir));
+            return this.runFail(bioPipelineStage, errorLoadingInput + "加载失败",
+                    r1AndR2GetResult.get(errorLoadingInput).e());
+        }
+
+        // Path samTmp = workDir.resolve("aln.sam");
+        // Path bamTmp = workDir.resolve("aln.bam"); // view 输出的 BAM（未排序）
         Path bamSortedTmp = workDir.resolve("aln.sorted.bam"); // sort 的结果
         Path bamIndexTmp = workDir.resolve("aln.sorted.bam.bai"); // index 结果
 
-        try {
-            Files.createDirectories(workDir);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            readFiles[0].delete();
-            File f2 = readFiles[1];
-            if (f2 != null) {
-                f2.delete();
-            }
-            e.printStackTrace();
-            return StageRunResult.fail("创建运行目录失败", bioPipelineStage);
-        }
+        String pipelineCmd = buildMappingPipelineCmd(refSeq, r1TmpPath, r2TmpPath, bamSortedTmp);
 
         List<String> cmd = new ArrayList<>();
-        cmd.add(this.mappingTools);
-        cmd.add("-ax");
-        cmd.add("sr");
-        cmd.add(refSeq.getAbsolutePath());
-        cmd.add(r1TmpPath.toString());
+        cmd.add("sh");
+        cmd.add("-c");
+        cmd.add(pipelineCmd);
 
-        //sam输出文件目录
-        cmd.add("-o");
-        cmd.add(samTmp.toString());
 
-        if (r2TmpPath != null) {
-            cmd.add(r2TmpPath.toString());
+        ExecuteResult executeResult = execute(cmd, workDir);
+        if(!executeResult.success()){
+            return this.runFail(bioPipelineStage, "运行mapping tool失败", executeResult.ex, inputTmpPath, workDir);
         }
 
-        List<File> toDeleteFile = new ArrayList<>();
-        toDeleteFile.add(readFiles[0]);
-        if (readFiles[1] != null) {
-            toDeleteFile.add(readFiles[1]);
-        }
-
-        boolean runError = false;
-        try {
-            int runCode = runSubProcess(cmd, workDir);
-            if (runCode != 0) {
-                runError = true;
-            }
-        } catch (IOException | InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            runError = true;
-        }
-
-        if (runError) {
-            this.deleteTmpFiles(toDeleteFile);
-            return StageRunResult.fail("运行错误", bioPipelineStage);
-        }
-
-
-        cmd.clear();
-        cmd.add(this.samTools);
-        cmd.add("view");
-        cmd.add("-bS");
-        cmd.add(samTmp.toString());
-        cmd.add("-o");
-        cmd.add(bamTmp.toString());
-
-        toDeleteFile.add(new File(bamTmp.toString()));
-        boolean samRunResult = this.runSamTool(cmd, workDir);
-        String samToolError = "samtool运行错误";
-        if (!samRunResult) {
-            this.deleteTmpFiles(toDeleteFile);
-            return StageRunResult.fail(samToolError, bioPipelineStage);
-        }
-
-        cmd.clear();
-        cmd.add(this.samTools);
-        cmd.add("sort");
-        cmd.add("-o");
-        cmd.add(bamSortedTmp.toString());
-        cmd.add(bamTmp.toString());
-
-        samRunResult = this.runSamTool(cmd, workDir);
-        //this.deleteTmpFiles(toDeleteFile);
-        toDeleteFile.add(new File(bamSortedTmp.toString()));
-        if (!samRunResult) {
-            this.deleteTmpFiles(toDeleteFile);
-            
-            return StageRunResult.fail(samToolError, bioPipelineStage);
+        List<StageOutputValidationResult> errorOutput = validateOutputFiles(bamSortedTmp);
+        if (!errorOutput.isEmpty()) {
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, inputTmpPath, workDir);
         }
 
         cmd.clear();
@@ -206,24 +134,42 @@ public class MappingStageExecutor extends AbstractPipelineStageExector{
         cmd.add("-o");
         cmd.add(bamIndexTmp.toString());
 
-        samRunResult = this.runSamTool(cmd, workDir);
-        toDeleteFile.add(new File(bamIndexTmp.toString()));
-        if (!samRunResult) {
-            this.deleteTmpFiles(toDeleteFile);
-            return StageRunResult.fail(samToolError, bioPipelineStage);
+        executeResult = execute(cmd, workDir);
+        if(!executeResult.success()){
+            return this.runFail(bioPipelineStage, "生成bam索引失败", executeResult.ex, inputTmpPath, workDir);
         }
 
+        errorOutput = validateOutputFiles(bamIndexTmp);
+        if (!errorOutput.isEmpty()) {
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, inputTmpPath, workDir);
+        }
 
-        // HashMap<String,String> outputMap = new HashMap<>();
-
-        // outputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY, bamSortedTmp.toString());
-        // outputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexTmp.toString());
-
-        StageRunResult stageRunResult = StageRunResult.OK(new MappingStageOutput(bamSortedTmp.toString(), bamIndexTmp.toString()), bioPipelineStage);
+        StageRunResult stageRunResult = StageRunResult
+                .OK(new MappingStageOutput(bamSortedTmp.toString(), bamIndexTmp.toString()), bioPipelineStage);
 
         return stageRunResult;
     }
 
-    
+
+    private String buildMappingPipelineCmd(File refSeq, Path r1, Path r2, Path bamSortedOut) {
+        StringBuilder sb = new StringBuilder(256);
+        // mapping tool（输出到 stdout）
+        sb.append(quote(mappingTools)).append(" -ax sr ")
+          .append(quote(refSeq.getAbsolutePath())).append(' ')
+          .append(quote(r1.toString())).append(' ');
+        if (r2 != null) {
+            sb.append(quote(r2.toString())).append(' ');
+        }
+        // view: 从 stdin 读 SAM，输出 BAM 到 stdout
+        sb.append("| ").append(quote(samTools)).append(" view -bS - ");
+        // sort: 从 stdin 读 BAM，输出最终排序 bam
+        sb.append("| ").append(quote(samTools)).append(" sort -o ").append(quote(bamSortedOut.toString())).append(" -");
+        return sb.toString();
+    }
+
+    private static String quote(String s) {
+        if (s == null) return "''";
+        return "'" + s.replace("'", "'\"'\"'") + "'";
+    }
 
 }

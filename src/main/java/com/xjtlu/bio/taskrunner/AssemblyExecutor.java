@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 
 @Component
@@ -40,42 +41,40 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
         String r1 = inputUrlMap.get(PipelineService.PIPELINE_STAGE_QC_INPUT_R1);
         String r2 = inputUrlMap.get(PipelineService.PIPELINE_STAGE_QC_INPUT_R2);
 
-        Path tempInputDir = Paths
-                .get(String.format("%s/%d", this.stageInputTmpBasePath, bioPipelineStage.getStageId()));
-        Path r1Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r1.substring(r1.lastIndexOf("/") + 1), ""));
+        Path tempInputDir = stageInputPath(bioPipelineStage);
+        Path workDir = workDirPath(bioPipelineStage);
+
+        
+        try{
+            Files.createDirectories(tempInputDir);
+            Files.createDirectories(workDir);
+        }catch(IOException e){
+            this.deleteTmpFiles(List.of(tempInputDir.toFile(), workDir.toFile()));
+            return this.runFail(bioPipelineStage, "创建临时目录失败",e);
+        }
+
+
+        // Path r1Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r1.substring(r1.lastIndexOf("/") + 1), ""));
+        Path r1Path = tempInputDir.resolve("R1"+r1.substring(r1.lastIndexOf(".")));
+
         Path r2Path = null;
         if (r2 != null) {
-            r2Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r2.substring(r2.lastIndexOf("/") + 1), ""));
+            // r2Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r2.substring(r2.lastIndexOf("/") + 1), ""));
+            r2Path = tempInputDir.resolve("R2"+r2.substring(r2.lastIndexOf(".")));
         }
 
-        File[] readFiles = moveSampleReadFilesToTmpPath(inputUrl, r1Path, inputUrl, r2Path);
-        if (readFiles[0] == null || (r2Path != null && readFiles[1] == null)) {
-            if (readFiles[0] != null) {
-                readFiles[0].delete();
-            }
-            if (readFiles[1] != null) {
-                readFiles[1].delete();
-            }
-            return this.runFail(bioPipelineStage, "读取样本文件出错");
-        }
+        Map<String,GetObjectResult> getR1AndR2Results = this.loadInput(r2!=null?Map.of(r1, r1Path, r2, r2Path):Map.of(r1,r1Path));
 
-        String resultDirFormat = "%s/%d";
-
-        Path workDir = Paths
-                .get(String.format(resultDirFormat, this.stageResultTmpBasePath, bioPipelineStage.getStageId()));
-        try {
-            Files.createDirectories(workDir, null);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            this.deleteTmpFiles(List.of(readFiles[0], readFiles[1]));
-            return this.runException(bioPipelineStage, e);
+        String failedLoadRead = findFailedLoadingObject(getR1AndR2Results);
+        if(failedLoadRead!=null){
+            this.deleteTmpFiles(List.of(tempInputDir.toFile()));
+            return this.runFail(bioPipelineStage, "加载"+failedLoadRead+"失败", getR1AndR2Results.get(failedLoadRead).e());
         }
 
         List<String> cmd = new ArrayList<>();
         cmd.add(this.spadesTool);
         cmd.add("-t");
-        cmd.add(String.valueOf(2));
+        cmd.add(String.valueOf(3));
         if (r2Path != null) { // 双端
             cmd.add("-1");
             cmd.add(r1Path.toString());
@@ -88,52 +87,32 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
         cmd.add("-o");
         cmd.add(workDir.toString());
 
-        try {
-            int code = this.runSubProcess(cmd, workDir);
-            if (code != 0) {
-                // 失败清理输入副本
-                this.deleteTmpFiles(List.of(readFiles[0], readFiles[1]));
-                if (readFiles.length > 1 && readFiles[1] != null)
-                    readFiles[1].delete();
-                return this.runFail(bioPipelineStage, "SPAdes 运行失败，exitCode=" + code);
-            }
-        } catch (Exception e) {
-            this.deleteTmpFiles(List.of(readFiles[0], readFiles[1]));
-            return this.runException(bioPipelineStage, e);
+        ExecuteResult executeResult = execute(cmd, workDir);
+        if(!executeResult.success()){
+            return this.runFail(bioPipelineStage, "运行spades tool失败", executeResult.ex, tempInputDir, workDir);
         }
 
         Path contigs = workDir.resolve("contigs.fasta");
         Path scaffolds = workDir.resolve("scaffolds.fasta");
-
-
-        Map<String,String> outputMap = new HashMap<>();        
+        List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(contigs);
         
-        
-        try{
-            boolean exists = requireNonEmpty(contigs);
-            if(!exists){
-                this.deleteTmpFiles(List.of(readFiles[0],readFiles[1], workDir.toFile()));
-                return this.runFail(bioPipelineStage, "组装输出为空");
-            }
-            outputMap.put(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY, contigs.toString());
-        }catch(IOException e){
-            return this.runException(bioPipelineStage, e);
+        if(!errOutputValidationResults.isEmpty()){
+            this.deleteTmpFiles(List.of(tempInputDir.toFile(), workDir.toFile()));
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
         }
-
+        
 
 
 
         boolean hasScaffold = true;
         try{
-            if(this.requireNonEmpty(scaffolds)){
-                outputMap.put(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, scaffolds.toString());
-            }else {
+            if(!this.requireNonEmpty(scaffolds)){
                 hasScaffold = false;
             }
         }catch(IOException e){
             //if error happen here, just ingore. The callback will know it and handle
+            hasScaffold = false;
         }
-
         return StageRunResult.OK(new AssemblyStageOutput(contigs.toAbsolutePath().toString(), hasScaffold? scaffolds.toAbsolutePath().toString():null), bioPipelineStage);
         
     }
