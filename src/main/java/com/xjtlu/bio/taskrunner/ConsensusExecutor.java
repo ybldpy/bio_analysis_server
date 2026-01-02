@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -89,8 +87,9 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         }
 
         
+        ConsensusStageOutput consensusStageOutput = bioStageUtil.consensusOutput(bioPipelineStage, resultDir);
         String consensus = "consensus";
-        Path consensusPath = resultDir.resolve("consensus.fa");
+        Path consensusPath = Path.of(consensusStageOutput.getConsensusFa());
         List<String> cmd = List.of(
             this.bcftools,
             consensus,
@@ -125,7 +124,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
         }
         
-        return StageRunResult.OK(new ConsensusStageOutput(consensusPath.toAbsolutePath().toString()), bioPipelineStage);
+        return StageRunResult.OK(consensusStageOutput, bioPipelineStage);
     }
 
     @Override

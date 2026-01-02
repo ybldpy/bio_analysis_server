@@ -55,12 +55,12 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
 
 
         // Path r1Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r1.substring(r1.lastIndexOf("/") + 1), ""));
-        Path r1Path = tempInputDir.resolve("R1"+r1.substring(r1.lastIndexOf(".")));
+        Path r1Path = tempInputDir.resolve(r1.substring(r1.lastIndexOf("/")+1));
 
         Path r2Path = null;
         if (r2 != null) {
             // r2Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r2.substring(r2.lastIndexOf("/") + 1), ""));
-            r2Path = tempInputDir.resolve("R2"+r2.substring(r2.lastIndexOf(".")));
+            r2Path = tempInputDir.resolve(r2.substring(r2.lastIndexOf("/")+1));
         }
 
         Map<String,GetObjectResult> getR1AndR2Results = this.loadInput(r2!=null?Map.of(r1, r1Path, r2, r2Path):Map.of(r1,r1Path));
@@ -92,8 +92,11 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
             return this.runFail(bioPipelineStage, "运行spades tool失败", executeResult.ex, tempInputDir, workDir);
         }
 
-        Path contigs = workDir.resolve("contigs.fasta");
-        Path scaffolds = workDir.resolve("scaffolds.fasta");
+
+        AssemblyStageOutput assemblyStageOutput = bioStageUtil.assemblyOutput(bioPipelineStage, workDir);
+
+        Path contigs = Path.of(assemblyStageOutput.getContigPath());
+        Path scaffolds = Path.of(assemblyStageOutput.getScaffoldPath());
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(contigs);
         
         if(!errOutputValidationResults.isEmpty()){
@@ -113,7 +116,11 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
             //if error happen here, just ingore. The callback will know it and handle
             hasScaffold = false;
         }
-        return StageRunResult.OK(new AssemblyStageOutput(contigs.toAbsolutePath().toString(), hasScaffold? scaffolds.toAbsolutePath().toString():null), bioPipelineStage);
+
+        if(!hasScaffold){
+            assemblyStageOutput.setScaffoldPath(null);
+        }
+        return StageRunResult.OK(assemblyStageOutput, bioPipelineStage);
         
     }
 

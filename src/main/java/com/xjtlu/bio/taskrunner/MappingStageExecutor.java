@@ -2,17 +2,13 @@ package com.xjtlu.bio.taskrunner;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.catalina.Pipeline;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -106,8 +102,10 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
 
         // Path samTmp = workDir.resolve("aln.sam");
         // Path bamTmp = workDir.resolve("aln.bam"); // view 输出的 BAM（未排序）
-        Path bamSortedTmp = workDir.resolve("aln.sorted.bam"); // sort 的结果
-        Path bamIndexTmp = workDir.resolve("aln.sorted.bam.bai"); // index 结果
+
+        MappingStageOutput mappingStageOutput = bioStageUtil.mappingOutput(bioPipelineStage, workDir);
+        Path bamSortedTmp =  Path.of(mappingStageOutput.getBamPath());
+        Path bamIndexTmp = Path.of(mappingStageOutput.getBamIndexPath()); // index 结果
 
         String pipelineCmd = buildMappingPipelineCmd(refSeq, r1TmpPath, r2TmpPath, bamSortedTmp);
 

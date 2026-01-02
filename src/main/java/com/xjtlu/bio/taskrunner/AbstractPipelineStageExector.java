@@ -23,6 +23,7 @@ import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
+import com.xjtlu.bio.utils.BioStageUtil;
 
 import jakarta.annotation.Resource;
 
@@ -70,6 +71,9 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     @Resource
     protected StorageService storageService;
 
+    @Resource
+    protected BioStageUtil bioStageUtil;
+
     protected static final String PARSE_JSON_ERROR = "解析参数错误";
 
     protected String stageResultTmpBasePath;
@@ -98,7 +102,7 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     }
 
     public Path stageInputPath(BioPipelineStage bioPipelineStage) {
-        return Paths.get(this.stageInputTmpBasePath, String.valueOf(bioPipelineStage.getStageId()));
+        return bioStageUtil.stageExecutorInputDir(bioPipelineStage);
     }
 
     protected static List<StageOutputValidationResult> validateOutputFiles(Path... paths) {
@@ -326,7 +330,7 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     }
 
     public Path workDirPath(BioPipelineStage bioPipelineStage) {
-        return Paths.get(this.stageResultTmpBasePath, String.valueOf(bioPipelineStage.getStageId()));
+        return bioStageUtil.stageExecutorWorkDir(bioPipelineStage);
     }
 
     protected StageRunResult ok(BioPipelineStage bioPipelineStage, StageOutput stageOutput, Path deleteDir){

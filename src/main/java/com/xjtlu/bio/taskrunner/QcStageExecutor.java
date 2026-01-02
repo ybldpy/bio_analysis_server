@@ -44,7 +44,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
         Path outputDir = workDirPath(bioPipelineStage);
-
         Path inputDir = stageInputPath(bioPipelineStage);
 
         try{
@@ -59,12 +58,17 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
             return StageRunResult.fail("IO错误", bioPipelineStage, e);
         }
 
-        Path trimmedR1Path = outputDir.resolve(appendSuffixBeforeExtensions(input1FileName, "_trimmed"));
-        Path trimmedR2Path = inputUrl2 == null ? null
-                : outputDir.resolve(appendSuffixBeforeExtensions(input2FileName, "_trimmed"));
+        QCStageOutput qcStageOutput = this.bioStageUtil.qcStageOutput(outputDir, inputUrl2 != null);
 
-        Path outputQcJson = outputDir.resolve("qc_json.json");
-        Path outputQcHtml = outputDir.resolve("qc_html.html");
+        Path trimmedR1Path = Path.of(qcStageOutput.getR1Path());
+        Path trimmedR2Path = inputUrl2 == null ? null
+                : Path.of(qcStageOutput.getR2Path());
+
+        if(inputUrl2 == null){
+            qcStageOutput.setR2Path(null);
+        }
+        Path outputQcJson = Path.of(qcStageOutput.getJsonPath());
+        Path outputQcHtml = Path.of(qcStageOutput.getHtmlPath());
 
         GetObjectResult objectResult = storageService.getObject(inputUrl1,
                 inputDir.resolve(input1FileName).toString());
@@ -129,9 +133,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
         }
 
         return StageRunResult.OK(
-                new QCStageOutput(trimmedR1Path.toAbsolutePath().toString(), trimmedR2Path.toAbsolutePath().toString(),
-                        outputQcJson.toAbsolutePath().toString(),
-                        outputQcHtml.toAbsolutePath().toString()),
+                qcStageOutput,
                 bioPipelineStage);
     }
 

@@ -6,8 +6,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -17,9 +15,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.ibatis.javassist.tools.framedump;
-import org.bouncycastle.jcajce.provider.asymmetric.ec.GMSignatureSpi.sha256WithSM2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -36,7 +31,6 @@ import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioSample;
-import com.xjtlu.bio.entity.BioSampleExample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
@@ -47,9 +41,8 @@ import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
-import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
-import com.xjtlu.bio.utils.ParameterUtil;
+import com.xjtlu.bio.utils.BioStageUtil;
 
 import jakarta.annotation.Resource;
 
@@ -234,6 +227,9 @@ public class PipelineService {
 
     @Value("${analysisPipeline.stage.baseOutputPath}")
     private String stagesOutputBasePath;
+
+    @Resource
+    private BioStageUtil bioStageUtil;
 
     private Set<Integer> bioAnalysisPipelineLockSet = ConcurrentHashMap.newKeySet();
 
@@ -421,7 +417,10 @@ public class PipelineService {
         } else {
             return null;
         }
+    }
 
+    private String createStoreObjectName(BioPipelineStage pipelineStage, String name){
+        return bioStageUtil.createStoreObjectName(pipelineStage, name);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -559,12 +558,7 @@ public class PipelineService {
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
         ConsensusStageOutput consensusStageOutput = (ConsensusStageOutput) stageRunResult.getStageOutput();
 
-        String consesusOutputObjName = String.format(
-                stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                consensusStageOutput.getConsensusFa()
-                        .substring(consensusStageOutput.getConsensusFa().lastIndexOf("/") + 1));
+        String consesusOutputObjName = createStoreObjectName(bioPipelineStage, consensusStageOutput.getConsensusFa());
 
         boolean uploadRes = this.batchUploadObjectsFromLocal(consesusOutputObjName,
                 consensusStageOutput.getConsensusFa());
@@ -677,18 +671,9 @@ public class PipelineService {
         MappingStageOutput mappingStageOutput = (MappingStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
-        String bamObjectName = String.format(
-                stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                mappingStageOutput.getBamPath().substring(mappingStageOutput.getBamPath().lastIndexOf("/") + 1));
+        String bamObjectName = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(mappingStageOutput.getBamPath()));
 
-        String bamIndexObjectName = String.format(
-                stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                mappingStageOutput.getBamIndexPath()
-                        .substring(mappingStageOutput.getBamIndexPath().lastIndexOf("/") + 1));
+        String bamIndexObjectName = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(mappingStageOutput.getBamIndexPath()));
 
         HashMap<String, String> outputStoreMap = new HashMap<>();
         outputStoreMap.put(bamObjectName, mappingStageOutput.getBamPath());
@@ -752,18 +737,10 @@ public class PipelineService {
     private void handleAssemblyDone(StageRunResult stageRunResult) {
         AssemblyStageOutput assemblyStageOutput = (AssemblyStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
-        String format = "stageOutput/%d/%s/%s";
-        String contigOutputKey = String.format(
-                format,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                "contigs.fasta");
 
-        String scaffoldOuputKey = String.format(
-                format,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                "scaffold.fasta");
+        String contigOutputKey = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(assemblyStageOutput.getContigPath()));
+
+        String scaffoldOuputKey = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(assemblyStageOutput.getScaffoldPath()));
 
         HashMap<String, String> outputMap = new HashMap<>();
 
@@ -778,15 +755,12 @@ public class PipelineService {
         boolean success = this.batchUploadObjectsFromLocal(outputMap);
 
         if (!success) {
-            
             this.handleUnsuccessUpload(bioPipelineStage, resultDirPath.toString());
             return;
         }
-
         HashMap<String, String> outputPathMap = new HashMap<>();
         outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY, contigOutputKey);
         outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, hasScaffold ? scaffoldOuputKey : null);
-
         String serializedOutputPath = null;
         try {
             serializedOutputPath = this.jsonMapper.writeValueAsString(outputPathMap);
@@ -853,6 +827,11 @@ public class PipelineService {
         // todo: bacteria part. do it later
     }
 
+
+    private String substractFileNameFromPath(String path){
+        return Path.of(path).getFileName().toString();
+    }
+
     private void handleQcStageDone(StageRunResult stageRunResult) {
 
         QCStageOutput qcStageOutput = (QCStageOutput) stageRunResult.getStageOutput();
@@ -864,19 +843,10 @@ public class PipelineService {
         String qcJsonPath = qcStageOutput.getJsonPath();
         String qcHTMLPath = qcStageOutput.getHtmlPath();
 
-        String r1OutputPath = String.format(this.stageOutputFormat, bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageIndex(), qcR1Path.substring(qcR1Path.lastIndexOf("/") + 1));
-        String r2OutputPath = !hasR2 ? null
-                : String.format(this.stageOutputFormat, bioPipelineStage.getStageId(),
-                        bioPipelineStage.getStageIndex(), qcR2Path.substring(qcR2Path.lastIndexOf("/") + 1));
-        String jsonOutputPath = String.format(this.stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageIndex(), "qc.json");
-        String htmlOutputPath = String.format(this.stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageIndex(), "qc.html");
-
-        
+        String r1OutputPath = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(qcR1Path));
+        String r2OutputPath = hasR2? createStoreObjectName(bioPipelineStage, substractFileNameFromPath(qcR2Path)):null;
+        String jsonOutputPath = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(qcJsonPath));
+        String htmlOutputPath = createStoreObjectName(bioPipelineStage, substractFileNameFromPath(qcHTMLPath));
 
 
         Path resultDirPath = Path.of(qcR1Path).getParent();
@@ -893,7 +863,6 @@ public class PipelineService {
             this.handleUnsuccessUpload(bioPipelineStage, resultDirPath.toString());
             return;
         }
-        this.deleteStageResultDir(resultDirPath.toString());
 
         Map<String, String> outputPathMap = new HashMap<>();
         outputPathMap.put(PIPELINE_STAGE_QC_OUTPUT_R1, r1OutputPath);
@@ -927,9 +896,9 @@ public class PipelineService {
             HashMap<String, String> inputMap = new HashMap<>();
             inputMap.put(PIPELINE_STAGE_INPUT_READ1_KEY, r1OutputPath);
             inputMap.put(PIPELINE_STAGE_INPUT_READ2_KEY, r2OutputPath);
-            String assemblyInput = this.jsonMapper.writeValueAsString(inputMap);
-            updateNextStage.setInputUrl(assemblyInput);
-            nextStage.setInputUrl(assemblyInput);
+            String nextStageInput = this.jsonMapper.writeValueAsString(inputMap);
+            updateNextStage.setInputUrl(nextStageInput);
+            nextStage.setInputUrl(nextStageInput);
 
             updateRes = this.updateStageFromStatus(updateNextStage, nextStage.getStageId(),
                     PIPELINE_STAGE_STATUS_PENDING);

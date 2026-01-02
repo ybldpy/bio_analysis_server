@@ -22,17 +22,8 @@ import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 @Component
 public class VarientExecutor extends AbstractPipelineStageExector {
 
-    private final QcStageExecutor qcStageExecutor;
-
-
     private String bcftools;
     private String samtools;
-
-
-    VarientExecutor(QcStageExecutor qcStageExecutor) {
-        this.qcStageExecutor = qcStageExecutor;
-    }
-
 
 
     @Override
@@ -136,8 +127,9 @@ public class VarientExecutor extends AbstractPipelineStageExector {
 
         // 中间与最终产物
         Path bcfRaw = workDir.resolve("raw.bcf");
-        Path vcfGz = workDir.resolve("variants.vcf.gz");
-        Path vcfTbi = workDir.resolve("variants.vcf.gz.tbi");
+        VariantStageOutput variantStageOutput = bioStageUtil.varientOutput(bioPipelineStage, workDir);
+        Path vcfGz = Path.of(variantStageOutput.getVcfGz());
+        Path vcfTbi = Path.of(variantStageOutput.getVcfTbi());
 
         // ---------- 1) mpileup: BAM -> BCF ----------
         // -Ou 输出未压缩 BCF 到 stdout（这里我们直接 -o 写文件，避免管道）
@@ -213,7 +205,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         if(!errorOutputValidationResults.isEmpty()){
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
         }
-        return ok(bioPipelineStage,new VariantStageOutput(vcfGz.toAbsolutePath().toString(), vcfTbi.toAbsolutePath().toString()), inputTempDir);
+        return ok(bioPipelineStage,variantStageOutput, inputTempDir);
     }
 
     @Override
