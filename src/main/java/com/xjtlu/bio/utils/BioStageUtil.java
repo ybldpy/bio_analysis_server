@@ -1,22 +1,15 @@
 package com.xjtlu.bio.utils;
 
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Paths;
 
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.taskrunner.AssemblyExecutor;
 import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
-import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 
 @Component
@@ -25,16 +18,14 @@ public class BioStageUtil {
     private String stageWorkDirPath;
     private String stageInputDirPath;
 
-    private JsonMapper jsonMapper = new JsonMapper();
-
-
-
     public Path stageExecutorWorkDir(BioPipelineStage bioPipelineStage){
         //todo
+        return Paths.get(stageWorkDirPath, String.valueOf(bioPipelineStage.getStageId()));
     }
 
     public Path stageExecutorInputDir(BioPipelineStage bioPipelineStage){
         //todo
+        return Paths.get(stageInputDirPath, String.valueOf(bioPipelineStage.getStageId()));
     }
 
     public String createStoreObjectName(BioPipelineStage pipelineStage, String name){

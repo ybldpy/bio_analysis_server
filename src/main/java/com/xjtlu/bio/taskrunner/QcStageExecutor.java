@@ -4,16 +4,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
@@ -45,6 +44,24 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
 
         Path outputDir = workDirPath(bioPipelineStage);
         Path inputDir = stageInputPath(bioPipelineStage);
+
+        String params = bioPipelineStage.getParameters();
+        Map<String, Object> qcParams;
+        try {
+            qcParams = this.objectMapper.readValue(params, Map.class);
+        } catch (JsonMappingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return this.runFail(bioPipelineStage,String.format("解析%\ns\n错误", params), e);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return this.runFail(bioPipelineStage,String.format("解析%\ns\n错误", params), e);
+        }
+
+        boolean isLongRead = (Boolean) qcParams.get(PipelineService.PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY);
+
+
 
         try{
             Files.createDirectories(inputDir);

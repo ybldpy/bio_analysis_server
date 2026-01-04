@@ -43,7 +43,7 @@ public interface StorageService {
     /**
      * 生成临时访问链接（本地存储可返回 null 或抛 UnsupportedOperationException）。
      */
-    default String presignedGetUrl(String key, Duration ttl) throws StorageException {
+    default String presignedGetUrl(String key, Duration ttl) {
         throw new UnsupportedOperationException("presigned url not supported");
     }
 

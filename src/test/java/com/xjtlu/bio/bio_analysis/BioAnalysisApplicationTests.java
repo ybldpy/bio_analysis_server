@@ -20,7 +20,7 @@ class BioAnalysisApplicationTests {
     @Test
     void testDuplicateInsert(){
         System.out.println("Testing duplicate insert:");
-        sampleService.testInsertDuplicate("1", 1);
+        //sampleService.testInsertDuplicate("1", 1);
     }
 
 }

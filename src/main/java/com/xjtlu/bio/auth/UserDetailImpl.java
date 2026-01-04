@@ -40,7 +40,7 @@ public class UserDetailImpl implements UserDetails {
         // TODO Auto-generated method stub
         return user.getName();
     }
-    public Integer getUid(){
+    public Long getUid(){
         return user.getUid();
     }
     

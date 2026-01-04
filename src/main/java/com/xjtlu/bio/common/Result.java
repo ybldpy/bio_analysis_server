@@ -11,6 +11,9 @@ public class Result<T>{
     public static final int DUPLICATE_OPERATION = 3;
 
 
+    public static final int PARAMETER_NOT_VALID = 4;
+
+
 
     public int getStatus() {
         return status;

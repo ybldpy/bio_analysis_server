@@ -26,28 +26,24 @@ api:
     login: "user/login"
     logout: "user/logout"
 
-minio:
-    user: minioadmin
-    password: minioadmin
-    url: "http://localhost:9000"
 
-    expose-url: http://localhosts:3306
-    bucket: "bio-bucket"
-
-
-localStorage:
-    tmp: "/data/bioServer/tmp"
-
+localstorageService:
+    baseDir: /home/bio_app_data/storage
 
 refSeq:
     virus: /data/refs/ncbi_dataset/data
     virus-index: /data/refs/ncbi_dataset/data/assembly_data_report.jsonl
 
 analysisPipeline:
+
     stage:
-        baseOutputPath: /pipeline
+        baseInputDir: /home/bio_app_data/temp/stage/input
+        baseWorkDir: /home/bio_app_data//temp/stage/work
+        
         qc:
-            cmd: fastq
+            cmd: /home/analysisTools/fastp
+        assembly:
+            cmd: /
         
 
 

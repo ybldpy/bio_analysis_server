@@ -1,11 +1,13 @@
 package com.xjtlu.bio.service;
 
+import java.io.IOException;
 import java.io.InputStream;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.logging.Log;
 import org.apache.ibatis.transaction.TransactionException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.service.StorageService.PutResult;
+import com.xjtlu.bio.utils.SampleReadLengthDetector;
+
 import jakarta.annotation.Resource;
 
 @Service
@@ -36,6 +40,8 @@ public class SampleService {
     private PipelineService pipelineService;
     @Resource
     private TransactionTemplate transactionTemplate;
+    @Resource
+    private SampleReadLengthDetector sampleReadLengthDetector;
     
 
     @Resource
@@ -118,9 +124,14 @@ public class SampleService {
         to.setRead1Url(origin.getRead1Url());
         to.setProjectId(origin.getProjectId());
         to.setIsPair(origin.getIsPair());
-        to.setPipelineId(origin.getPipelineId());
         to.setCreatedBy(origin.getCreatedBy());
 
+    }
+
+
+    private boolean isLongRead(String readUrl) throws IOException, Exception{
+        boolean isLongRead = sampleReadLengthDetector.isLongRead(readUrl);
+        return isLongRead;
     }
 
     public Result<Boolean> receiveSampleData(long sid, int index, InputStream datastream) {
