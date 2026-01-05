@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,7 +23,10 @@ import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 @Component
 public class VarientExecutor extends AbstractPipelineStageExector {
 
+
+    @Value("${analysisPipeline.stage.varient.bcftools.cmd}")
     private String bcftools;
+    @Value("${analysisPipeline.stage.samtools.cmd}")
     private String samtools;
 
 

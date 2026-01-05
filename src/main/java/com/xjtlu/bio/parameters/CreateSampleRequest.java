@@ -1,4 +1,4 @@
-package com.xjtlu.bio.controller.parameters;
+package com.xjtlu.bio.parameters;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class CreateSampleRequest {
 
     public static class PipelineStageParameters {
-        private String refseq;
+        private Long refseq;
 
         Map<String, Object> extraParams;
 
@@ -17,18 +17,21 @@ public class CreateSampleRequest {
             return extraParams;
         }
 
+        public Long getRefseq() {
+            return refseq;
+        }
+
+        public void setRefseq(Long refseq) {
+            this.refseq = refseq;
+        }
+
         public void setExtraParams(Map<String, Object> extraParams) {
             this.extraParams = extraParams;
         }
 
-        public String getRefseq() {
-            return refseq;
-        }
-
-        public void setRefseq(String refseq) {
-            this.refseq = refseq;
-        }
     }
+
+
 
     @NotBlank(message = "sampleName不能为空")
     private String sampleName;
@@ -50,6 +53,7 @@ public class CreateSampleRequest {
     // pair=true 时建议必填（后续用自定义校验实现）
     private String read2OriginName;
 
+    
     private PipelineStageParameters pipelineStageParameters;
 
     public String getSampleName() {

@@ -22,6 +22,8 @@ import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 public class ConsensusExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor{
 
 
+
+    @Value("${consensus.cmd}")
     private String bcftools;
 
 

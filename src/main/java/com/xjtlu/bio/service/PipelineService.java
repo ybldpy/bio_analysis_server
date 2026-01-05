@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
@@ -37,6 +38,7 @@ import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
+import com.xjtlu.bio.parameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.StorageService.PutResult;
 import com.xjtlu.bio.taskrunner.PipelineStageTaskDispatcher;
 import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
@@ -79,14 +81,16 @@ class BioPipelineStagesBuilder {
     }
 
     public static List<BioPipelineStage> buildVirusStages(long pid, int pipelineType, BioSample bioSample,
-            Map<String, Object> pipelineStageParams) throws JsonProcessingException {
+            PipelineStageParameters pipelineStageParams) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
         String qcInputRead1 = bioSample.getRead1Url();
         String qcInputRead2 = bioSample.getRead2Url();
 
-        Object refseqObj = pipelineStageParams.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+        Object refseqObj = pipelineStageParams==null?null:pipelineStageParams.getRefseq();
         long refseqId = -1;
+
+        Map<String,Object> pipelineStagesConfig = pipelineStageParams.getExtraParams();
 
         if (refseqObj != null) {
             refseqId = refseqObj instanceof Integer ? (Integer) refseqObj
@@ -128,7 +132,8 @@ class BioPipelineStagesBuilder {
 
             BioPipelineStage assembly = new BioPipelineStage();
 
-            Map<String, Object> assemblyParams = substractStageParams("assembly", pipelineStageParams);
+            //TODO
+            Map<String,Object> assemblyParams = substractStageParams("assembly", pipelineStagesConfig);
             String assemlyParamsStr = assemblyParams == null ? "{}" : objectMapper.writeValueAsString(assemblyParams);
             assembly.setStatus(PipelineService.PIPELINE_STAGE_STATUS_NOT_READY);
             assembly.setPipelineId(pid);
@@ -151,7 +156,7 @@ class BioPipelineStagesBuilder {
         if (refseqId == -1) {
             mappingStage.setParameters("{}");
         } else {
-            Map<String, Object> mappingParams = substractStageParams("mapping", pipelineStageParams);
+            Map<String, Object> mappingParams = substractStageParams("mapping", pipelineStagesConfig);
             mappingParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
             mappingStage.setParameters(objectMapper.writeValueAsString(mappingParams));
         }
@@ -159,7 +164,7 @@ class BioPipelineStagesBuilder {
         stages.add(mappingStage);
         index++;
 
-        Map<String, Object> varientStageParams = substractStageParams("varient", pipelineStageParams);
+        Map<String, Object> varientStageParams = substractStageParams("varient", pipelineStagesConfig);
         varientStageParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
         BioPipelineStage varient = new BioPipelineStage();
         varient.setStageName(PipelineService.PIPELINE_STAGE_NAME_VARIANT);
@@ -175,7 +180,7 @@ class BioPipelineStagesBuilder {
         index++;
 
         BioPipelineStage consensus = new BioPipelineStage();
-        Map<String, Object> consesusParams = substractStageParams("consensus", pipelineStageParams);
+        Map<String, Object> consesusParams = substractStageParams("consensus", pipelineStagesConfig);
         consesusParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
         consensus.setStageName("生成一致性序列");
         consensus.setPipelineId(pid);
@@ -189,7 +194,7 @@ class BioPipelineStagesBuilder {
             return stages;
         }
 
-        Map<String, Object> snpParams = substractStageParams("snp", pipelineStageParams);
+        Map<String, Object> snpParams = substractStageParams("snp", pipelineStagesConfig);
         snpParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
         ;
         BioPipelineStage snp = new BioPipelineStage();
@@ -204,7 +209,7 @@ class BioPipelineStagesBuilder {
         index++;
 
         BioPipelineStage depthConverage = new BioPipelineStage();
-        Map<String, Object> depthParams = substractStageParams("depth", pipelineStageParams);
+        Map<String, Object> depthParams = substractStageParams("depth", pipelineStagesConfig);
         depthParams.put(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refseqConfig);
         ;
         depthConverage.setStageName("深度分布图");
@@ -238,20 +243,16 @@ public class PipelineService {
     @Resource
     private BioAnalysisPipelineMapper bioAnalysisPipelineMapper;
 
-    @Resource
-    private SampleService sampleService;
 
     @Resource
     private StorageService storageService;
 
     @Resource
+    @Lazy
     private PipelineStageTaskDispatcher pipelineStageTaskDispatcher;
 
     @Resource
     private TransactionTemplate rcTransactionTemplate;
-
-    @Value("${analysisPipeline.stage.baseOutputPath}")
-    private String stagesOutputBasePath;
 
     @Resource
     private BioStageUtil bioStageUtil;
@@ -403,7 +404,7 @@ public class PipelineService {
 
     @Transactional(rollbackFor = Exception.class)
     public Result<Long> createPipeline(BioSample bioSample,
-            Map<String, Object> pipelineStageParams) {
+            PipelineStageParameters pipelineStageParams) {
 
         BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
         bioAnalysisPipeline.setPipelineType(mapSampleTypeToPipelineType(bioSample.getSampleType()));
@@ -430,7 +431,7 @@ public class PipelineService {
     }
 
     private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline,
-            Map<String, Object> pipelineParams) {
+            PipelineStageParameters pipelineParams) {
 
         if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS
                 || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {

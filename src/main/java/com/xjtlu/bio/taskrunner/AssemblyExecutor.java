@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,7 +24,11 @@ import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 @Component
 public class AssemblyExecutor extends AbstractPipelineStageExector {
 
+
+    @Value("${stage.assembly.cmd}")
     protected String spadesTool;
+
+    
 
     @Override
     public StageRunResult execute(BioPipelineStage bioPipelineStage) {

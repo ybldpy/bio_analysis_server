@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,7 +23,11 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 @Component
 public class MappingStageExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor {
 
+
+
+    @Value("${analysisPipeline.stage.mapping.mappingtools.cmd}")
     private String mappingTools;
+    @Value("${analysisPipeline.stage.mapping.samtools.cmd}")
     private String samTools;
 
     @Override

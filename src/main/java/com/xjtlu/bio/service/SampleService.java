@@ -24,6 +24,7 @@ import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
+import com.xjtlu.bio.parameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.StorageService.PutResult;
 import com.xjtlu.bio.utils.SampleReadLengthDetector;
 
@@ -65,7 +66,7 @@ public class SampleService {
 
     @Transactional
     public Result<BioSample> createSample(boolean isPair, String sampleName, long projectId, int sampleType,
-            String read1FileOriginalName, String read2FileOriginalName, Map<String, Object> pipelineStageParams) {
+            String read1FileOriginalName, String read2FileOriginalName, PipelineStageParameters pipelineStageParams) {
 
         BioSample bioSample = new BioSample();
         bioSample.setIsPair(isPair);

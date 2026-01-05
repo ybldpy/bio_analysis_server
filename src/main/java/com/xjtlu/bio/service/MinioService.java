@@ -32,7 +32,7 @@ import io.minio.messages.DeleteError;
 import io.minio.messages.DeleteObject;
 import jakarta.annotation.Resource;
 
-@Service
+
 public class MinioService {
 
     @Resource

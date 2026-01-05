@@ -9,8 +9,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 
-@Configuration
-@ConfigurationProperties(prefix = "minio")
+
 public class MinioConfiguration {
 
     private String user;
