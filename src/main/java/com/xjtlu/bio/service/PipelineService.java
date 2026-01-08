@@ -586,6 +586,7 @@ public class PipelineService {
             return false;
         }
     }
+    
 
     private void handleUnsuccessUpload(BioPipelineStage bioPipelineStage, String deleteDir) {
         this.deleteStageResultDir(deleteDir);
