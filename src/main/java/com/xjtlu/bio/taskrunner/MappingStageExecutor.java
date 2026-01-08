@@ -25,9 +25,9 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
 
 
 
-    @Value("${analysisPipeline.stage.mapping.mappingtools.cmd}")
-    private String mappingTools;
-    @Value("${analysisPipeline.stage.mapping.samtools.cmd}")
+    @Value("${analysisPipeline.tools.minimap2}")
+    private String minimap2;
+    @Value("${analysisPipeline.tools.samtools}")
     private String samTools;
 
     @Override
@@ -157,7 +157,7 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
     private String buildMappingPipelineCmd(File refSeq, Path r1, Path r2, Path bamSortedOut) {
         StringBuilder sb = new StringBuilder(256);
         // mapping tool（输出到 stdout）
-        sb.append(quote(mappingTools)).append(" -ax sr ")
+        sb.append(quote(minimap2)).append(" -ax sr ")
           .append(quote(refSeq.getAbsolutePath())).append(' ')
           .append(quote(r1.toString())).append(' ');
         if (r2 != null) {

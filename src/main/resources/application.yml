@@ -1,12 +1,8 @@
 spring:
     application:
         name: bio
-
-    datasource:
-        url: jdbc:mysql://localhost:3306/bio
-        username: bio_dev
-        password: '062400'
-        driver-class-name: com.mysql.cj.jdbc.Driver
+    profiles:
+        active: dev
 
 mybatis:
     mapper-locations: classpath*:mapper/*.xml
@@ -17,8 +13,6 @@ mybatis:
 
 server:
     port: 8080
-
-
     servlet:
         session:
             timeout: 2h 
@@ -26,31 +20,7 @@ api:
     login: "user/login"
     logout: "user/logout"
 
-
-localstorageService:
-    baseDir: /home/bio_app_data/storage
-
-refSeq:
-    virus: /data/refs/ncbi_dataset/data
-    virus-index: /data/refs/ncbi_dataset/data/assembly_data_report.jsonl
-
-analysisPipeline:
-
-    stage:
-        baseInputDir: /home/bio_app_data/temp/stage/input
-        baseWorkDir: /home/bio_app_data//temp/stage/work
-        
-        qc:
-            cmd: /home/analysisTools/fastp
-            
-        assembly:
-            cmd: /
-
-        mapping:
-            mappingtools:
-                cmd: /
-            samtools:
-                cmd: /
+             
             
         
 

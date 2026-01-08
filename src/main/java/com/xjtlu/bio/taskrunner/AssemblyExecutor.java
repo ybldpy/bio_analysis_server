@@ -25,7 +25,7 @@ import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 public class AssemblyExecutor extends AbstractPipelineStageExector {
 
 
-    @Value("${stage.assembly.cmd}")
+    @Value("${analysisPipeline.tools.spades}")
     protected String spadesTool;
 
     

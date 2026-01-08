@@ -61,7 +61,9 @@ public class SampleService {
     private Set<String> bioSampleCreationSet = ConcurrentHashMap.newKeySet();
 
     private static String substractPostfixFromFileName(String filename) {
-        return null;
+        int index = filename.indexOf(".");
+        if(index == -1){return "";}
+        return filename.substring(index+1);
     }
 
     @Transactional
@@ -92,26 +94,32 @@ public class SampleService {
         String r1Url = String.format("samples/%d/%s", sid, r1Name);
         String r2Url = isPair ? String.format("samples/%d/%s", sid, r2Name) : null;
 
-        bioSample.setRead1Url(r1Url);
-        bioSample.setRead2Url(r2Url);
+        BioSample updateSample = new BioSample();
+        updateSample.setSid(sid);
+        updateSample.setRead1Url(r1Url);
+        updateSample.setRead2Url(r2Url);
 
-        res = this.sampleMapper.updateByPrimaryKey(bioSample);
+        res = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
         if (res < 1) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return new Result<BioSample>(Result.INTERNAL_FAIL, null, "创建样本失败");
         }
 
-        res = 0;
-        if (res == 1) {
-            Result<Long> createPipelineResult = pipelineService.createPipeline(bioSample, pipelineStageParams);
-            if (createPipelineResult.getStatus() != Result.SUCCESS) {
-                // do rollback
-                TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-                return new Result<BioSample>(Result.INTERNAL_FAIL, null, "创建样本失败");
-            }
-            return new Result<BioSample>(Result.SUCCESS, bioSample, null);
+        
+        bioSample.setRead1Url(r1Url);
+        bioSample.setRead2Url(r2Url);
+
+
+        Result<Long> createPipelineResult = pipelineService.createPipeline(bioSample, pipelineStageParams);
+        if(createPipelineResult.getStatus()!=Result.SUCCESS){
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new Result<BioSample>(createPipelineResult.getStatus(), null, createPipelineResult.getFailMsg());
         }
-        return new Result<BioSample>(Result.BUSINESS_FAIL, bioSample, "创建样本失败");
+
+        
+        return new Result<BioSample>(Result.SUCCESS, bioSample, null);
+        
+        
     }
 
     private static void copyTo(BioSample origin, BioSample to) {

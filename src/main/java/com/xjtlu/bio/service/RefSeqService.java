@@ -23,10 +23,10 @@ import jakarta.annotation.Resource;
 @Service
 public class RefSeqService {
 
-    @Value("${refSeq.virus}")
+    @Value("${refSeqService.virusPath}")
     private String virusPath;
 
-    @Value("${refSeq.virus-index}")
+    @Value("${refSeqService.virusIndexPath}")
     private String virusIndexPath;
 
 
@@ -39,24 +39,21 @@ public class RefSeqService {
 
     @Resource
     private StorageService storageService;
-
-    private String nonInnerRefseqDir;
-
     @Resource
     private BioRefseqMetaMapper refseqMetaMapper;
 
-    private String refSeqServiceTmpPath;
 
+    @Value("${refSeqService.nonInnerRefSeqDir}")
+    private String nonInnerRefseqDir;
+    @Value("${refSeqService.temporaryPath")
+    private String refSeqServiceTmpPath;
+    @Value("${refSeqService.refSeqIndexDir}")
     private String refSeqIndexDir;
 
     private Map<String, Object> virusIndex;
 
+    @Value("${analysisPipeline.tools.samtools}")
     private String samtools;
-
-    private static final String ACCESSION_KEY = "accession";
-
-
-
 
 
     public boolean deleteRefSeq(String outterRefseqObjName) {

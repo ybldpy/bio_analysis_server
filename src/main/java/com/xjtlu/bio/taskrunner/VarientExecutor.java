@@ -24,9 +24,9 @@ import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 public class VarientExecutor extends AbstractPipelineStageExector {
 
 
-    @Value("${analysisPipeline.stage.varient.bcftools.cmd}")
+    @Value("${analysisPipeline.tools.bcftools}")
     private String bcftools;
-    @Value("${analysisPipeline.stage.samtools.cmd}")
+    @Value("${analysisPipeline.tools.samtools}")
     private String samtools;
 
 

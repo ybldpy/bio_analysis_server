@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,7 +24,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
 
 
 
-    @Value("${consensus.cmd}")
+    @Value("${analysisPipeline.tools.bcftools}")
     private String bcftools;
 
 
@@ -32,7 +33,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         // TODO Auto-generated method stub
         String inputUrls = bioPipelineStage.getInputUrl();
         Map<String,String> inputUrlMap = null;
-        Map<String,Object> paramsMap = null;
+        Map<String,Object> paramsMap = null; 
         
         try {
             inputUrlMap = this.objectMapper.readValue(inputUrls,Map.class);

@@ -24,7 +24,7 @@ import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
 public class QcStageExecutor extends AbstractPipelineStageExector {
 
 
-    @Value("${analysisPipeline.stage.qc.cmd}")
+    @Value("${analysisPipeline.tools.fastp}")
     private String qcCmd;
 
     @Override

@@ -1,0 +1,38 @@
+spring:
+    datasource:
+        url: jdbc:mysql://localhost:3306/bio
+        username: bio_dev
+        password: '062400'
+        driver-class-name: com.mysql.cj.jdbc.Driver
+
+localstorageService:
+    baseDir: /home/bio_app_data/storage
+
+
+refSeqService:
+    nonInnerRefSeqDir: /
+    temporaryPath: /
+    refSeqIndexDir: /
+    virusPath: /
+    virusIndexPath: /
+
+
+analysisPipeline:
+
+
+    conda: "conda"
+
+    tools:
+        fastp: ${analysisPipeline.conda} run -n bio-fastp fastp"
+        spades: "${analysisPipeline.conda} run -n bio-spades spades.py"
+        samtools: "${analysisPipeline.conda} run -n bio-map samtools"
+        minimap2: "${analysisPipeline.conda} run -n bio-map minimap2"
+        bcftools: "${analysisPipeline.conda} run -n bio-var bcftools"
+
+    stage:
+        baseInputDir: /home/bio_app_data/temp/stage/input
+        baseWorkDir: /home/bio_app_data//temp/stage/work
+
+
+
+
