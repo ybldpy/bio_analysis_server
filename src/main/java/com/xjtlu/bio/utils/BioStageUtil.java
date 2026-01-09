@@ -3,6 +3,7 @@ package com.xjtlu.bio.utils;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -15,7 +16,10 @@ import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 @Component
 public class BioStageUtil {
 
+
+    @Value("${analysisPipeline.stage.baseWorkDir}")
     private String stageWorkDirPath;
+    @Value("${analysisPipeline.stage.baseInputDir}")
     private String stageInputDirPath;
 
     public Path stageExecutorWorkDir(BioPipelineStage bioPipelineStage){
@@ -69,5 +73,6 @@ public class BioStageUtil {
         Path consesnusFa = dir.resolve(ConsensusStageOutput.CONSENSUS);
         return new ConsensusStageOutput(consesnusFa.toString());
     }
+
 
 }

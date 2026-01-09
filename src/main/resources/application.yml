@@ -3,6 +3,14 @@ spring:
         name: bio
     profiles:
         active: dev
+    servlet:
+        multipart:
+            max-request-size: 1200MB
+            max-file-size: 1024MB
+
+logging:
+    level:
+      com.xjtlu.bio: DEBUG
 
 mybatis:
     mapper-locations: classpath*:mapper/*.xml

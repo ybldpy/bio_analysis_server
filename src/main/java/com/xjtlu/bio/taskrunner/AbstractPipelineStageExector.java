@@ -317,16 +317,17 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     }
 
     protected static int runSubProcess(List<String> cmd, Path workDir) throws IOException, InterruptedException {
+
+
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir.toFile());
 
         // 不需要日志：直接丢弃 stdout/stderr
-        pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-        pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+        pb.redirectErrorStream(true);
+        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
         Process p = pb.start();
         int code = p.waitFor(); // 无超时：一直等到结束
         return code;
-
     }
 
     public Path workDirPath(BioPipelineStage bioPipelineStage) {

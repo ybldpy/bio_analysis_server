@@ -83,9 +83,9 @@
     --> sid, sample_name, is_pair, read1_url, read2_url, project_id,
         created_by, sample_type, pipeline_id, column_name </sql>
 
-    <select id="selectByIdForUpdate"
-        parameterType="Long"
-        resultMap="BaseResultMap"> select <include refid="Base_Column_List" /> from bio_sample where
-        sid = #{sid,jdbcType=BIGINT} for update </select>
+<!--    <select id="selectByIdForUpdate"-->
+<!--        parameterType="Long"-->
+<!--        resultMap="BaseResultMap"> select <include refid="Base_Column_List" /> from bio_sample where-->
+<!--        sid = #{sid,jdbcType=BIGINT} for update </select>-->
 
 </mapper>

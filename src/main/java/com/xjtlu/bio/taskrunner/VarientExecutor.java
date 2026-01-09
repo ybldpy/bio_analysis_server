@@ -25,9 +25,9 @@ public class VarientExecutor extends AbstractPipelineStageExector {
 
 
     @Value("${analysisPipeline.tools.bcftools}")
-    private String bcftools;
+    private List<String> bcftools;
     @Value("${analysisPipeline.tools.samtools}")
-    private String samtools;
+    private List<String> samtools;
 
 
     @Override
@@ -125,8 +125,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         }
 
         // 工具路径与参数
-        String bcftools = this.bcftools;
-        String samtools = this.samtools;
+
         int threads = 2;
 
         // 中间与最终产物
@@ -138,7 +137,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         // ---------- 1) mpileup: BAM -> BCF ----------
         // -Ou 输出未压缩 BCF 到 stdout（这里我们直接 -o 写文件，避免管道）
         List<String> cmd = new ArrayList<>();
-        cmd.add(bcftools);
+        cmd.addAll(bcftools);
         cmd.add("mpileup");
         cmd.add("-f");
         cmd.add(refSeqFileLink.toString());
@@ -168,7 +167,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
 
         // ---------- 2) call: BCF -> VCF.GZ ----------
         cmd.clear();
-        cmd.add(this.bcftools);
+        cmd.addAll(this.bcftools);
         cmd.add("call");
         cmd.add("-m"); // multiallelic caller
         cmd.add("--ploidy");
@@ -194,7 +193,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
 
         // ---------- 3) index: VCF.GZ -> TBI ----------
         cmd = new ArrayList<>();
-        cmd.add(bcftools);
+        cmd.addAll(bcftools);
         cmd.add("index");
         cmd.add("-t"); // 生成 TBI
         cmd.add("--threads");

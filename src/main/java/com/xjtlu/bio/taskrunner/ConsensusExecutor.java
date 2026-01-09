@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +26,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
 
 
     @Value("${analysisPipeline.tools.bcftools}")
-    private String bcftools;
+    private List<String> bcftools;
 
 
     @Override
@@ -93,17 +94,33 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         ConsensusStageOutput consensusStageOutput = bioStageUtil.consensusOutput(bioPipelineStage, resultDir);
         String consensus = "consensus";
         Path consensusPath = Path.of(consensusStageOutput.getConsensusFa());
-        List<String> cmd = List.of(
-            this.bcftools,
-            consensus,
+//        List<String> cmd = List.of(
+//                this.bcftools,
+//            consensus,
+//            "-f",
+//            refseqFile.getAbsolutePath(),
+//            "-H",
+//            String.valueOf(1),
+//            "-o",
+//            consensusPath.toString(),
+//            vcfGzTmpPath.toString()
+//        );
+
+        List<String> cmd = new ArrayList<>();
+        cmd.addAll(this.bcftools);
+        cmd.addAll(List.of(
+                consensus,
             "-f",
             refseqFile.getAbsolutePath(),
             "-H",
-            String.valueOf(1), 
+            String.valueOf(1),
             "-o",
             consensusPath.toString(),
             vcfGzTmpPath.toString()
+        )
         );
+
+
 
 
 

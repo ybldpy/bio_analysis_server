@@ -14,7 +14,7 @@ public interface BioAnalysisStageMapperExtension {
     public BioPipelineStage selectByIdForUpdate(Long stageId);
 
 
-    @Select("SELECT * FROM bio_pipeline_stage t1 JOIN bio_analysis_pipeline t2 ON AND t1.pipeline_id = t2.pipeline_id WHERE t2.sample_id = #{sampleId}")
+    @Select("SELECT * FROM bio_pipeline_stage t1 JOIN bio_analysis_pipeline t2 ON t1.pipeline_id = t2.pipeline_id WHERE t2.sample_id = #{sampleId}")
     public List<BioPipelineStage> selectStagesBySampleId(Long sampleId);
 
 }

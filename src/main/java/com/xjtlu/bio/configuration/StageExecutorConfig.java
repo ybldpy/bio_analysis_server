@@ -25,12 +25,9 @@ public class StageExecutorConfig {
     public Map<Integer, PipelineStageExecutor> makeStageExecutorMap(List<PipelineStageExecutor> executors){
         
         Map<Integer, PipelineStageExecutor> map = new HashMap<>();
-
-
         for(PipelineStageExecutor pipelineStageExecutor:executors){
             map.put(pipelineStageExecutor.id(), pipelineStageExecutor);
         }
-
         return map;
         
     }

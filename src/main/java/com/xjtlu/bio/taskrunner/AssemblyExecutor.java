@@ -26,7 +26,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
 
 
     @Value("${analysisPipeline.tools.spades}")
-    protected String spadesTool;
+    protected List<String> spadesTool;
 
     
 
@@ -77,7 +77,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
         }
 
         List<String> cmd = new ArrayList<>();
-        cmd.add(this.spadesTool);
+        cmd.addAll(this.spadesTool);
         cmd.add("-t");
         cmd.add(String.valueOf(3));
         if (r2Path != null) { // 双端

@@ -173,7 +173,6 @@ public class SampleService {
                     updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                     selectedBioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                 } else {
-
                     updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                     selectedBioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
                 }

@@ -3,6 +3,9 @@ package com.xjtlu.bio.taskrunner;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.common.StageRunResult;
@@ -21,6 +24,7 @@ public class PipelineStageTaskDispatcher implements Runnable {
     private static final int taskBufferCapacity = 200;
     private BlockingQueue<BioPipelineStage> stageBuffer;
 
+    private static final Logger logger = LoggerFactory.getLogger(PipelineStageTaskDispatcher.class);
 
 
     private int concurrentNum;
@@ -33,18 +37,23 @@ public class PipelineStageTaskDispatcher implements Runnable {
     @Override
     public void run() {
         // TODO Auto-generated method stub
+        logger.debug("Worker Thread "+Thread.currentThread().getName()+" start to run");
         while (true) {
             // todo
             try {
+
                 BioPipelineStage bioPipelineStage = stageBuffer.take();
+                logger.debug("take {} to run", bioPipelineStage);
                 int updateRes = this.pipelineService.updateStageFromOldToNew(bioPipelineStage.getStageId(), PipelineService.PIPELINE_STAGE_STATUS_QUEUING, PipelineService.PIPELINE_STAGE_STATUS_RUNNING);
                 if(updateRes!=1){
+                    logger.debug("stage "+bioPipelineStage.toString()+" unable to update status to running and cannot run");
                     continue;
                 }
+                logger.info("stage "+bioPipelineStage.toString()+" start running");
                 runStage(bioPipelineStage);
             } catch (InterruptedException e) {
                 // TODO Auto-generated catch block
-                e.printStackTrace();
+                logger.debug("Worker Thread interruption", e);
             }
         }
 
@@ -55,9 +64,10 @@ public class PipelineStageTaskDispatcher implements Runnable {
 
     @PostConstruct
     public void init() {
-        for(int i = 0;i<this.concurrentNum;i++){
+        for(int i = 0;i<Math.max(4, this.concurrentNum);i++){
             new Thread(this).start();
         }
+        logger.debug("create "+Math.max(4, this.concurrentNum)+" worker threads");
     }
     private void notifyPipelineService(StageRunResult stageRunResult) {
         this.pipelineService.pipelineStageDone(stageRunResult);
@@ -65,7 +75,13 @@ public class PipelineStageTaskDispatcher implements Runnable {
 
     private void runStage(BioPipelineStage bPipelineStage) {
         PipelineStageExecutor executor = stageExecutorMap.get(bPipelineStage.getStageType());
-        StageRunResult stageRunResult = executor.execute(bPipelineStage);
+        StageRunResult stageRunResult = null;
+        try {
+            stageRunResult = executor.execute(bPipelineStage);
+        }catch (Exception e){
+            e.printStackTrace();
+            stageRunResult = StageRunResult.fail("运行时异常", bPipelineStage, e);
+        }
         notifyPipelineService(stageRunResult);
     }
 
@@ -73,6 +89,12 @@ public class PipelineStageTaskDispatcher implements Runnable {
     
 
     public boolean addTask(BioPipelineStage bioPipelineStage) {
-        return stageBuffer.offer(bioPipelineStage);
+        boolean pushRes = stageBuffer.offer(bioPipelineStage);
+        if(pushRes){
+            logger.debug("push {} to queue", bioPipelineStage);
+        }else {
+            logger.debug("maxsize reach: unable to push {} to queue", bioPipelineStage);
+        }
+        return pushRes;
     }
 }

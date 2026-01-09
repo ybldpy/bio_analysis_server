@@ -23,11 +23,8 @@ import jakarta.annotation.Resource;
 @Service
 public class RefSeqService {
 
-    @Value("${refSeqService.virusPath}")
-    private String virusPath;
-
-    @Value("${refSeqService.virusIndexPath}")
-    private String virusIndexPath;
+    @Value("${refSeqService.refseqsDir}")
+    private String refseqsDir;
 
 
     public final static int VIRUS_TYPE = 1;
@@ -204,7 +201,7 @@ public class RefSeqService {
 
         String refPath = bioRefseqMeta.getPath();
 
-        File f = new File(virusPath + "/"+refPath);
+        File f = new File( refseqsDir + "/"+refPath);
         return f.exists()?f:null;
     }
 
@@ -235,7 +232,7 @@ public class RefSeqService {
         int refseqType = bioRefseqMeta.getOrgType();
 
         if(refseqType == VIRUS_TYPE){
-            File f = new File(this.virusPath + "/" + path);
+            File f = new File(this.refseqsDir + "/" + path);
             if(f.exists() && f.length() > 0){
                 return f;
             }
@@ -246,18 +243,6 @@ public class RefSeqService {
         }
 
         return null;
-    }
-
-    
-
-
-
-    private String queryRefSeqPath(String queryRefSeqAccession) {
-        Object o = virusIndex.get(queryRefSeqAccession);
-        if (o == null) {
-            return null;
-        }
-        return String.format("%s/%s", virusPath, queryRefSeqAccession);
     }
 
 }

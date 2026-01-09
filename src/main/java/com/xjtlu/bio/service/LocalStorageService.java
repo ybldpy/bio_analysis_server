@@ -25,6 +25,10 @@ public class LocalStorageService implements StorageService{
 
         Path objectPath = Paths.get(base, key);
         try {
+            Path parentDir = objectPath.getParent();
+            if (parentDir != null && Files.notExists(parentDir)) {
+                Files.createDirectories(parentDir);
+            }
             Files.copy(data, objectPath);
             return new PutResult(true, null);
         } catch (IOException e) {

@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -122,7 +124,7 @@ class BioPipelineStagesBuilder {
 
         qcInputMap.put(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY, qcInputRead1);
         qcInputMap.put(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY, qcInputRead2);
-        String qcInputMapStr = null;
+        String qcInputMapStr = objectMapper.writeValueAsString(qcInputMap);
         qc.setStageIndex(index);
         qc.setStageName("质控(QC)");
         qc.setStageType(PipelineService.PIPELINE_STAGE_QC);
@@ -241,6 +243,8 @@ class BioPipelineStagesBuilder {
 
 @Service
 public class PipelineService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PipelineService.class);
 
     @Resource
     private BioAnalysisPipelineMapper analysisPipelineMapper;
@@ -403,6 +407,7 @@ public class PipelineService {
         try {
             return this.bioPipelineStageMapper.updateByExampleSelective(updateStage, bioPipelineStageExample);
         } catch (Exception e) {
+            logger.error("update stage id {} to {} from status {} exception: ",updateStageId, updateStage, status, e);
             return -1;
         }
     }
@@ -501,8 +506,11 @@ public class PipelineService {
             return new Result<Boolean>(Result.INTERNAL_FAIL, false, "流水线启动失败");
         }
 
-        firstStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-        this.pipelineStageTaskDispatcher.addTask(firstStage);
+
+        if(updateRes==1){
+            firstStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
+            this.pipelineStageTaskDispatcher.addTask(firstStage);
+        }
         return new Result<Boolean>(Result.SUCCESS, true, null);
     }
 

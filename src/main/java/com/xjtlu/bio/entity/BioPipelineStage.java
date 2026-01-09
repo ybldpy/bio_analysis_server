@@ -398,4 +398,22 @@ public class BioPipelineStage {
     public void setParameters(String parameters) {
         this.parameters = parameters;
     }
+
+    @Override
+    public String toString() {
+        return "BioPipelineStage{" +
+                "stageId=" + stageId +
+                ", pipelineId=" + pipelineId +
+                ", stageIndex=" + stageIndex +
+                ", stageName='" + stageName + '\'' +
+                ", status=" + status +
+                ", startTime=" + startTime +
+                ", endTime=" + endTime +
+                ", inputUrl='" + inputUrl + '\'' +
+                ", outputUrl='" + outputUrl + '\'' +
+                ", stageType=" + stageType +
+                ", columnName=" + columnName +
+                ", parameters='" + parameters + '\'' +
+                '}';
+    }
 }

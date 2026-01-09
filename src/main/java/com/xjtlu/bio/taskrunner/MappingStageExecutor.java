@@ -26,9 +26,9 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
 
 
     @Value("${analysisPipeline.tools.minimap2}")
-    private String minimap2;
+    private List<String> minimap2;
     @Value("${analysisPipeline.tools.samtools}")
-    private String samTools;
+    private List<String> samTools;
 
     @Override
     public int id() {
@@ -131,7 +131,7 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
         }
 
         cmd.clear();
-        cmd.add(this.samTools);
+        cmd.addAll(this.samTools);
         cmd.add("index");
         cmd.add(bamSortedTmp.toString());
         cmd.add("-o");
@@ -157,16 +157,16 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
     private String buildMappingPipelineCmd(File refSeq, Path r1, Path r2, Path bamSortedOut) {
         StringBuilder sb = new StringBuilder(256);
         // mapping tool（输出到 stdout）
-        sb.append(quote(minimap2)).append(" -ax sr ")
+        sb.append(quote(String.join(" ", this.minimap2))).append(" -ax sr ")
           .append(quote(refSeq.getAbsolutePath())).append(' ')
           .append(quote(r1.toString())).append(' ');
         if (r2 != null) {
             sb.append(quote(r2.toString())).append(' ');
         }
         // view: 从 stdin 读 SAM，输出 BAM 到 stdout
-        sb.append("| ").append(quote(samTools)).append(" view -bS - ");
+        sb.append("| ").append(quote(String.join(" ", this.samTools))).append(" view -bS - ");
         // sort: 从 stdin 读 BAM，输出最终排序 bam
-        sb.append("| ").append(quote(samTools)).append(" sort -o ").append(quote(bamSortedOut.toString())).append(" -");
+        sb.append("| ").append(quote(String.join(" ", this.samTools))).append(" sort -o ").append(quote(bamSortedOut.toString())).append(" -");
         return sb.toString();
     }
 
