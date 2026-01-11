@@ -22,42 +22,17 @@ refSeqService:
 
 
 
-analysisPipeline:
+analysis-pipeline:
 
 
-    conda: "conda"
+    conda: "/usr/conda/condabin/conda"
 
     tools:
-        fastp:
-            - "conda"
-            - "run"
-            - "-n"
-            - "bio-fastp"
-            - "fastp"
-        spades:
-            - "conda"
-            - "run"
-            - "-n"
-            - "bio-spades"
-            - "spades.py"
-        samtools:
-            - "conda"
-            - "run"
-            - "-n"
-            - "bio-map"
-            - "samtools"
-        minimap2:
-            - "conda"
-            - "run"
-            - "-n"
-            - "bio-map"
-            - "minimap2"
-        bcftools:
-            - "conda"
-            - "run"
-            - "-n"
-            - "bio-var"
-            - "bcftools"
+        fastp: ["${analysis-pipeline.conda}", "run", "-n", "bio-fastp","fastp"]
+        spades: ["${analysis-pipeline.conda}", "run", "-n", "bio-spades", "spades.py"]
+        samtools: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "samtools"]
+        minimap2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "minimap2"]
+        bcftools: ["${analysis-pipeline.conda}", "run", "-n", "bio-var", "bcftools"]
 
     stage:
         baseInputDir: /home/jcy/bio_app_data/temp/stage/input

@@ -79,7 +79,7 @@ public class PipelineStageTaskDispatcher implements Runnable {
         try {
             stageRunResult = executor.execute(bPipelineStage);
         }catch (Exception e){
-            e.printStackTrace();
+            logger.error("{} 运行时异常", bPipelineStage, e);
             stageRunResult = StageRunResult.fail("运行时异常", bPipelineStage, e);
         }
         notifyPipelineService(stageRunResult);

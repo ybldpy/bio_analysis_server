@@ -126,7 +126,7 @@ class BioPipelineStagesBuilder {
         qcInputMap.put(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY, qcInputRead2);
         String qcInputMapStr = objectMapper.writeValueAsString(qcInputMap);
         qc.setStageIndex(index);
-        qc.setStageName("质控(QC)");
+        qc.setStageName(PipelineService.PIPELINE_STAGE_NAME_QC);
         qc.setStageType(PipelineService.PIPELINE_STAGE_QC);
         qc.setStatus(PipelineService.PIPELINE_STAGE_STATUS_PENDING);
         qc.setPipelineId(pid);
@@ -151,7 +151,7 @@ class BioPipelineStagesBuilder {
             assembly.setStageIndex(index);
             assembly.setParameters(assemlyParamsStr);
             assembly.setStageType(PipelineService.PIPELINE_STAGE_ASSEMBLY);
-            assembly.setStageName("组装");
+            assembly.setStageName(PipelineService.PIPELINE_STAGE_NAME_ASSEMBLY);
             stages.add(assembly);
             index++;
         }
@@ -473,6 +473,33 @@ public class PipelineService {
         return bioStageUtil.createStoreObjectName(pipelineStage, name);
     }
 
+
+
+    //TODO: this is an quick method for just test. Never Use it in production env or treat it as normal service method
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Boolean> restartStage(long stageId){
+        BioPipelineStage bioPipelineStage = this.bioPipelineStageMapper.selectByPrimaryKey(stageId);
+        if (bioPipelineStage.getStageIndex()!=PipelineService.PIPELINE_STAGE_STATUS_FAIL){
+            return new Result<>(Result.BUSINESS_FAIL, false, null);
+        }
+
+        BioPipelineStageExample lastStageExample = new BioPipelineStageExample();
+        lastStageExample.createCriteria()
+                .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
+                .andStageIndexEqualTo(bioPipelineStage.getStageIndex()-1)
+                .andStatusEqualTo(PIPELINE_STAGE_STATUS_FINISHED);
+
+        List<BioPipelineStage> lastStageContainer = this.bioPipelineStageMapper.selectByExample(lastStageExample);
+        if(lastStageContainer == null || lastStageContainer.isEmpty()){
+            return new Result<>(Result.BUSINESS_FAIL, false, null);
+        }
+
+        BioPipelineStage lastStage = lastStageContainer.get(0);
+
+
+
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> pipelineStart(long sampleId) {
 
@@ -550,8 +577,8 @@ public class PipelineService {
         for (Map.Entry<String, String> objectConfig : params.entrySet()) {
             FileInputStream fileInputStream = null;
             try {
-                fileInputStream = new FileInputStream(objectConfig.getValue());
-                PutResult putResult = this.storageService.putObject(objectConfig.getKey(), fileInputStream);
+                fileInputStream = new FileInputStream(objectConfig.getKey());
+                PutResult putResult = this.storageService.putObject(objectConfig.getValue(), fileInputStream);
                 if (!putResult.success()) {
                     return false;
                 }
@@ -618,8 +645,7 @@ public class PipelineService {
 
         String consesusOutputObjName = createStoreObjectName(bioPipelineStage, consensusStageOutput.getConsensusFa());
 
-        boolean uploadRes = this.batchUploadObjectsFromLocal(consesusOutputObjName,
-                consensusStageOutput.getConsensusFa());
+        boolean uploadRes = this.batchUploadObjectsFromLocal(Map.of(consensusStageOutput.getConsensusFa(), consesusOutputObjName));
         if (!uploadRes) {
             try {
                 Files.delete(Path.of(consensusStageOutput.getConsensusFa()));
@@ -665,11 +691,18 @@ public class PipelineService {
                 bioPipelineStage.getStageName(),
                 variantStageOutput.getVcfTbi().substring(variantStageOutput.getVcfTbi().lastIndexOf("/") + 1));
 
-        boolean uploadSuccess = this.batchUploadObjectsFromLocal(
-                vcfGzObjctName,
+//        boolean uploadSuccess = this.batchUploadObjectsFromLocal(
+//                vcfGzObjctName,
+//                variantStageOutput.getVcfGz(),
+//                vcfTbiObjectName,
+//                variantStageOutput.getVcfTbi());
+
+        boolean uploadSuccess = this.batchUploadObjectsFromLocal(Map.of(
                 variantStageOutput.getVcfGz(),
-                vcfTbiObjectName,
-                variantStageOutput.getVcfTbi());
+                vcfGzObjctName,
+                variantStageOutput.getVcfTbi(),
+                vcfTbiObjectName
+        ));
 
         Path resultDirPath = Path.of(variantStageOutput.getVcfGz()).getParent();
 
@@ -736,8 +769,8 @@ public class PipelineService {
                 substractFileNameFromPath(mappingStageOutput.getBamIndexPath()));
 
         HashMap<String, String> outputStoreMap = new HashMap<>();
-        outputStoreMap.put(bamObjectName, mappingStageOutput.getBamPath());
-        outputStoreMap.put(bamIndexObjectName, mappingStageOutput.getBamIndexPath());
+        outputStoreMap.put(mappingStageOutput.getBamPath(), bamObjectName);
+        outputStoreMap.put(mappingStageOutput.getBamIndexPath(), bamIndexObjectName);
 
         boolean storeSuccss = this.batchUploadObjectsFromLocal(outputStoreMap);
         Path outputDirPath = Path.of(mappingStageOutput.getBamPath()).getParent();
@@ -897,9 +930,9 @@ public class PipelineService {
 
         Path resultDirPath = Path.of(assemblyStageOutput.getContigPath()).getParent();
 
-        outputMap.put(contigOutputKey, assemblyStageOutput.getContigPath());
+        outputMap.put(assemblyStageOutput.getContigPath(), contigOutputKey);
         if (hasScaffold) {
-            outputMap.put(scaffoldOuputKey, assemblyStageOutput.getScaffoldPath());
+            outputMap.put(assemblyStageOutput.getScaffoldPath(), scaffoldOuputKey);
         }
         boolean success = this.batchUploadObjectsFromLocal(outputMap);
 
@@ -1005,9 +1038,12 @@ public class PipelineService {
         params.put(qcJsonPath, jsonOutputPath);
         params.put(qcHTMLPath, htmlOutputPath);
 
+
+        logger.info("{} done. uploading {}", bioPipelineStage, params);
         boolean uploadSuccess = this.batchUploadObjectsFromLocal(params);
         if (!uploadSuccess) {
             this.handleUnsuccessUpload(bioPipelineStage, resultDirPath.toString());
+            logger.error("{} -> {} result upload failed.", bioPipelineStage, params);
             return;
         }
 

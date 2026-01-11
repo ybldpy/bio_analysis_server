@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.apache.commons.io.FileUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -74,6 +75,9 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
     @Resource
     protected BioStageUtil bioStageUtil;
 
+    @Resource
+    protected AnalysisPipelineToolsConfig analysisPipelineToolsConfig;
+
     protected static final String PARSE_JSON_ERROR = "解析参数错误";
 
     protected String stageResultTmpBasePath;
@@ -88,6 +92,8 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         }
         return true;
     }
+
+
 
     protected StageRunResult runException(BioPipelineStage bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());

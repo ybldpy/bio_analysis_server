@@ -25,8 +25,6 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
 
 
 
-    @Value("${analysisPipeline.tools.bcftools}")
-    private List<String> bcftools;
 
 
     @Override
@@ -107,7 +105,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
 //        );
 
         List<String> cmd = new ArrayList<>();
-        cmd.addAll(this.bcftools);
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.addAll(List.of(
                 consensus,
             "-f",

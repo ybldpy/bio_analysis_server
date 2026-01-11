@@ -2,7 +2,9 @@ package com.xjtlu.bio.utils;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,18 +19,16 @@ import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 public class BioStageUtil {
 
 
-    @Value("${analysisPipeline.stage.baseWorkDir}")
+    @Value("${analysis-pipeline.stage.baseWorkDir}")
     private String stageWorkDirPath;
-    @Value("${analysisPipeline.stage.baseInputDir}")
+    @Value("${analysis-pipeline.stage.baseInputDir}")
     private String stageInputDirPath;
 
     public Path stageExecutorWorkDir(BioPipelineStage bioPipelineStage){
-        //todo
         return Paths.get(stageWorkDirPath, String.valueOf(bioPipelineStage.getStageId()));
     }
 
     public Path stageExecutorInputDir(BioPipelineStage bioPipelineStage){
-        //todo
         return Paths.get(stageInputDirPath, String.valueOf(bioPipelineStage.getStageId()));
     }
 
@@ -41,7 +41,6 @@ public class BioStageUtil {
     }
 
     public QCStageOutput qcStageOutput(Path dir, boolean hasR2){
-
 
         return new QCStageOutput(
             dir.resolve(QCStageOutput.R1).toString(),
@@ -63,16 +62,18 @@ public class BioStageUtil {
         return new MappingStageOutput(bamPath.toString(), bamIndex.toString());
     }
 
-    public VariantStageOutput varientOutput(BioPipelineStage bioPipelineStage, Path dir){
+    public VariantStageOutput varientOutput(BioPipelineStage bioPipelineStage, @NonNull Path dir){
         Path vcfGz = dir.resolve(VariantStageOutput.VCF_GZ);
         Path vcfTbi = dir.resolve(VariantStageOutput.VCF_TBI);
         return new VariantStageOutput(vcfGz.toString(), vcfTbi.toString());
     }
 
-    public ConsensusStageOutput consensusOutput(BioPipelineStage bioPipelineStage, Path dir){
+    public ConsensusStageOutput consensusOutput(BioPipelineStage bioPipelineStage, @NonNull Path dir){
         Path consesnusFa = dir.resolve(ConsensusStageOutput.CONSENSUS);
         return new ConsensusStageOutput(consesnusFa.toString());
     }
+
+
 
 
 }

@@ -9,6 +9,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +29,6 @@ import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
 public class QcStageExecutor extends AbstractPipelineStageExector {
 
 
-    @Value("${analysisPipeline.tools.fastp}")
-    private List<String> fastpCmd;
 
     private static final Logger logger = LoggerFactory.getLogger(QcStageExecutor.class);
 
@@ -98,21 +98,28 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
         Path outputQcJson = Path.of(qcStageOutput.getJsonPath());
         Path outputQcHtml = Path.of(qcStageOutput.getHtmlPath());
 
-        GetObjectResult objectResult = storageService.getObject(inputUrl1,
-                inputDir.resolve(input1FileName).toString());
+
+        Path r1Path = inputDir.resolve(input1FileName);
+        Path r2Path = inputUrl2 == null? null: inputDir.resolve(input2FileName);
+
+        //先删除一遍，防止冲突
+        this.deleteTmpFiles(List.of(r1Path.toFile(), r2Path.toFile()));
+
+        GetObjectResult objectResult = storageService.getObject(inputUrl1, r1Path.toString());
         if (!objectResult.success()) {
             if(objectResult.e()==null){
                 logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1);
             }else {
                 logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1, objectResult.e());
             }
+            this.deleteTmpFiles(List.of(inputDir.toFile()));
             return StageRunResult.fail("加载read1失败", bioPipelineStage,objectResult.e());
         }
 
         File inputFile1 = objectResult.objectFile();
         File inputFile2 = null;
         if (StringUtils.isNotBlank(inputUrl2)) {
-            GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, inputDir.resolve(input2FileName).toString());
+            GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, r2Path.toString());
             if (!r2ObjectGetResult.success()) {
                 this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
                 if(objectResult.e()==null){
@@ -120,13 +127,14 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
                 }else {
                     logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1, objectResult.e());
                 }
+                this.deleteTmpFiles(List.of(inputDir.toFile()));
                 return StageRunResult.fail("加载read2失败", bioPipelineStage, r2ObjectGetResult.e());
             }
             inputFile2 = r2ObjectGetResult.objectFile();
         }
 
         List<String> cmd = new ArrayList<>();
-        cmd.addAll(this.fastpCmd);
+        cmd.addAll(this.analysisPipelineToolsConfig.getFastp());
         if (inputUrl2 != null) {
             // 双端
             cmd.addAll(List.of(
@@ -162,6 +170,8 @@ public class QcStageExecutor extends AbstractPipelineStageExector {
             }else {
                 logger.error("{} qc failed. exit code = {}", bioPipelineStage, runResult);
             }
+
+            this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
             return this.runFail(bioPipelineStage, "运行qc tool失败", runException, inputDir, outputDir);
         }
 

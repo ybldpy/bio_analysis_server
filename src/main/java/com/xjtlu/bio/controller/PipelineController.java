@@ -25,8 +25,11 @@ public class PipelineController {
         if(startResult.getStatus()==Result.INTERNAL_FAIL){
             return ResponseEntity.internalServerError().body(startResult.getFailMsg());
         }
-
         return ResponseEntity.ok().body(startResult);
+    }
+
+    @GetMapping("/restart")
+    public ResponseEntity restart(@Param("stageId")long stageId){
 
     }
 }

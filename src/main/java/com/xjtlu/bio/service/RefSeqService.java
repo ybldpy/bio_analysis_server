@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 
+import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -49,8 +50,9 @@ public class RefSeqService {
 
     private Map<String, Object> virusIndex;
 
-    @Value("${analysisPipeline.tools.samtools}")
-    private String samtools;
+
+    @Resource
+    private AnalysisPipelineToolsConfig analysisPipelineToolsConfig;
 
 
     public boolean deleteRefSeq(String outterRefseqObjName) {
@@ -82,7 +84,7 @@ public class RefSeqService {
 
         // 组装命令：samtools faidx <ref.fa>
         List<String> cmd = new ArrayList<>();
-        cmd.add(samtools);
+        cmd.addAll(analysisPipelineToolsConfig.getSamtools());
         cmd.add("faidx");
         cmd.add(refseqLink.toAbsolutePath().toString());
         

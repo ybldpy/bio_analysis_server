@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
+import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,10 +26,7 @@ import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 public class VarientExecutor extends AbstractPipelineStageExector {
 
 
-    @Value("${analysisPipeline.tools.bcftools}")
-    private List<String> bcftools;
-    @Value("${analysisPipeline.tools.samtools}")
-    private List<String> samtools;
+
 
 
     @Override
@@ -137,7 +136,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         // ---------- 1) mpileup: BAM -> BCF ----------
         // -Ou 输出未压缩 BCF 到 stdout（这里我们直接 -o 写文件，避免管道）
         List<String> cmd = new ArrayList<>();
-        cmd.addAll(bcftools);
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.add("mpileup");
         cmd.add("-f");
         cmd.add(refSeqFileLink.toString());
@@ -167,7 +166,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
 
         // ---------- 2) call: BCF -> VCF.GZ ----------
         cmd.clear();
-        cmd.addAll(this.bcftools);
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.add("call");
         cmd.add("-m"); // multiallelic caller
         cmd.add("--ploidy");
@@ -193,7 +192,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
 
         // ---------- 3) index: VCF.GZ -> TBI ----------
         cmd = new ArrayList<>();
-        cmd.addAll(bcftools);
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.add("index");
         cmd.add("-t"); // 生成 TBI
         cmd.add("--threads");
