@@ -29,6 +29,9 @@ public class LocalStorageService implements StorageService{
             if (parentDir != null && Files.notExists(parentDir)) {
                 Files.createDirectories(parentDir);
             }
+            if(Files.exists(objectPath)){
+                Files.delete(objectPath);
+            }
             Files.copy(data, objectPath);
             return new PutResult(true, null);
         } catch (IOException e) {

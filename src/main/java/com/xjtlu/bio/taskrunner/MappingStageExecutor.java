@@ -63,8 +63,8 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
             return StageRunResult.fail("参考基因组加载失败", bioPipelineStage, null);
         }
 
-        String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
-        String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY);
+        String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R1);
+        String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R2);
 
         Path inputTmpPath = this.stageInputPath(bioPipelineStage);
         File inputTmpDir = inputTmpPath.toFile();

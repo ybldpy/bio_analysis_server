@@ -56,8 +56,8 @@ public class VarientExecutor extends AbstractPipelineStageExector {
             refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
         }
 
-        String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY);
-        String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY);
+        String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY);
+        String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY);
 
         Path inputTempDir = this.stageInputPath(bioPipelineStage);
 

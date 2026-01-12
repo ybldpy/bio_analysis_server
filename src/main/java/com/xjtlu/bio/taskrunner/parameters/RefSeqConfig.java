@@ -14,6 +14,10 @@ public class RefSeqConfig {
         this.refseqObjectName = refseqObjectName;
         this.refseqId = refseqId;
     }
+
+    public RefSeqConfig(String refSeqObjName){
+        new RefSeqConfig(false, refSeqObjName, -1);
+    }
     public String getRefseqObjectName() {
         return refseqObjectName;
     }
