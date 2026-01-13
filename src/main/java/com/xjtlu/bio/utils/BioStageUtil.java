@@ -140,9 +140,13 @@ public class BioStageUtil {
             return createInputMapForVarient(curStage, nextStage);
         }
         if(nextStage.getStageType() == PipelineService.PIPELINE_STAGE_CONSENSUS){
-
+            //no next stage here
         }
+        return null;
+    }
 
+
+    public Map<String,Object> createParamsForNextStage(BioPipelineStage curStage, BioPipelineStage nextStage){
         return null;
     }
 
