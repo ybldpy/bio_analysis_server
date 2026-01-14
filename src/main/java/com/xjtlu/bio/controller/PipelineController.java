@@ -30,6 +30,6 @@ public class PipelineController {
 
     @GetMapping("/restart")
     public ResponseEntity restart(@Param("stageId")long stageId){
-
+        return null;
     }
 }

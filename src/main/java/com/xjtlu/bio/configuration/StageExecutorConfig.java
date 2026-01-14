@@ -13,14 +13,6 @@ import com.xjtlu.bio.taskrunner.PipelineStageExecutor;
 @Configuration
 public class StageExecutorConfig {
 
-    private final PipelineService pipelineService;
-
-
-    StageExecutorConfig(PipelineService pipelineService) {
-        this.pipelineService = pipelineService;
-    }
-
-
     @Bean(name = "stageExecutorMap")
     public Map<Integer, PipelineStageExecutor> makeStageExecutorMap(List<PipelineStageExecutor> executors){
         

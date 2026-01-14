@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
+import com.xjtlu.bio.taskrunner.parameters.QcStageExecutorInput;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -26,7 +27,7 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
 
 @Component
-public class QcStageExecutor extends AbstractPipelineStageExector {
+public class QcStageExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor {
 
 
 
