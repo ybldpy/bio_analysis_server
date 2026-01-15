@@ -4,11 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
-import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
-import org.apache.ibatis.executor.BatchResult;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -17,7 +17,7 @@ import java.util.*;
 import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
-public class AssemblyStageDoneHandler extends AbstractStageDoneHandler implements StageDoneHandler{
+public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyStageOutput> implements StageDoneHandler<AssemblyStageOutput>{
 
 
     @Override
@@ -26,7 +26,7 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler implement
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
+    public void handleStageDone(StageRunResult<AssemblyStageOutput> stageRunResult) {
 
         AssemblyStageOutput assemblyStageOutput = (AssemblyStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
@@ -58,7 +58,7 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler implement
         outputPathMap.put(PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, hasScaffold ? scaffoldOuputKey : null);
         String serializedOutputPath = null;
         try {
-            serializedOutputPath = jsonMapper.writeValueAsString(outputPathMap);
+            serializedOutputPath = JsonUtil.toJson(outputMap);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("{} serializing exception", outputPathMap,e);
@@ -106,7 +106,7 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler implement
 
                 try {
                     Map<String,String> inputMap = bioStageUtil.createInputMapForNextStage(bioPipelineStage, stage);
-                    String serializedInput = this.jsonMapper.writeValueAsString(inputMap);
+                    String serializedInput = JsonUtil.toJson(inputMap);
                     updateStage.setInputUrl(serializedInput);
                     nextStage.setInputUrl(serializedInput);
                 } catch (JsonProcessingException e) {
@@ -116,11 +116,11 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler implement
             }
 
             try {
-                Map<String,Object> params = this.jsonMapper.readValue(stage.getParameters(), Map.class);
+                Map<String,Object> params = JsonUtil.toMap(nextStage.getParameters(), Object.class);
                 params.remove(PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
                 RefSeqConfig refSeqConfig = new RefSeqConfig(contigOutputKey);
                 params.put(PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refSeqConfig);
-                String serializedParams = this.jsonMapper.writeValueAsString(params);
+                String serializedParams = JsonUtil.toJson(params);
                 updateStage.setParameters(serializedParams);
                 if(isNextStage){
                     nextStage.setParameters(serializedParams);
@@ -139,8 +139,6 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler implement
             pipelineService.addStageTask(nextStage);
             return;
         }
-
-        // TODO: bacteria part. do it later
 
 
 

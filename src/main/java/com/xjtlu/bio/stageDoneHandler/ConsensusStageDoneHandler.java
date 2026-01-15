@@ -5,6 +5,8 @@ import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -17,7 +19,7 @@ import java.util.Map;
 import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
-public class ConsensusStageDoneHandler extends AbstractStageDoneHandler implements StageDoneHandler{
+public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<ConsensusStageOutput> implements StageDoneHandler<ConsensusStageOutput>{
 
 
     @Override
@@ -26,10 +28,10 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler implemen
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
+    public void handleStageDone(StageRunResult<ConsensusStageOutput> stageRunResult) {
 
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
-        ConsensusStageOutput consensusStageOutput = (ConsensusStageOutput) stageRunResult.getStageOutput();
+        ConsensusStageOutput consensusStageOutput = stageRunResult.getStageOutput();
 
         String consesusOutputObjName = createStoreObjectName(bioPipelineStage, consensusStageOutput.getConsensusFa());
 
@@ -40,7 +42,7 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler implemen
         String serializedOutputMap = null;
 
         try {
-            serializedOutputMap = jsonMapper.writeValueAsString(outputMap);
+            serializedOutputMap = JsonUtil.toJson(outputMap);
         }catch (JsonProcessingException e) {
             try {
                 Files.delete(outputParentDir);

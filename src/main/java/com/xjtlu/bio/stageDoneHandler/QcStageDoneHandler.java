@@ -6,6 +6,8 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -18,7 +20,7 @@ import static com.xjtlu.bio.service.PipelineService.*;
 
 
 @Component
-public class QcStageDoneHandler extends AbstractStageDoneHandler implements StageDoneHandler{
+public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> implements StageDoneHandler<QCStageOutput>{
 
 
 
@@ -30,9 +32,9 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler implements Stag
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
+    public void handleStageDone(StageRunResult<QCStageOutput> stageRunResult) {
 
-        QCStageOutput qcStageOutput = (QCStageOutput) stageRunResult.getStageOutput();
+        QCStageOutput qcStageOutput = stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
         String qcR1Path = qcStageOutput.getR1Path();
         String qcR2Path = qcStageOutput.getR2Path();
@@ -72,7 +74,7 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler implements Stag
         outputPathMap.put(PIPELINE_STAGE_QC_OUTPUT_JSON, jsonOutputPath);
         outputPathMap.put(PIPELINE_STAGE_QC_OUTPUT_HTML, htmlOutputPath);
         try {
-            String outputPathMapJson = this.jsonMapper.writeValueAsString(outputPathMap);
+            String outputPathMapJson = JsonUtil.toJson(outputPathMap);
             BioPipelineStage updateStage = new BioPipelineStage();
             updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
             updateStage.setOutputUrl(outputPathMapJson);
@@ -105,7 +107,7 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler implements Stag
             inputMap.put(PIPELINE_STAGE_INPUT_READ1_KEY, r1OutputPath);
             inputMap.put(PIPELINE_STAGE_INPUT_READ2_KEY, r2OutputPath);
 
-            String nextStageInput = this.jsonMapper.writeValueAsString(inputMap);
+            String nextStageInput = JsonUtil.toJson(inputMap);
             updateNextStage.setInputUrl(nextStageInput);
             nextStage.setInputUrl(nextStageInput);
             updateNextStage.setVersion(bioPipelineStage.getVersion()+1);

@@ -8,6 +8,8 @@ import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.stageOutput.ReadLengthDetectStageOutput;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import io.micrometer.common.util.StringUtils;
 import org.apache.ibatis.executor.BatchResult;
 import org.springframework.stereotype.Component;
@@ -17,7 +19,7 @@ import java.util.*;
 import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
-public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler implements StageDoneHandler{
+public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler<ReadLengthDetectStageOutput> implements StageDoneHandler<ReadLengthDetectStageOutput>{
 
 
     @Override
@@ -26,8 +28,8 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler i
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
-        boolean longRead = ((ReadLengthDetectStageOutput) stageRunResult.getStageOutput()).isLongRead();
+    public void handleStageDone(StageRunResult<ReadLengthDetectStageOutput> stageRunResult) {
+        boolean longRead = stageRunResult.getStageOutput().isLongRead();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
         BioPipelineStage updateStage = new BioPipelineStage();
@@ -62,9 +64,7 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler i
             }
             Map<String, Object> params = null;
             try {
-                params = StringUtils.isNotBlank(nextStage.getParameters())
-                        ? jsonMapper.readValue(nextStage.getParameters(), Map.class)
-                        : null;
+                params = JsonUtil.toMap(nextStage.getParameters());
             } catch (JsonMappingException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -79,7 +79,7 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler i
             params.put(PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY, longRead);
             String serializedParams = null;
             try {
-                serializedParams = jsonMapper.writeValueAsString(params);
+                serializedParams = JsonUtil.toJson(params);
             } catch (JsonProcessingException e) {
                 // TODO Auto-generated catch block
                 logger.error("{} parsing exception exception", bioPipelineStage, e);

@@ -25,7 +25,7 @@ import jakarta.annotation.Resource;
 
 
 @Component
-public class ReadLengthDetectStage extends AbstractPipelineStageExector implements PipelineStageExecutor{
+public class ReadLengthDetectStage extends AbstractPipelineStageExector<ReadLengthDetectStageOutput> implements PipelineStageExecutor<ReadLengthDetectStageOutput>{
 
 
     // 你可以按需调整
@@ -61,24 +61,20 @@ public class ReadLengthDetectStage extends AbstractPipelineStageExector implemen
 
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<ReadLengthDetectStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         // TODO Auto-generated method stub
 
-        Path inputDir = this.stageInputPath(bioPipelineStage);
 
-        try {
-            Files.createDirectories(inputDir);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            return this.runFail(bioPipelineStage, "创建目录失败", e);
-        }
+
+
+        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
+        Path inputDir = stageExecutionInput.inputDir;
 
 
         String readUrl = bioPipelineStage.getInputUrl();
 
         GetObjectResult getReadResult = this.storageService.getObject(readUrl, inputDir.resolve("r.fastq").toString());
         if(!getReadResult.success()){
-            this.deleteTmpFiles(List.of(inputDir.toFile()));
             return this.runFail(bioPipelineStage, "加载reads文件失败", getReadResult.e());
         }
 
@@ -91,7 +87,6 @@ public class ReadLengthDetectStage extends AbstractPipelineStageExector implemen
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-            this.deleteTmpFiles(List.of(inputDir.toFile()));
             return this.runFail(bioPipelineStage, "检测读长失败", e);
         }
         return StageRunResult.OK(new ReadLengthDetectStageOutput(longRead), bioPipelineStage);

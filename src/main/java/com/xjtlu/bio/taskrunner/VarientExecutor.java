@@ -19,19 +19,22 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
+import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 
 
 @Component
-public class VarientExecutor extends AbstractPipelineStageExector {
+public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOutput> implements PipelineStageExecutor<VariantStageOutput>{
 
 
 
 
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         // TODO Auto-generated method stub
+
+        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrls = bioPipelineStage.getInputUrl();
         Map<String, String> inputUrlMap = null;
         Map<String,Object> params = null;
@@ -59,25 +62,9 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY);
         String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY);
 
-        Path inputTempDir = this.stageInputPath(bioPipelineStage);
-
-
+        Path inputTempDir = stageExecutionInput.inputDir;
         // 结果目录
-        Path workDir = this.workDirPath(bioPipelineStage);
-        try {
-            Files.createDirectories(workDir);
-        } catch (IOException e) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return StageRunResult.fail("创建目录失败", bioPipelineStage, e);
-        }
-
-        try {
-            Files.createDirectories(inputTempDir);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return this.runException(bioPipelineStage, e);
-        }
+        Path workDir = stageExecutionInput.workDir;
 
         Path refSeqFileLink = null;
         try {
@@ -154,7 +141,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add(bcfRaw.toString()); // 直接落盘
         cmd.add(bam.toString());
 
-        ExecuteResult executeResult = execute(cmd, workDir);
+        ExecuteResult executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
             return this.runFail(bioPipelineStage, "生成bcf.gz失败", executeResult.ex, inputTempDir, workDir);
         }
@@ -178,7 +165,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add(vcfGz.toString());
         cmd.add(bcfRaw.toString());
 
-        executeResult = execute(cmd, workDir);
+        executeResult = _execute(cmd, workDir);
 
         if(!executeResult.success()){
             return this.runFail(bioPipelineStage, "生成VCF.gz失败", executeResult.ex, inputTempDir, workDir);
@@ -199,7 +186,7 @@ public class VarientExecutor extends AbstractPipelineStageExector {
         cmd.add(String.valueOf(threads));
         cmd.add(vcfTbi.toString());
 
-        executeResult = execute(cmd, workDir);
+        executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
             return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
         }

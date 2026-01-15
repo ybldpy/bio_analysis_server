@@ -1,5 +1,7 @@
 package com.xjtlu.bio.taskrunner;
 
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -20,10 +22,11 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
+import com.xjtlu.bio.utils.JsonUtil;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
 @Component
-public class MappingStageExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor {
+public class MappingStageExecutor extends AbstractPipelineStageExector<MappingStageOutput> implements PipelineStageExecutor<MappingStageOutput> {
 
 
 
@@ -36,28 +39,31 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
     }
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<MappingStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         // TODO Auto-generated method stub
+
+        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrls = bioPipelineStage.getInputUrl();
         Map<String, String> inputUrlJson = null;
         Map<String, Object> params = null;
         try {
-            inputUrlJson = objectMapper.readValue(inputUrls, Map.class);
-            params = objectMapper.readValue(bioPipelineStage.getParameters(), Map.class);
+            inputUrlJson = JsonUtil.toMap(inputUrls, String.class);
+            params = JsonUtil.toMap(bioPipelineStage.getParameters());
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
             return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage, null);
         }
 
-        RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(params);
+        
+        RefSeqConfig refSeqConfig = JsonUtil.mapToPojo((Map<String,Object>)params.get(PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG), RefSeqConfig.class);
 
         if (refSeqConfig == null) {
             return StageRunResult.fail("未能加载参考基因", bioPipelineStage, null);
         }
 
         File refSeq = refSeqConfig.getRefseqId() >= 0 ? this.refSeqService.getRefseq(refSeqConfig.getRefseqId())
-                : this.refSeqService.getRefseq((String) refSeqConfig.getRefseqObjectName());
+                : this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
 
         if (refSeq == null) {
             return StageRunResult.fail("参考基因组加载失败", bioPipelineStage, null);
@@ -66,25 +72,12 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
         String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R1);
         String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R2);
 
-        Path inputTmpPath = this.stageInputPath(bioPipelineStage);
-        File inputTmpDir = inputTmpPath.toFile();
+        Path inputTmpPath = stageExecutionInput.inputDir;
+        Path workDir = stageExecutionInput.workDir;
 
-        if (!inputTmpDir.exists()) {
-            try {
-                FileUtils.createParentDirectories(inputTmpDir);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                return StageRunResult.fail("创建临时目录出错", bioPipelineStage, null);
-            }
-        }
+        
 
-        Path workDir = this.workDirPath(bioPipelineStage);
-        try {
-            FileUtils.createParentDirectories(workDir.toFile());
-        } catch (IOException e) {
-            return this.runFail(bioPipelineStage, "创建临时目录出错", e);
-        }
+        
 
         Path r1TmpPath = inputTmpPath.resolve(inputR1Url.substring(inputR1Url.lastIndexOf("/") + 1));
         Path r2TmpPath = inputR2Url == null ? null
@@ -99,7 +92,6 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
 
         String errorLoadingInput = this.findFailedLoadingObject(r1AndR2GetResult);
         if (errorLoadingInput != null) {
-            this.deleteTmpFiles(List.of(inputTmpDir));
             return this.runFail(bioPipelineStage, errorLoadingInput + "加载失败",
                     r1AndR2GetResult.get(errorLoadingInput).e());
         }
@@ -119,7 +111,7 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
         cmd.add(pipelineCmd);
 
 
-        ExecuteResult executeResult = execute(cmd, workDir);
+        ExecuteResult executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
             return this.runFail(bioPipelineStage, "运行mapping tool失败", executeResult.ex, inputTmpPath, workDir);
         }
@@ -136,7 +128,7 @@ public class MappingStageExecutor extends AbstractPipelineStageExector implement
         cmd.add("-o");
         cmd.add(bamIndexTmp.toString());
 
-        executeResult = execute(cmd, workDir);
+        executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
             return this.runFail(bioPipelineStage, "生成bam索引失败", executeResult.ex, inputTmpPath, workDir);
         }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
+import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.utils.BioStageUtil;
 import jakarta.annotation.Resource;
 import org.apache.commons.io.FileUtils;
@@ -20,7 +21,7 @@ import java.util.Map;
 
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FAIL;
 
-public abstract class AbstractStageDoneHandler implements StageDoneHandler{
+public abstract class AbstractStageDoneHandler<T extends StageOutput> implements StageDoneHandler<T>{
 
     protected static final JsonMapper jsonMapper = new JsonMapper();
 

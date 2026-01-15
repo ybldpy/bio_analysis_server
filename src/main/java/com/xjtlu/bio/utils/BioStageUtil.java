@@ -81,7 +81,7 @@ public class BioStageUtil {
 
 
     private static Map<String,String> createInputMapForAssembly(BioPipelineStage curStage) throws JsonProcessingException {
-        Map<String,String> outputMap = objectMapper.readValue(curStage.getOutputUrl(),Map.class);
+        Map<String,String> outputMap = JsonUtil.toMap(curStage.getOutputUrl(), String.class);
         HashMap<String,String> inputMap = new HashMap<>();
         inputMap.put(PipelineService.PIPELINE_STAGE_ASSEMBLY_INPUT_R1, outputMap.get(PipelineService.PIPELINE_STAGE_QC_OUTPUT_R1));
         String outputR2 = outputMap.get(PipelineService.PIPELINE_STAGE_QC_OUTPUT_R2);

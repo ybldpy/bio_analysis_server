@@ -1,5 +1,7 @@
 package com.xjtlu.bio.taskrunner;
 
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -14,6 +16,8 @@ import java.util.Map;
 
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.common.StageRunResult;
@@ -28,7 +32,7 @@ import com.xjtlu.bio.utils.BioStageUtil;
 
 import jakarta.annotation.Resource;
 
-public abstract class AbstractPipelineStageExector implements PipelineStageExecutor {
+public abstract class AbstractPipelineStageExector<T extends StageOutput> implements PipelineStageExecutor<T> {
 
     protected static class StageOutputValidationResult {
 
@@ -49,18 +53,27 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         }
     }
 
-    protected static class ExecuteResult{
+    protected static class ExecuteResult {
         public final int runCode;
         public final Exception ex;
+
         public ExecuteResult(int runCode, Exception ex) {
             this.runCode = runCode;
             this.ex = ex;
         }
 
-        public boolean success(){
+        public boolean success() {
             return runCode == 0 && ex == null;
         }
     }
+
+    protected static class StageExecutionInput {
+        BioPipelineStage bioPipelineStage;
+        Path workDir;
+        Path inputDir;
+    }
+
+    protected Logger logger = LoggerFactory.getLogger(getClass());
 
     @Resource
     protected PipelineService pipelineService;
@@ -93,7 +106,62 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         return true;
     }
 
+    protected void preExecute(BioPipelineStage bioPipelineStage) throws IOException {
+        resetDirectory(this.workDirPath(bioPipelineStage));
+        resetDirectory(this.stageInputPath(bioPipelineStage));
+    }
 
+    private void resetDirectory(Path path) throws IOException {
+        File dir = path.toFile();
+
+        if (dir.exists()) {
+            // 关键点：cleanDirectory 只会删里面的东西，不会删 dir 这个壳
+            // 这能有效避免 "delete之后立刻mkdir" 导致的 FileAlreadyExistsException
+            FileUtils.cleanDirectory(dir);
+        } else {
+            // 不存在，则连同父级目录一起创建
+            Files.createDirectories(path);
+        }
+    }
+
+    protected void postExecute(StageRunResult stageRunResult) {
+        Path inputDir = this.stageInputPath(stageRunResult.getStage());
+        FileUtils.deleteQuietly(inputDir.toFile());
+        if (!stageRunResult.isSuccess()) {
+            FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStage()).toFile());
+        }
+    }
+
+    @Override
+    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+        try {
+            preExecute(bioPipelineStage);
+        } catch (Exception e) {
+            logger.error("{} exception happens at preExecute", bioPipelineStage, e);
+            StageRunResult stageRunResult = StageRunResult.fail("异常发生", bioPipelineStage, e);
+            postExecute(stageRunResult);
+            return stageRunResult;
+        }
+
+        Path workDir = this.workDirPath(bioPipelineStage);
+        Path inputDir = this.stageInputPath(bioPipelineStage);
+
+        StageExecutionInput stageExecutionInput = new StageExecutionInput();
+        stageExecutionInput.bioPipelineStage = bioPipelineStage;
+        stageExecutionInput.inputDir = inputDir;
+        stageExecutionInput.workDir = workDir;
+
+        StageRunResult stageRunResult = _execute(stageExecutionInput);
+        postExecute(stageRunResult);
+        return stageRunResult;
+    }
+
+    /**
+     * Subclasses must NOT throw exceptions.
+     * Any failure should be captured and returned as
+     * {@link StageRunResult#fail(...)}.
+     */
+    protected abstract StageRunResult _execute(StageExecutionInput stageExecutionInput);
 
     protected StageRunResult runException(BioPipelineStage bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());
@@ -155,7 +223,8 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
             if (ioe != null) {
                 sb.append(" ioEx=").append(ioe.getClass().getSimpleName())
-                        .append(" msg=").append(ioe.getMessage()==null?"<null>": ioe.getMessage().replace("\n", " ").replace("\r", " ").replace("\t", " "));
+                        .append(" msg=").append(ioe.getMessage() == null ? "<null>"
+                                : ioe.getMessage().replace("\n", " ").replace("\r", " ").replace("\t", " "));
             }
 
             sb.append('\n');
@@ -167,10 +236,10 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
     }
 
-
-    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String errorMessge, Exception e,Path inputDir, Path workDir){
+    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String errorMessge, Exception e, Path inputDir,
+            Path workDir) {
         this.deleteTmpFiles(List.of(inputDir.toFile(), workDir.toFile()));
-        return this.runFail(bioPipelineStage, errorMessge,e);
+        return this.runFail(bioPipelineStage, errorMessge, e);
     }
 
     protected static String appendSuffixBeforeExtensions(String fileName, String suffix) {
@@ -258,7 +327,10 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
     protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
 
-        Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+
+
+
+        Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
         if (!isMap(refseqConfigObj)) {
             return null;
         }
@@ -324,7 +396,6 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
 
     protected static int runSubProcess(List<String> cmd, Path workDir) throws IOException, InterruptedException {
 
-
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir.toFile());
 
@@ -340,13 +411,12 @@ public abstract class AbstractPipelineStageExector implements PipelineStageExecu
         return bioStageUtil.stageExecutorWorkDir(bioPipelineStage);
     }
 
-    protected StageRunResult ok(BioPipelineStage bioPipelineStage, StageOutput stageOutput, Path deleteDir){
+    protected StageRunResult ok(BioPipelineStage bioPipelineStage, StageOutput stageOutput, Path deleteDir) {
         this.deleteTmpFiles(List.of(deleteDir.toFile()));
         return StageRunResult.OK(stageOutput, bioPipelineStage);
     }
 
-
-    protected ExecuteResult execute(List<String> cmd, Path workDir){
+    protected ExecuteResult _execute(List<String> cmd, Path workDir) {
 
         int runCode = -1;
         Exception runEx = null;

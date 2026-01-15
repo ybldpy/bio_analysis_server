@@ -22,15 +22,17 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.stageOutput.AssemblyStageOutput;
 
 @Component
-public class AssemblyExecutor extends AbstractPipelineStageExector {
+public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput> {
 
 
 
     
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<AssemblyStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         // TODO Auto-generated method stub
+
+        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrl = bioPipelineStage.getInputUrl();
         Map<String, String> inputUrlMap = null;
         try {
@@ -44,18 +46,8 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
         String r1 = inputUrlMap.get(PipelineService.PIPELINE_STAGE_QC_INPUT_R1);
         String r2 = inputUrlMap.get(PipelineService.PIPELINE_STAGE_QC_INPUT_R2);
 
-        Path tempInputDir = stageInputPath(bioPipelineStage);
-        Path workDir = workDirPath(bioPipelineStage);
-
-        
-        try{
-            Files.createDirectories(tempInputDir);
-            Files.createDirectories(workDir);
-        }catch(IOException e){
-            this.deleteTmpFiles(List.of(tempInputDir.toFile(), workDir.toFile()));
-            return this.runFail(bioPipelineStage, "创建临时目录失败",e);
-        }
-
+        Path tempInputDir = stageExecutionInput.inputDir;
+        Path workDir = stageExecutionInput.workDir;
 
         // Path r1Path = tempInputDir.resolve(appendSuffixBeforeExtensions(r1.substring(r1.lastIndexOf("/") + 1), ""));
         Path r1Path = tempInputDir.resolve(r1.substring(r1.lastIndexOf("/")+1));
@@ -70,7 +62,6 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
 
         String failedLoadRead = findFailedLoadingObject(getR1AndR2Results);
         if(failedLoadRead!=null){
-            this.deleteTmpFiles(List.of(tempInputDir.toFile()));
             return this.runFail(bioPipelineStage, "加载"+failedLoadRead+"失败", getR1AndR2Results.get(failedLoadRead).e());
         }
 
@@ -90,7 +81,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
         cmd.add("-o");
         cmd.add(workDir.toString());
 
-        ExecuteResult executeResult = execute(cmd, workDir);
+        ExecuteResult executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
             return this.runFail(bioPipelineStage, "运行spades tool失败", executeResult.ex, tempInputDir, workDir);
         }
@@ -103,7 +94,6 @@ public class AssemblyExecutor extends AbstractPipelineStageExector {
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(contigs);
         
         if(!errOutputValidationResults.isEmpty()){
-            this.deleteTmpFiles(List.of(tempInputDir.toFile(), workDir.toFile()));
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
         }
         

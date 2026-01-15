@@ -6,6 +6,8 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -15,7 +17,7 @@ import java.util.Map;
 import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
-public class VarientStageDoneHandler extends AbstractStageDoneHandler implements StageDoneHandler{
+public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantStageOutput> implements StageDoneHandler<VariantStageOutput>{
 
 
     @Override
@@ -24,7 +26,7 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler implements
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
+    public void handleStageDone(StageRunResult<VariantStageOutput> stageRunResult) {
         VariantStageOutput variantStageOutput = (VariantStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
@@ -83,7 +85,7 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler implements
         Map<String,String> inputMap = Map.of(PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ, vcfGzObjctName, PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI, vcfTbiObjectName);
         String serializedInputMap = null;
         try {
-            serializedInputMap = this.jsonMapper.writeValueAsString(inputMap);
+            serializedInputMap = JsonUtil.toJson(inputMap);
         } catch (JsonProcessingException e) {
             logger.error("{} happens exception when serialzing inputMap", bioPipelineStage, e);
         }

@@ -30,6 +30,14 @@ public class PipelineController {
 
     @GetMapping("/restart")
     public ResponseEntity restart(@Param("stageId")long stageId){
-        return null;
+        Result<Boolean> result = this.pipelineService.restartStage(stageId);
+
+        if(result.getStatus()==Result.INTERNAL_FAIL){
+            return ResponseEntity.internalServerError().body(result.getFailMsg());
+        }
+
+        
+        return ResponseEntity.ok(result);
+        
     }
 }

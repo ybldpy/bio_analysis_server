@@ -7,6 +7,8 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -16,7 +18,7 @@ import java.util.List;
 import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
-public class MappingStageDoneHandler extends AbstractStageDoneHandler implements StageDoneHandler{
+public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingStageOutput> implements StageDoneHandler<MappingStageOutput>{
 
 
     @Override
@@ -25,7 +27,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler implements
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
+    public void handleStageDone(StageRunResult<MappingStageOutput> stageRunResult) {
         MappingStageOutput mappingStageOutput = (MappingStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
@@ -68,7 +70,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler implements
             inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamIndexObjectName);
             String serializedInputUrl = null;
             try {
-                serializedInputUrl = this.jsonMapper.writeValueAsString(inputMap);
+                serializedInputUrl = JsonUtil.toJson(inputMap);
             } catch (JsonProcessingException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();

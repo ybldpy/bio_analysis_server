@@ -7,14 +7,14 @@ import java.util.Map;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 
-public class StageRunResult {
+public class StageRunResult<T extends StageOutput> {
 
     private boolean success;
     private String failReason;
 
     private Map<String,String> outputPath;
 
-    private StageOutput stageOutput;
+    private T stageOutput;
 
     private Exception e;
 
@@ -30,11 +30,11 @@ public class StageRunResult {
         this.e = e;
     }
 
-    public StageOutput getStageOutput() {
+    public T getStageOutput() {
         return stageOutput;
     }
 
-    public void setStageOutput(StageOutput stageOutput) {
+    public void setStageOutput(T stageOutput) {
         this.stageOutput = stageOutput;
     }
     private BioPipelineStage stage;
@@ -67,7 +67,7 @@ public class StageRunResult {
     }
 
     public static StageRunResult OK(Map<String,String> outputPath, BioPipelineStage stage){
-        return new StageRunResult(true, null,outputPath, stage,null);
+        return new StageRunResult<>(true, null,outputPath, stage,null);
     }
 
     public static StageRunResult OK(StageOutput stageOutput, BioPipelineStage stage){

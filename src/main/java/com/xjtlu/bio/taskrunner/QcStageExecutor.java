@@ -27,15 +27,17 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.stageOutput.QCStageOutput;
 
 @Component
-public class QcStageExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor {
+public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput> implements PipelineStageExecutor<QCStageOutput> {
 
 
 
     private static final Logger logger = LoggerFactory.getLogger(QcStageExecutor.class);
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         // TODO Auto-generated method stub
+
+        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrlsJson = bioPipelineStage.getInputUrl();
         Map<String, String> inputUrls = null;
 
@@ -52,8 +54,8 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
         String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY) : null;
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
-        Path outputDir = workDirPath(bioPipelineStage);
-        Path inputDir = stageInputPath(bioPipelineStage);
+        Path outputDir = stageExecutionInput.workDir;
+        Path inputDir = stageExecutionInput.inputDir;
 
         String params = bioPipelineStage.getParameters();
         Map<String, Object> qcParams;
@@ -72,21 +74,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
         boolean isLongRead = (Boolean) qcParams.get(PipelineService.PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY);
 
 
-
-        try{
-            Files.createDirectories(inputDir);
-        }catch(IOException e){
-            logger.error("{} 创建临时目录 {} IO异常", bioPipelineStage, inputDir.toString(),e);
-            return StageRunResult.fail("IO错误", bioPipelineStage, e);
-        }
-
-        try {
-            Files.createDirectories(outputDir);
-        } catch (IOException e) {
-            logger.error("{} 创建临时目录 {} IO异常", bioPipelineStage, outputDir.toString(),e);
-            return StageRunResult.fail("IO错误", bioPipelineStage, e);
-        }
-
         QCStageOutput qcStageOutput = this.bioStageUtil.qcStageOutput(outputDir, inputUrl2 != null);
 
         Path trimmedR1Path = Path.of(qcStageOutput.getR1Path());
@@ -103,8 +90,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
         Path r1Path = inputDir.resolve(input1FileName);
         Path r2Path = inputUrl2 == null? null: inputDir.resolve(input2FileName);
 
-        //先删除一遍，防止冲突
-        this.deleteTmpFiles(List.of(r1Path.toFile(), r2Path.toFile()));
 
         GetObjectResult objectResult = storageService.getObject(inputUrl1, r1Path.toString());
         if (!objectResult.success()) {
@@ -113,7 +98,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
             }else {
                 logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1, objectResult.e());
             }
-            this.deleteTmpFiles(List.of(inputDir.toFile()));
             return StageRunResult.fail("加载read1失败", bioPipelineStage,objectResult.e());
         }
 
@@ -122,13 +106,11 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
         if (StringUtils.isNotBlank(inputUrl2)) {
             GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, r2Path.toString());
             if (!r2ObjectGetResult.success()) {
-                this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
                 if(objectResult.e()==null){
                     logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1);
                 }else {
                     logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1, objectResult.e());
                 }
-                this.deleteTmpFiles(List.of(inputDir.toFile()));
                 return StageRunResult.fail("加载read2失败", bioPipelineStage, r2ObjectGetResult.e());
             }
             inputFile2 = r2ObjectGetResult.objectFile();
@@ -172,7 +154,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
                 logger.error("{} qc failed. exit code = {}", bioPipelineStage, runResult);
             }
 
-            this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
             return this.runFail(bioPipelineStage, "运行qc tool失败", runException, inputDir, outputDir);
         }
 
@@ -184,7 +165,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector implements Pip
         }
 
         if(!errStageOutputValidationResults.isEmpty()){
-            this.deleteTmpFiles(List.of(inputDir.toFile(), outputDir.toFile()));
             String errorMsg = createStageOutputValidationErrorMessge(errStageOutputValidationResults);
             logger.error("{} qc no output. {}", bioPipelineStage, errorMsg);
             return this.runFail(bioPipelineStage, errorMsg);

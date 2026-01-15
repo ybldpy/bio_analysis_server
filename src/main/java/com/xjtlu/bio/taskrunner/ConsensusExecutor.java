@@ -21,15 +21,17 @@ import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 
 
 @Component
-public class ConsensusExecutor extends AbstractPipelineStageExector implements PipelineStageExecutor{
+public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusStageOutput> implements PipelineStageExecutor<ConsensusStageOutput>{
 
 
 
 
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         // TODO Auto-generated method stub
+
+        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrls = bioPipelineStage.getInputUrl();
         Map<String,String> inputUrlMap = null;
         Map<String,Object> paramsMap = null; 
@@ -63,16 +65,8 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         }
 
 
-        Path inputTmpDir = this.stageInputPath(bioPipelineStage);
-        Path resultDir = this.workDirPath(bioPipelineStage);
-        try {
-            Files.createDirectories(inputTmpDir);
-            Files.createDirectories(resultDir);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return this.runException(bioPipelineStage, e);
-        }
+        Path inputTmpDir = stageExecutionInput.inputDir;
+        Path resultDir = stageExecutionInput.workDir;
 
         String vcfGzUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ);
         String vcfTbiUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI);
@@ -84,7 +78,6 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         Map<String, GetObjectResult> getResults = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
         String objectFailLoad = findFailedLoadingObject(getResults);
         if(objectFailLoad!=null){
-            this.deleteTmpFiles(List.of(inputTmpDir.toFile(), resultDir.toFile()));
             return this.runFail(bioPipelineStage, "加载文件"+objectFailLoad+"失败", getResults.get(objectFailLoad).e());
         }
 
@@ -92,17 +85,6 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
         ConsensusStageOutput consensusStageOutput = bioStageUtil.consensusOutput(bioPipelineStage, resultDir);
         String consensus = "consensus";
         Path consensusPath = Path.of(consensusStageOutput.getConsensusFa());
-//        List<String> cmd = List.of(
-//                this.bcftools,
-//            consensus,
-//            "-f",
-//            refseqFile.getAbsolutePath(),
-//            "-H",
-//            String.valueOf(1),
-//            "-o",
-//            consensusPath.toString(),
-//            vcfGzTmpPath.toString()
-//        );
 
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
@@ -138,7 +120,6 @@ public class ConsensusExecutor extends AbstractPipelineStageExector implements P
 
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(consensusPath);
         if(!errOutputValidationResults.isEmpty()){
-            this.deleteTmpFiles(List.of(inputTmpDir.toFile(), resultDir.toFile()));
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
         }
         
