@@ -133,12 +133,12 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
     }
 
     @Override
-    public StageRunResult execute(BioPipelineStage bioPipelineStage) {
+    public StageRunResult<T> execute(BioPipelineStage bioPipelineStage) {
         try {
             preExecute(bioPipelineStage);
         } catch (Exception e) {
             logger.error("{} exception happens at preExecute", bioPipelineStage, e);
-            StageRunResult stageRunResult = StageRunResult.fail("异常发生", bioPipelineStage, e);
+            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", bioPipelineStage, e);
             postExecute(stageRunResult);
             return stageRunResult;
         }
@@ -151,7 +151,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         stageExecutionInput.inputDir = inputDir;
         stageExecutionInput.workDir = workDir;
 
-        StageRunResult stageRunResult = _execute(stageExecutionInput);
+        StageRunResult<T> stageRunResult = _execute(stageExecutionInput);
         postExecute(stageRunResult);
         return stageRunResult;
     }
@@ -161,17 +161,17 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
      * Any failure should be captured and returned as
      * {@link StageRunResult#fail(...)}.
      */
-    protected abstract StageRunResult _execute(StageExecutionInput stageExecutionInput);
+    protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput);
 
-    protected StageRunResult runException(BioPipelineStage bioPipelineStage, Exception e) {
+    protected StageRunResult<T> runException(BioPipelineStage bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());
     }
 
-    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String errorMsg, Exception e) {
+    protected StageRunResult<T> runFail(BioPipelineStage bioPipelineStage, String errorMsg, Exception e) {
         return StageRunResult.fail(errorMsg, bioPipelineStage, e);
     }
 
-    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String msg) {
+    protected StageRunResult<T> runFail(BioPipelineStage bioPipelineStage, String msg) {
         return runFail(bioPipelineStage, msg, null);
     }
 
@@ -236,7 +236,8 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     }
 
-    protected StageRunResult runFail(BioPipelineStage bioPipelineStage, String errorMessge, Exception e, Path inputDir,
+    protected StageRunResult<T> runFail(BioPipelineStage bioPipelineStage, String errorMessge, Exception e,
+            Path inputDir,
             Path workDir) {
         this.deleteTmpFiles(List.of(inputDir.toFile(), workDir.toFile()));
         return this.runFail(bioPipelineStage, errorMessge, e);
@@ -327,9 +328,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
 
-
-
-
         Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
         if (!isMap(refseqConfigObj)) {
             return null;
@@ -394,7 +392,36 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     }
 
-    protected static int runSubProcess(List<String> cmd, Path workDir) throws IOException, InterruptedException {
+    protected int runSubProcess(List<String> cmd, Path workDir, Path stdout, Path stdErr, boolean append) throws InterruptedException, IOException {
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(workDir.toFile());
+
+        // stdout
+        if (stdout != null) {
+            Files.createDirectories(stdout.toAbsolutePath().getParent());
+            pb.redirectOutput(append
+                    ? ProcessBuilder.Redirect.appendTo(stdout.toFile())
+                    : ProcessBuilder.Redirect.to(stdout.toFile()));
+        } else {
+            pb.redirectOutput(ProcessBuilder.Redirect.INHERIT); // 或 DISCARD，看你默认想要啥
+        }
+
+        // stderr（仅在不合并时有效）
+        if (stdErr != null) {
+
+            pb.redirectError(append
+                    ? ProcessBuilder.Redirect.appendTo(stdErr.toFile())
+                    : ProcessBuilder.Redirect.to(stdErr.toFile()));
+
+        } else {
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT); // 或 DISCARD
+        }
+
+        Process p = pb.start();
+        return p.waitFor();
+    }
+
+    protected int runSubProcess(List<String> cmd, Path workDir) throws IOException, InterruptedException {
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir.toFile());
@@ -416,6 +443,28 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         return StageRunResult.OK(stageOutput, bioPipelineStage);
     }
 
+
+    protected ExecuteResult _execute(List<String> cmd, Path workDir, Path stdout, Path stdErr){
+        int runCode = -1;
+        Exception runEx = null;
+        try {
+            runCode = runSubProcess(cmd, workDir, stdout, stdErr, false);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            runEx = e;
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            Thread.currentThread().interrupt();
+            runEx = e;
+        }
+
+        if (runEx != null) {
+            return new ExecuteResult(runCode, runEx);
+        }
+
+        return new ExecuteResult(runCode, runEx);
+    }
+
     protected ExecuteResult _execute(List<String> cmd, Path workDir) {
 
         int runCode = -1;
@@ -430,6 +479,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
             Thread.currentThread().interrupt();
             runEx = e;
         }
+
+        if (runEx != null) {
+            return new ExecuteResult(runCode, runEx);
+        }
+
         return new ExecuteResult(runCode, runEx);
     }
 

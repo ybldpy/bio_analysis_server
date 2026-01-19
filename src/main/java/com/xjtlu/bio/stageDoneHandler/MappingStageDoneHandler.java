@@ -44,10 +44,23 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
         boolean storeSuccss  = this.batchUploadObjectsFromLocal(outputStoreMap);
         Path outputDirPath = Path.of(mappingStageOutput.getBamPath()).getParent();
         if (!storeSuccss) {
-
             this.handleUnsuccessUpload(bioPipelineStage, outputDirPath.toString());
             return;
         }
+
+        String serializedOutput = null;
+        try {
+            serializedOutput = JsonUtil.toJson(outputDirPath);
+        } catch (JsonProcessingException e) {
+            
+            logger.error("stage id = {}. parsing {} to json error", bioPipelineStage.getStageId(), outputDirPath);
+            //TODO: 1/20 task
+            
+        }
+
+
+        BioPipelineStage updateStage = new BioPipelineStage();
+        
 
         BioPipelineStageExample nextStagesExample = new BioPipelineStageExample();
         nextStagesExample.createCriteria()

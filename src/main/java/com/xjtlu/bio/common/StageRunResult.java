@@ -67,11 +67,11 @@ public class StageRunResult<T extends StageOutput> {
     }
 
     public static StageRunResult OK(Map<String,String> outputPath, BioPipelineStage stage){
-        return new StageRunResult<>(true, null,outputPath, stage,null);
+        return new StageRunResult(true, null,outputPath, stage,null);
     }
 
-    public static StageRunResult OK(StageOutput stageOutput, BioPipelineStage stage){
-        StageRunResult stageRunResult = new StageRunResult(true, null, null, stage, null);
+    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, BioPipelineStage stage){
+        StageRunResult<T> stageRunResult = new StageRunResult<>(true, null, null, stage, null);
         stageRunResult.setStageOutput(stageOutput);
         return stageRunResult;
     }

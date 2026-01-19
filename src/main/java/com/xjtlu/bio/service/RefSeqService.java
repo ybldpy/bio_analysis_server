@@ -2,7 +2,7 @@ package com.xjtlu.bio.service;
 
 import java.io.File;
 import java.io.IOException;
-
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -170,8 +170,11 @@ public class RefSeqService {
             return null;
         }
 
+
+        
         Path outterRefSeqObjectPath = null;
         try {
+            Files.delete(refseqIndexPath);
             outterRefSeqObjectPath = Files.createSymbolicLink(refseqIndexPath, outterRefSeqObjectLocalPath);
         } catch (IOException e) {
             // TODO Auto-generated catch block
@@ -210,10 +213,14 @@ public class RefSeqService {
 
     public File getRefseq(String refseqObjName){
         String refseqObjNameInFlat = refseqObjName.replaceAll("/", "_");
-        Path storePath = Paths.get(this.nonInnerRefseqDir, refseqObjNameInFlat);
+        Path parentDir = Path.of(this.nonInnerRefseqDir);
+
+        Path storePath = parentDir.resolve(refseqObjNameInFlat);
+
         if(Files.exists(storePath)){
             return storePath.toFile();
         }
+
         GetObjectResult getObjectResult = this.storageService.getObject(refseqObjName, storePath.toString());
         if(!getObjectResult.success()){
             return null;

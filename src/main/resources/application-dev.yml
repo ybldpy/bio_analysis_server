@@ -31,7 +31,8 @@ analysis-pipeline:
         fastp: ["${analysis-pipeline.conda}", "run", "-n", "bio-fastp","fastp"]
         spades: ["${analysis-pipeline.conda}", "run", "-n", "bio-spades", "spades.py"]
         samtools: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "samtools"]
-        minimap2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "minimap2"]
+        # minimap2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "minimap2"]
+        minimap2: ["/usr/conda/envs/bio-map/bin/minimap2"]
         bcftools: ["${analysis-pipeline.conda}", "run", "-n", "bio-var", "bcftools"]
 
     stage:
