@@ -12,6 +12,7 @@ import com.xjtlu.bio.utils.JsonUtil;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 
@@ -38,8 +39,8 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
                 substractFileNameFromPath(mappingStageOutput.getBamIndexPath()));
 
         HashMap<String, String> outputStoreMap = new HashMap<>();
-        outputStoreMap.put(mappingStageOutput.getBamPath(), bamObjectName);
-        outputStoreMap.put(mappingStageOutput.getBamIndexPath(), bamIndexObjectName);
+        outputStoreMap.put(mappingStageOutput.getBamPath().toString(), bamObjectName);
+        outputStoreMap.put(mappingStageOutput.getBamIndexPath().toString(), bamIndexObjectName);
 
         boolean storeSuccss  = this.batchUploadObjectsFromLocal(outputStoreMap);
         Path outputDirPath = Path.of(mappingStageOutput.getBamPath()).getParent();
@@ -48,19 +49,25 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
             return;
         }
 
+        this.deleteStageResultDir(outputDirPath.toString());
+
         String serializedOutput = null;
+        HashMap<String,String> outputUrlMap = new HashMap<>();
+        outputUrlMap.put(PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY, bamObjectName);
+        outputUrlMap.put(PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexObjectName);
         try {
-            serializedOutput = JsonUtil.toJson(outputDirPath);
+            serializedOutput = JsonUtil.toJson(outputUrlMap);
         } catch (JsonProcessingException e) {
             
             logger.error("stage id = {}. parsing {} to json error", bioPipelineStage.getStageId(), outputDirPath);
-            //TODO: 1/20 task
-            
+        }
+
+        int updateRes = updateStageFinish(bioPipelineStage, serializedOutput);
+        if(updateRes!=1){
+            return;            
         }
 
 
-        BioPipelineStage updateStage = new BioPipelineStage();
-        
 
         BioPipelineStageExample nextStagesExample = new BioPipelineStageExample();
         nextStagesExample.createCriteria()
@@ -80,13 +87,14 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
         if (varientStage != null) {
             BioPipelineStage updateVarientStage = new BioPipelineStage();
             HashMap<String, Object> inputMap = new HashMap<>();
-            inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamIndexObjectName);
+            inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamObjectName);
+            inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY, bamIndexObjectName);
             String serializedInputUrl = null;
             try {
                 serializedInputUrl = JsonUtil.toJson(inputMap);
             } catch (JsonProcessingException e) {
                 // TODO Auto-generated catch block
-                e.printStackTrace();
+                logger.error("{} parsing json exception", varientStage, e);
             }
 
             int curVersion = varientStage.getVersion();
@@ -102,7 +110,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
             updateVarientStage.setVersion(varientStage.getVersion()+1);
             varientStage.setVersion(varientStage.getVersion()+1);
 
-            int updateRes = this.updateStageFromVersion(updateVarientStage, varientStage.getStageId(),
+            updateRes = this.updateStageFromVersion(updateVarientStage, varientStage.getStageId(),
                     curVersion);
             if (updateRes != 1) {
                 return;

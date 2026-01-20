@@ -1,6 +1,7 @@
 package com.xjtlu.bio.stageDoneHandler;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
@@ -17,9 +18,11 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Date;
 import java.util.Map;
 
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FAIL;
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FINISHED;
 
 public abstract class AbstractStageDoneHandler<T extends StageOutput> implements StageDoneHandler<T>{
 
@@ -86,13 +89,27 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
         }
     }
 
-    protected void handleUnsuccessUpload(BioPipelineStage bioPipelineStage, String deleteDir) {
+    protected void handleFail(BioPipelineStage bioPipelineStage, String deleteDir){
         this.deleteStageResultDir(deleteDir);
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setVersion(bioPipelineStage.getVersion()+1);
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
         pipelineService.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion());
     }
+
+    protected void handleUnsuccessUpload(BioPipelineStage bioPipelineStage, String deleteDir) {
+        handleFail(bioPipelineStage, deleteDir);
+    }
+
+    protected int updateStageFinish(BioPipelineStage bioPipelineStage, String outputUrl){
+        BioPipelineStage updateStage = new BioPipelineStage();
+        updateStage.setOutputUrl(outputUrl);
+        updateStage.setVersion(bioPipelineStage.getVersion()+1);
+        updateStage.setEndTime(new Date());
+        updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+        return pipelineService.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion());
+    }
+
 
     protected int updateStageFromVersion(BioPipelineStage bioPipelineStage, long updateStageId, int currentVersion){
         return pipelineService.updateStageFromVersion(bioPipelineStage, updateStageId, currentVersion);

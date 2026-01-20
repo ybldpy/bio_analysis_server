@@ -29,6 +29,7 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.utils.BioStageUtil;
+import com.xjtlu.bio.utils.JsonUtil;
 
 import jakarta.annotation.Resource;
 
@@ -329,40 +330,17 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
     protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
 
         Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
-        if (!isMap(refseqConfigObj)) {
+        if (refseqConfigObj == null || !(refseqConfigObj instanceof Map)) {
             return null;
         }
 
-        Map<String, Object> refseqConfig = (Map) refseqConfigObj;
-
-        Object refseq = refseqConfig.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
-        Object isInnerRefseq = refseqConfig.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
-
-        if (refseq == null) {
+        try {
+            RefSeqConfig refSeqConfig = JsonUtil.mapToPojo((Map) refseqConfigObj, RefSeqConfig.class);
+            return refSeqConfig;
+        } catch (Exception e) {
+            logger.error("converting {} to RefseqConfigException", refseqConfigObj);
             return null;
         }
-        if (isInnerRefseq == null && !(refseq instanceof Integer)) {
-            return null;
-        }
-
-        if (isInnerRefseq != null && !(isInnerRefseq instanceof Boolean)) {
-            return null;
-        }
-
-        boolean isInner = (Boolean) isInnerRefseq;
-
-        if (isInner && !(refseq instanceof Integer)) {
-            return null;
-        }
-        if (!isInner && !(refseq instanceof String)) {
-            return null;
-        }
-
-        if (isInner) {
-            return new RefSeqConfig(true, null, (Integer) refseq);
-        }
-
-        return new RefSeqConfig(false, (String) refseq, -1);
 
     }
 
@@ -392,7 +370,8 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     }
 
-    protected int runSubProcess(List<String> cmd, Path workDir, Path stdout, Path stdErr, boolean append) throws InterruptedException, IOException {
+    protected int runSubProcess(List<String> cmd, Path workDir, Path stdout, Path stdErr, boolean append)
+            throws InterruptedException, IOException {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir.toFile());
 
@@ -438,13 +417,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         return bioStageUtil.stageExecutorWorkDir(bioPipelineStage);
     }
 
-    protected StageRunResult ok(BioPipelineStage bioPipelineStage, StageOutput stageOutput, Path deleteDir) {
-        this.deleteTmpFiles(List.of(deleteDir.toFile()));
-        return StageRunResult.OK(stageOutput, bioPipelineStage);
-    }
-
-
-    protected ExecuteResult _execute(List<String> cmd, Path workDir, Path stdout, Path stdErr){
+    protected ExecuteResult _execute(List<String> cmd, Path workDir, Path stdout, Path stdErr) {
         int runCode = -1;
         Exception runEx = null;
         try {

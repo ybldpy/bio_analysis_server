@@ -75,8 +75,8 @@ public class StageRunResult<T extends StageOutput> {
         stageRunResult.setStageOutput(stageOutput);
         return stageRunResult;
     }
-    public static StageRunResult fail(String failReason, BioPipelineStage stage,Exception e){
-        return new StageRunResult(false, failReason, null, stage, e);
+    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, BioPipelineStage stage,Exception e){
+        return new StageRunResult<>(false, failReason, null, stage, e);
     }
 
 

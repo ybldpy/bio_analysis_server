@@ -8,9 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
-import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -19,7 +16,6 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
-import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.taskrunner.stageOutput.VariantStageOutput;
 
 
@@ -49,6 +45,7 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
 
         RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(params);
         if(refSeqConfig == null){
+            logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage.getStageId(), params);
             return StageRunResult.fail("未能加载参考基因文件",bioPipelineStage, null);
         }
 
@@ -81,19 +78,13 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
         File refSeqIndexFile = refSeqConfig.getRefseqId()>=0?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
 
         if (refSeqIndexFile == null || !refSeqIndexFile.exists() || refSeqIndexFile.length() < 1) {
-            try {
-                Files.delete(inputTempDir);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
             return this.runFail(bioPipelineStage, "生成参考索引失败");
         }
 
         Path refSeqIndexFileLinkPath = null;
 
         try {
-            refSeqIndexFileLinkPath = Files.createSymbolicLink(inputTempDir.resolve(refseq.getName()+".fai"), refSeqIndexFile.toPath());
+            refSeqIndexFileLinkPath = Files.createSymbolicLink(inputTempDir.resolve("reference.fai"), refSeqIndexFile.toPath());
         } catch (IOException e) {
             // TODO Auto-generated catch block
             return this.runFail(bioPipelineStage, "加载参考基因组索引失败", e, inputTempDir, workDir);
@@ -184,17 +175,23 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
         cmd.add("-t"); // 生成 TBI
         cmd.add("--threads");
         cmd.add(String.valueOf(threads));
-        cmd.add(vcfTbi.toString());
+        cmd.add(vcfGz.toString());
 
         executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
-            return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
+             return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
         }
+
+        
+
+        vcfTbi = workDir.resolve(vcfGz.getFileName()+".tbi");
         errorOutputValidationResults = validateOutputFiles(vcfTbi);
         if(!errorOutputValidationResults.isEmpty()){
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
         }
-        return ok(bioPipelineStage,variantStageOutput, inputTempDir);
+
+        
+        return StageRunResult.OK(new VariantStageOutput(vcfGz.toString(), vcfTbi.toString()), bioPipelineStage);
     }
 
     @Override

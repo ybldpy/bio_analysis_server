@@ -68,11 +68,11 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         Path inputTmpDir = stageExecutionInput.inputDir;
         Path resultDir = stageExecutionInput.workDir;
 
-        String vcfGzUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ);
-        String vcfTbiUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI);
+        String vcfGzUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ);
+        String vcfTbiUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI);
 
         Path vcfGzTmpPath = inputTmpDir.resolve("vcf.gz");
-        Path vcfTbiTmpPath = inputTmpDir.resolve("vcf.tbi");
+        Path vcfTbiTmpPath = inputTmpDir.resolve("vcf.gz.tbi");
 
         
         Map<String, GetObjectResult> getResults = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));

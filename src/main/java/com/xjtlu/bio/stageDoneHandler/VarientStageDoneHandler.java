@@ -11,6 +11,7 @@ import com.xjtlu.bio.utils.JsonUtil;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,17 +31,10 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
         VariantStageOutput variantStageOutput = (VariantStageOutput) stageRunResult.getStageOutput();
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
 
-        String vcfGzObjctName = String.format(
-                stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                variantStageOutput.getVcfGz().substring(variantStageOutput.getVcfGz().lastIndexOf("/") + 1));
+        String vcfGzObjctName = createStoreObjectName(bioPipelineStage, "vcf.gz");
 
-        String vcfTbiObjectName = String.format(
-                stageOutputFormat,
-                bioPipelineStage.getStageId(),
-                bioPipelineStage.getStageName(),
-                variantStageOutput.getVcfTbi().substring(variantStageOutput.getVcfTbi().lastIndexOf("/") + 1));
+
+        String vcfTbiObjectName = createStoreObjectName(bioPipelineStage, "vcf.gz.tbi");
 
         boolean uploadSuccess = this.batchUploadObjectsFromLocal(Map.of(
                 variantStageOutput.getVcfGz(),
@@ -57,14 +51,23 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
         }
         this.deleteStageResultDir(resultDirPath.toString());
 
-        String outputUrl = String.format(
-                "{\"%s\": \"%s\", \"%s\":\"%s\"}",
-                PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ,
-                vcfGzObjctName,
-                PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI,
-                vcfTbiObjectName);
+        HashMap<String,String> outputUrlMap = new HashMap<>();
+        outputUrlMap.put(PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ, vcfGzObjctName);
+        outputUrlMap.put(PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI, vcfTbiObjectName);
 
-        int updateRes = pipelineService.markStageFinish(bioPipelineStage, outputUrl);
+        String outputUrl = null;
+
+        try {
+            outputUrl = JsonUtil.toJson(outputUrlMap);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            logger.error("{} parsing json exception", bioPipelineStage.getStageId(), e);
+            this.handleFail(bioPipelineStage, resultDirPath.toString());
+            return;
+        }
+
+
+        int updateRes = this.updateStageFinish(bioPipelineStage, outputUrl);
 
         if (updateRes != 1) {
             return;
@@ -88,18 +91,17 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
             serializedInputMap = JsonUtil.toJson(inputMap);
         } catch (JsonProcessingException e) {
             logger.error("{} happens exception when serialzing inputMap", bioPipelineStage, e);
+            return;
         }
 
         BioPipelineStage updateConsensusStage = new BioPipelineStage();
 
         int curVersion = consensusStage.getVersion();
         consensusStage.setInputUrl(serializedInputMap);
-        consensusStage.setParameters(bioPipelineStage.getParameters());
         consensusStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
 
 
         updateConsensusStage.setInputUrl(serializedInputMap);
-        updateConsensusStage.setParameters(bioPipelineStage.getParameters());
         updateConsensusStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
 
         updateConsensusStage.setVersion(curVersion+1);

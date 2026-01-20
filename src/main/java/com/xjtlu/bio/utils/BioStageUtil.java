@@ -108,15 +108,14 @@ public class BioStageUtil {
     }
 
     private static Map<String,String> createInputMapForVarient(BioPipelineStage curStage, BioPipelineStage varientStage) throws JsonProcessingException {
-        Map<String,String> outputMap = objectMapper.readValue(curStage.getOutputUrl(), Map.class);
+        Map<String,String> outputMap = JsonUtil.toMap(curStage.getOutputUrl(), String.class);
         String bamUrl = outputMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY);
         String bamIndexUrl = outputMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY);
         return Map.of(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamUrl, PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY, bamIndexUrl);
     }
 
     private static Map<String,String> createInputMapForConsensus(BioPipelineStage curStage, BioPipelineStage consensusStage) throws JsonProcessingException {
-        Map<String,String> outputMap = objectMapper.readValue(curStage.getOutputUrl(), Map.class);
-
+        Map<String,String> outputMap = JsonUtil.toMap(curStage.getOutputUrl(), String.class);
         return Map.of(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ
                 , outputMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ)
                 , PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI, outputMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI));
@@ -140,7 +139,7 @@ public class BioStageUtil {
             return createInputMapForVarient(curStage, nextStage);
         }
         if(nextStage.getStageType() == PipelineService.PIPELINE_STAGE_CONSENSUS){
-            //no next stage here
+            return createInputMapForConsensus(curStage, nextStage);
         }
         return null;
     }

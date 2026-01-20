@@ -101,11 +101,15 @@ class BioPipelineStagesBuilder {
                     : refseqObj instanceof Long ? (Long) refseqObj : -1;
         }
 
-        HashMap<String, Object> refseqConfig = new HashMap<>();
+        
+        RefSeqConfig refseqConfig = new RefSeqConfig();
 
         if (refseqId >= 0) {
-            refseqConfig.put(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY, refseqId);
-            refseqConfig.put(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER, true);
+            refseqConfig.setInnerRefSeq(true);
+            refseqConfig.setRefseqId(refseqId);
+        }else {
+            refseqConfig.setInnerRefSeq(false);
+            refseqConfig.setRefseqId(-1);
         }
 
         int index = 0;
@@ -507,6 +511,7 @@ public class PipelineService {
         if(this.pipelineStageTaskDispatcher.isStageIn(stageId)){
             return new Result<Boolean>(Result.SUCCESS, true, null);
         }
+        
         if(startStage.getStatus() == PIPELINE_STAGE_STATUS_QUEUING){
             this.addStageTask(startStage);
             return new Result<Boolean>(Result.SUCCESS, true, null);
@@ -553,7 +558,7 @@ public class PipelineService {
         String serializedInputMap = null;
         try {
             inputMap = bioStageUtil.createInputMapForNextStage(lastStage, startStage);
-            serializedInputMap = this.jsonMapper.writeValueAsString(inputMap);
+            serializedInputMap = JsonUtil.toJson(inputMap);
         } catch (JsonProcessingException e) {
             logger.error("parsing exception", e);
             return new Result<>(Result.INTERNAL_FAIL, false, "内部错误");
@@ -570,7 +575,7 @@ public class PipelineService {
                 for(BioPipelineStage followingStage: followingStages){
                     BioPipelineStage updateStage = new BioPipelineStage();
 
-                    Map<String,Object> params = this.jsonMapper.readValue(followingStage.getParameters(), Map.class);
+                    Map<String,Object> params = JsonUtil.toMap(followingStage.getParameters());
                     RefSeqConfig refSeqConfig = new RefSeqConfig(contigUrl);
                     params.put(PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG, refSeqConfig);
                     String serializedUpdatedParams = JsonUtil.toJson(params);

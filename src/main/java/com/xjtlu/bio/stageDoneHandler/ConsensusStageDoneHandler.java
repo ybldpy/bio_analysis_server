@@ -22,6 +22,7 @@ import static com.xjtlu.bio.service.PipelineService.*;
 public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<ConsensusStageOutput> implements StageDoneHandler<ConsensusStageOutput>{
 
 
+    private static final String CONSENSUS_FA_NAME = "consensus.fa";
     @Override
     public int getType() {
         return PipelineService.PIPELINE_STAGE_CONSENSUS;
@@ -33,7 +34,7 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
         BioPipelineStage bioPipelineStage = stageRunResult.getStage();
         ConsensusStageOutput consensusStageOutput = stageRunResult.getStageOutput();
 
-        String consesusOutputObjName = createStoreObjectName(bioPipelineStage, consensusStageOutput.getConsensusFa());
+        String consesusOutputObjName = createStoreObjectName(bioPipelineStage, CONSENSUS_FA_NAME);
 
         Path outputParentDir = Path.of(consensusStageOutput.getConsensusFa()).getParent();
 
@@ -53,17 +54,9 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
         }
 
         boolean uploadRes = this.batchUploadObjectsFromLocal(Map.of(consensusStageOutput.getConsensusFa(), consesusOutputObjName));
+        this.deleteStageResultDir(outputParentDir.toString());
         if (!uploadRes) {
-            try {
-                Files.delete(outputParentDir);
-            } catch (IOException e) {
-                logger.error("delete file exception", e);
-            }
-
-            BioPipelineStage updateStage = new BioPipelineStage();
-            updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
-            updateStage.setVersion(bioPipelineStage.getVersion()+1);
-            this.updateStageFromVersion(updateStage, bioPipelineStage.getPipelineId(), bioPipelineStage.getVersion());
+            this.handleFail(bioPipelineStage, outputParentDir.toString());
             return;
         }
 
@@ -72,14 +65,8 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
         updateStage.setEndTime(new Date());
         updateStage.setOutputUrl(serializedOutputMap);
         updateStage.setVersion(bioPipelineStage.getVersion()+1);
-        this.updateStageFromVersion(updateStage, bioPipelineStage.getPipelineId(), bioPipelineStage.getVersion());
-
-        try {
-            Files.delete(outputParentDir);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            logger.error("delete file exception", e);
-        }
+        this.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion());
+        
 
     }
 }

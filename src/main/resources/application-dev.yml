@@ -10,6 +10,7 @@ spring:
 
 localstorageService:
     baseDir: /home/jcy/bio_app_data/storage
+    temporaryPath: /home/jcy/bio_app_data/tmp
 
 
 refSeqService:
