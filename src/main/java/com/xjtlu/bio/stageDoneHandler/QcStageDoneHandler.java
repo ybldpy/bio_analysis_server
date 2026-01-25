@@ -112,7 +112,7 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
             nextStage.setInputUrl(nextStageInput);
             updateNextStage.setVersion(bioPipelineStage.getVersion()+1);
             int nextStageCurrentVersion = nextStage.getVersion();
-            nextStage.setVersion(bioPipelineStage.getVersion()+1);
+            nextStage.setVersion(nextStage.getVersion()+1);
 
             updateRes = this.updateStageFromVersion(updateNextStage, nextStage.getStageId(),
                     nextStageCurrentVersion);

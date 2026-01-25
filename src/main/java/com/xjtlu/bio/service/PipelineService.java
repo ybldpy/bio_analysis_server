@@ -286,7 +286,6 @@ public class PipelineService {
     @Resource
     private Map<Integer, StageDoneHandler> stageDoneHandlerMap;
 
-    private JsonMapper jsonMapper = new JsonMapper();
 
     public static final int PIPELINE_VIRUS = 0;
     public static final int PIPELINE_VIRUS_COVID = 1;
@@ -443,6 +442,31 @@ public class PipelineService {
         return PIPELINE_VIRUS_COVID;
     }
 
+
+
+    //transaction required
+    private int batchInsertStages(List<BioPipelineStage> insertStages){
+        try {
+            BioPipelineStageMapper stageMapper = batchSqlSessionTemplate.getMapper(BioPipelineStageMapper.class);
+
+            for (BioPipelineStage bioPipelineStage : insertStages) {
+                stageMapper.insertSelective(bioPipelineStage);
+            }
+
+            List<BatchResult> batchResults = batchSqlSessionTemplate.flushStatements();
+            int updateSuccessCount = 0;
+            for(BatchResult batchResult: batchResults){
+                for(int i:batchResult.getUpdateCounts()){
+                    updateSuccessCount += i;
+                }
+            }
+            return updateSuccessCount;
+        }catch (Exception e){
+            logger.error("insert expcetion", e);
+            return -1;
+        }
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Result<Long> createPipeline(BioSample bioSample,
             PipelineStageParameters pipelineStageParams) {
@@ -460,6 +484,10 @@ public class PipelineService {
         if (stages == null || stages.isEmpty()) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+        }
+
+        for(BioPipelineStage stage:stages){
+            stage.setVersion(0);
         }
 
         insertRes = this.bioAnalysisStageMapperExtension.batchInsert(stages);
@@ -710,7 +738,7 @@ public class PipelineService {
 
         List<BioPipelineStage> stages = null;
         try {
-            stages = bioPipelineStageMapper.selectByExample(bioPipelineStageExample);
+            stages = bioPipelineStageMapper.selectByExampleWithBLOBs(bioPipelineStageExample);
         }catch (Exception e){
             logger.error("", e);
         }
