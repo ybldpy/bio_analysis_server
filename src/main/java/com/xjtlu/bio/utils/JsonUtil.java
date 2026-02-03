@@ -54,6 +54,9 @@ public class JsonUtil {
     }
 
     public static Map<String, Object> toMap(String json) throws JsonMappingException, JsonProcessingException {
+        if(org.apache.commons.lang3.StringUtils.isBlank(json)){
+            return new HashMap<>();
+        }
         return toMap(json, Object.class);
     }
 

@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -123,6 +124,21 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
             // 不存在，则连同父级目录一起创建
             Files.createDirectories(path);
         }
+    }
+
+    protected void logErr(String msg,Exception e){
+        this.logger.error("Msg = {}. Exception = ", msg, e);
+    }
+
+    protected Map<String,String> loadInputUrlMap(BioPipelineStage bioPipelineStage){
+        try {
+            Map<String,String> inputUrlMap = JsonUtil.toMap(bioPipelineStage.getInputUrl(), String.class);
+            return inputUrlMap;
+        } catch (JsonProcessingException e) {
+            logger.error("{} parsing input json exception", bioPipelineStage);
+        }
+        return null;
+
     }
 
     protected void postExecute(StageRunResult stageRunResult) {
@@ -303,17 +319,18 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         return (obj != null) && obj instanceof Map;
     }
 
-    protected Map<String, GetObjectResult> loadInput(Map<String, Path> objectAndWriteToPath) {
+    protected boolean loadInput(Map<String, Path> objectAndWriteToPath) {
 
         HashMap<String, GetObjectResult> inputMap = new HashMap<>();
         for (Map.Entry<String, Path> item : objectAndWriteToPath.entrySet()) {
             GetObjectResult getObjectResult = this.storageService.getObject(item.getKey(), item.getValue().toString());
             inputMap.put(item.getKey(), getObjectResult);
             if (!getObjectResult.success()) {
-                break;
+                logger.error("load input {} failed", item.getKey(), getObjectResult.e());
+                return false;
             }
         }
-        return inputMap;
+        return true;
     }
 
     protected String findFailedLoadingObject(Map<String, GetObjectResult> getResultMap) {

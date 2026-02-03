@@ -297,6 +297,7 @@ public class PipelineService {
     public static final int PIPELINE_STAGE_STATUS_RUNNING = 2;
     public static final int PIPELINE_STAGE_STATUS_FAIL = 3;
     public static final int PIPELINE_STAGE_STATUS_FINISHED = 4;
+    public static final int PIPELINE_STAGE_STATUS_ACTION_REQUIRED = 5;
 
     public static final String PIPELINE_REFSEQ_ACCESSION_KEY = "refSeq";
 
@@ -362,6 +363,12 @@ public class PipelineService {
 
     public static final String PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA = "consensus";
 
+    public static final String PIPELINE_STAGE_AMR_INPUT_SAMPLE = "reads";
+    public static final String PIPELINE_STAGE_AMR_OUTPUT_RESULT = "amr_result";
+
+    public static final String PIPELINE_STAGE_MLST_INPUT = "contigs";
+    public static final String PIPELINE_STAGE_MLST_OUTPUT = "mlstResult";
+
     public static final int PIPELINE_STAGE_QC = 0; // 质控 fastp
     public static final int PIPELINE_STAGE_TAXONOMY = 10; // 物种鉴定 Kraken2/Mash
 
@@ -379,6 +386,9 @@ public class PipelineService {
     public static final String PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY = "bamIndex";
     public static final String PIPELINE_STAGE_VARIENT_CALL_INPUT_REFSEQ_KEY = "refseq";
 
+
+    public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_INPUT = "assemblyInput";
+    public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_OUTPUT = "vfResult";
     // 功能注释（可选通用）
     public static final int PIPELINE_STAGE_FUNC_ANNOTATION = 50; // Prokka/Bakta/eggNOG
 
@@ -659,6 +669,7 @@ public class PipelineService {
         }
         return new Result<>(Result.BUSINESS_FAIL, false, "unable to start");
     }
+
 
 
 

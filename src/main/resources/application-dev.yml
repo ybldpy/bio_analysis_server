@@ -35,6 +35,9 @@ analysis-pipeline:
         # minimap2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "minimap2"]
         minimap2: ["/usr/conda/envs/bio-map/bin/minimap2"]
         bcftools: ["${analysis-pipeline.conda}", "run", "-n", "bio-var", "bcftools"]
+        amrfinder: ["${analysis-pipeline.conda}", "run", "-n", "amrfinder", "amrfinder"]
+        virulenceFactor: ["${analysis-pipeline.conda}", "run", "-n", "virulence", "abricate"]
+        mlst: ["${analysis-pipeline.conda}", "run", "-n", "mlst", "mlst"]
 
     stage:
         baseInputDir: /home/jcy/bio_app_data/temp/stage/input

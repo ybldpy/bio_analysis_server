@@ -82,12 +82,10 @@ public class MappingStageExecutor extends AbstractPipelineStageExector<MappingSt
         if (r2TmpPath != null) {
             loadMap.put(inputR2Url, r2TmpPath);
         }
-        Map<String, GetObjectResult> r1AndR2GetResult = this.loadInput(loadMap);
+        boolean loadResult = this.loadInput(loadMap);
 
-        String errorLoadingInput = this.findFailedLoadingObject(r1AndR2GetResult);
-        if (errorLoadingInput != null) {
-            return this.runFail(bioPipelineStage, errorLoadingInput + "加载失败",
-                    r1AndR2GetResult.get(errorLoadingInput).e());
+        if (!loadResult) {
+            return this.runFail(bioPipelineStage, "load input failed");
         }
 
         // Path samTmp = workDir.resolve("aln.sam");

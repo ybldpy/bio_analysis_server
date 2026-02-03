@@ -14,6 +14,34 @@ public class AnalysisPipelineToolsConfig {
     private List<String> fastp;
     private List<String> spades;
 
+    private List<String> amrfinder;
+    private List<String> virulenceFactor;
+    private List<String> mlst;
+
+    public List<String> getMlst() {
+        return mlst;
+    }
+
+    public void setMlst(List<String> mlst) {
+        this.mlst = mlst;
+    }
+
+    public List<String> getVirulenceFactor() {
+        return virulenceFactor;
+    }
+
+    public void setVirulenceFactor(List<String> virulenceFactor) {
+        this.virulenceFactor = virulenceFactor;
+    }
+
+    public List<String> getAmrfinder() {
+        return amrfinder;
+    }
+
+    public void setAmrfinder(List<String> amrfinder) {
+        this.amrfinder = amrfinder;
+    }
+
     public List<String> getFastp() {
         return fastp;
     }
