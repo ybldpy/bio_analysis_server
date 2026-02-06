@@ -387,8 +387,13 @@ public class PipelineService {
     public static final String PIPELINE_STAGE_VARIENT_CALL_INPUT_REFSEQ_KEY = "refseq";
 
 
-    public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_INPUT = "assemblyInput";
+    public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_INPUT = "contigs";
     public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_OUTPUT = "vfResult";
+
+    public static final String PIPELINE_STAGE_SEROTYPING_INPUT = "contigs";
+    public static final String PIPELINE_STAGE_SEROTYPING_OUTPUT = "serotypingResult";
+
+
     // 功能注释（可选通用）
     public static final int PIPELINE_STAGE_FUNC_ANNOTATION = 50; // Prokka/Bakta/eggNOG
 

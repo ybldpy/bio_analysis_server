@@ -2,6 +2,7 @@ package com.xjtlu.bio.utils;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.MappingStageExecutor;
@@ -21,8 +22,10 @@ import java.util.*;
 @Component
 public class StageOrchestrator {
 
-    private final ConnectionDetails connectionDetails;
-    private final MappingStageExecutor mappingStageExecutor;
+
+
+
+
 
     public StageOrchestrator(ConnectionDetails connectionDetails, MappingStageExecutor mappingStageExecutor) {
         this.connectionDetails = connectionDetails;
@@ -137,16 +140,48 @@ public class StageOrchestrator {
 
 
         return plan;
-
-
     }
 
 
     private OrchestratePlan planBacteriaDownstreamAfterAssembly(BioPipelineStage assembly, List<BioPipelineStage> followingStages) throws JsonProcessingException {
         OrchestratePlan plan = new OrchestratePlan();
         Map<String,String> outputMap = JsonUtil.toMap(assembly.getOutputUrl(),String.class);
+        String contigs = outputMap.get(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY);
+        int nextRunIndex = assembly.getStageIndex()+1;
+        for(BioPipelineStage followingStage:followingStages){
+            //这边先顺序跑
+            BioPipelineStage updateStage = new BioPipelineStage();
+            Map<String,String> inputUrlMap = new HashMap<>();
+            switch (followingStage.getStageType()){
+                case PipelineService.PIPELINE_STAGE_MLST -> {
+                    inputUrlMap.put(PipelineService.PIPELINE_STAGE_MLST_INPUT, contigs);
+                    break;
+                }
+                case PipelineService.PIPELINE_STAGE_AMR -> {
+                    inputUrlMap.put(PipelineService.PIPELINE_STAGE_AMR_INPUT_SAMPLE, contigs);
+                    break;
+                }
+                case PipelineService.PIPELINE_STAGE_VIRULENCE -> {
+                    inputUrlMap.put(PipelineService.PIPELINE_STAGE_VIRULENCE_FACTOR_INPUT, contigs);
+                    break;
+                }
+                case PipelineService.PIPELINE_STAGE_SEROTYPE -> {
+                    inputUrlMap.put(PipelineService.PIPELINE_STAGE_SEROTYPING_INPUT, contigs);
+                    break;
+                }
+            }
 
+            String serializedInputMap = JsonUtil.toJson(inputUrlMap);
+            boolean isNextRunStage = followingStage.getStageIndex() == nextRunIndex;
+            applyUpdatesToUpdateStage(updateStage,  isNextRunStage?followingStage: null,serializedInputMap, null, isNextRunStage? PipelineService.PIPELINE_STAGE_STATUS_QUEUING:-1, followingStage.getVersion());
+            plan.getUpdateStages().add(updateStage);
+            plan.getUpdateStageIds().add(followingStage.getStageId());
+            if(isNextRunStage){
+                plan.getRunStages().add(followingStage);
+            }
+        }
 
+        return plan;
     }
 
 
@@ -161,8 +196,7 @@ public class StageOrchestrator {
             return planBacteriaDownstreamAfterAssembly(assembly, followingStages);
         }
 
-
-
+        OrchestratePlan plan = new OrchestratePlan();
 
         RefSeqConfig refSeqConfig = new RefSeqConfig();
         refSeqConfig.setRefseqObjectName(assemblyOutputMap.get(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY));
@@ -187,10 +221,55 @@ public class StageOrchestrator {
     }
 
 
-    public OrchestratePlan planFollowingMapping(BioPipelineStage mapping, List<BioPipelineStage> followingStages){
+    //病毒才做mapping后续阶段
+    //这边先顺序跑
+    public OrchestratePlan planDownstreamMapping(BioPipelineStage mapping, List<BioPipelineStage> followingStages) throws JsonMappingException, JsonProcessingException{
+
+        OrchestratePlan plan = new OrchestratePlan();
+        Map<String,String> outputMap = JsonUtil.toMap(mapping.getOutputUrl(),String.class);
+
+        String bamUrl = outputMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY);
+        String bamIndexUrl = outputMap.get(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY);
+        
+        BioPipelineStage varientStage = followingStages.stream().filter((s)->s.getStageType() == PipelineService.PIPELINE_STAGE_VARIANT_CALL).findAny().orElse(null);
+        Map<String,String> inputMap = new HashMap<>();
+        inputMap.put(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamUrl);
+        inputMap.put(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexUrl);
+
+        BioPipelineStage updateVarientStage = new BioPipelineStage();
+        String serializedInputMap = JsonUtil.toJson(inputMap);
+        this.applyUpdatesToUpdateStage(updateVarientStage, varientStage, serializedInputMap, null, PipelineService.PIPELINE_STAGE_STATUS_QUEUING, varientStage.getVersion());
+        
+        plan.updateStageIds.add(varientStage.getStageId());
+        plan.updateStages.add(updateVarientStage);
+        plan.runStages.add(varientStage);
+        return plan;
+    }
+
+    public OrchestratePlan planDownstreamVarientCall(BioPipelineStage varientCallStage, List<BioPipelineStage> followingStages) throws JsonMappingException, JsonProcessingException{
+
+        OrchestratePlan plan = new OrchestratePlan();
+
+        BioPipelineStage consensusStage = followingStages.stream().filter((s)->s.getStageType() == PipelineService.PIPELINE_STAGE_CONSENSUS).findAny().orElse(null);
+
+        Map<String,String> outputMap = JsonUtil.toMap(varientCallStage.getInputUrl(),String.class);
+        String vcfGz = outputMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ);
+        String vcfTbi = outputMap.get(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI);
+
+        Map<String,String> inputMap = new HashMap<>();
+        inputMap.put(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ, vcfGz);
+        inputMap.put(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI, vcfTbi);
+
+        String serializedInputMap = JsonUtil.toJson(inputMap);
+        
+        BioPipelineStage updateConsensusStage = new BioPipelineStage();
+        this.applyUpdatesToUpdateStage(updateConsensusStage, consensusStage, serializedInputMap, null, PipelineService.PIPELINE_STAGE_STATUS_QUEUING, consensusStage.getVersion());
 
 
-
+        plan.runStages.add(consensusStage);
+        plan.updateStageIds.add(consensusStage.getStageId());
+        plan.updateStages.add(updateConsensusStage);
+        return plan;
 
     }
 
