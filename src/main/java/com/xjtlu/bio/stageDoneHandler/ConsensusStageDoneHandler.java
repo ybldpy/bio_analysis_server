@@ -7,6 +7,7 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.utils.JsonUtil;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -28,45 +29,69 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
         return PipelineService.PIPELINE_STAGE_CONSENSUS;
     }
 
+
     @Override
-    public void handleStageDone(StageRunResult<ConsensusStageOutput> stageRunResult) {
+    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+            StageRunResult<ConsensusStageOutput> stageRunResult) {
+        String consensusUrl = this.createStoreObjectName(stageRunResult.getStage(), CONSENSUS_FA_NAME);
+        return Pair.of(
+            Map.of(stageRunResult.getStageOutput().getConsensusFa(), consensusUrl),
+            Map.of(PipelineService.PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA, consensusUrl)
+        );
+    }
 
-        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
-        ConsensusStageOutput consensusStageOutput = stageRunResult.getStageOutput();
 
-        String consesusOutputObjName = createStoreObjectName(bioPipelineStage, CONSENSUS_FA_NAME);
+    // @Override
+    // protected Map<String, String> createOutputUrlMap(StageRunResult<ConsensusStageOutput> stageOutput) {
+    //     // TODO Auto-generated method stub
+    //     return Map.of(PipelineService.PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA, this.createStoreObjectName(stageOutput.getStage(), CONSENSUS_FA_NAME));
+    // }
 
-        Path outputParentDir = Path.of(consensusStageOutput.getConsensusFa()).getParent();
+    // @Override
+    // protected boolean batchUploadObjectsFromLocal(StageRunResult<ConsensusStageOutput> stageRunResult) {
+    //     // TODO Auto-generated method stub
+    //     return this.batchUploadObjectsFromLocal(Map.of(stageRunResult.getStageOutput().getConsensusFa(), this.createStoreObjectName(stageRunResult.getStage(), CONSENSUS_FA_NAME)));
+    // }
 
-        HashMap<String,String> outputMap = new HashMap<>();
-        outputMap.put(PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA, consesusOutputObjName);
-        String serializedOutputMap = null;
+    // @Override
+    // public void handleStageDone(StageRunResult<ConsensusStageOutput> stageRunResult) {
 
-        try {
-            serializedOutputMap = JsonUtil.toJson(outputMap);
-        }catch (JsonProcessingException e) {
-            try {
-                Files.delete(outputParentDir);
-            } catch (IOException ex) {
-                logger.error("delete dir exception", e);
-            }
-            logger.error("{} parsing {} exception", bioPipelineStage, outputMap, e);
-        }
+    //     BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+    //     ConsensusStageOutput consensusStageOutput = stageRunResult.getStageOutput();
 
-        boolean uploadRes = this.batchUploadObjectsFromLocal(Map.of(consensusStageOutput.getConsensusFa(), consesusOutputObjName));
-        this.deleteStageResultDir(outputParentDir.toString());
-        if (!uploadRes) {
-            this.handleFail(bioPipelineStage, outputParentDir.toString());
-            return;
-        }
+    //     String consesusOutputObjName = createStoreObjectName(bioPipelineStage, CONSENSUS_FA_NAME);
 
-        BioPipelineStage updateStage = new BioPipelineStage();
-        updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
-        updateStage.setEndTime(new Date());
-        updateStage.setOutputUrl(serializedOutputMap);
-        updateStage.setVersion(bioPipelineStage.getVersion()+1);
-        this.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion());
+    //     Path outputParentDir = Path.of(consensusStageOutput.getConsensusFa()).getParent();
+
+    //     HashMap<String,String> outputMap = new HashMap<>();
+    //     outputMap.put(PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA, consesusOutputObjName);
+    //     String serializedOutputMap = null;
+
+    //     try {
+    //         serializedOutputMap = JsonUtil.toJson(outputMap);
+    //     }catch (JsonProcessingException e) {
+    //         try {
+    //             Files.delete(outputParentDir);
+    //         } catch (IOException ex) {
+    //             logger.error("delete dir exception", e);
+    //         }
+    //         logger.error("{} parsing {} exception", bioPipelineStage, outputMap, e);
+    //     }
+
+    //     boolean uploadRes = this.batchUploadObjectsFromLocal(Map.of(consensusStageOutput.getConsensusFa(), consesusOutputObjName));
+    //     this.deleteStageResultDir(outputParentDir.toString());
+    //     if (!uploadRes) {
+    //         this.handleFail(bioPipelineStage, outputParentDir.toString());
+    //         return;
+    //     }
+
+    //     BioPipelineStage updateStage = new BioPipelineStage();
+    //     updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+    //     updateStage.setEndTime(new Date());
+    //     updateStage.setOutputUrl(serializedOutputMap);
+    //     updateStage.setVersion(bioPipelineStage.getVersion()+1);
+    //     this.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion());
         
 
-    }
+    // }
 }

@@ -12,6 +12,7 @@ public class StageRunResult<T extends StageOutput> {
     private boolean success;
     private String failReason;
 
+    
     private Map<String,String> outputPath;
 
     private T stageOutput;

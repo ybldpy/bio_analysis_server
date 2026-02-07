@@ -14,4 +14,10 @@ public class MLSTStageOutput implements StageOutput{
     public Path getMlstPath() {
         return mlstPath;
     }
+
+    @Override
+    public Path getParentPath() {
+        // TODO Auto-generated method stub
+        return mlstPath.getParent();
+    }
 }

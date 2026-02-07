@@ -3,17 +3,15 @@ package com.xjtlu.bio.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+
+
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.taskrunner.MappingStageExecutor;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
-import jakarta.annotation.Resource;
+
 import org.apache.commons.beanutils.PropertyUtils;
-import org.apache.logging.log4j.util.PropertiesUtil;
-import org.springframework.beans.BeanUtils;
-import org.springframework.boot.autoconfigure.service.connection.ConnectionDetails;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
@@ -27,9 +25,9 @@ public class StageOrchestrator {
 
 
 
-    public StageOrchestrator(ConnectionDetails connectionDetails, MappingStageExecutor mappingStageExecutor) {
-        this.connectionDetails = connectionDetails;
-        this.mappingStageExecutor = mappingStageExecutor;
+    public StageOrchestrator() {
+
+
     }
 
     public static class OrchestratePlan{
@@ -93,8 +91,11 @@ public class StageOrchestrator {
         int index = qc.getStageIndex();
         List<BioPipelineStage> assemblyAndMappingStage = followingStage.stream().filter((s)->s.getStageType() == PipelineService.PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PipelineService.PIPELINE_STAGE_MAPPING).toList();
 
-        BioPipelineStage assembly = assemblyAndMappingStage.getFirst();
-        BioPipelineStage mapping = assemblyAndMappingStage.getLast();
+
+        //only one stage
+
+        BioPipelineStage assembly = assemblyAndMappingStage.get(0);
+        BioPipelineStage mapping = assemblyAndMappingStage.get(assemblyAndMappingStage.size()-1);
 
         if(assembly == mapping){
             assembly = null;
@@ -143,7 +144,7 @@ public class StageOrchestrator {
     }
 
 
-    private OrchestratePlan planBacteriaDownstreamAfterAssembly(BioPipelineStage assembly, List<BioPipelineStage> followingStages) throws JsonProcessingException {
+    private OrchestratePlan planBacteriaDownstreamAssembly(BioPipelineStage assembly, List<BioPipelineStage> followingStages) throws JsonProcessingException {
         OrchestratePlan plan = new OrchestratePlan();
         Map<String,String> outputMap = JsonUtil.toMap(assembly.getOutputUrl(),String.class);
         String contigs = outputMap.get(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY);
@@ -193,7 +194,7 @@ public class StageOrchestrator {
 
 
         if(mapping==null){
-            return planBacteriaDownstreamAfterAssembly(assembly, followingStages);
+            return planBacteriaDownstreamAssembly(assembly, followingStages);
         }
 
         OrchestratePlan plan = new OrchestratePlan();
@@ -287,8 +288,12 @@ public class StageOrchestrator {
         if(currentStage.getStageType() == PipelineService.PIPELINE_STAGE_QC){
             return planFollowingQc(currentStage, copiesFollowingStage);
         }else if(currentStage.getStageType() == PipelineService.PIPELINE_STAGE_ASSEMBLY){
-
+            return planDownstreamAssembly(currentStage, followingStages);
+        }else if(currentStage.getStageType() == PipelineService.PIPELINE_STAGE_MAPPING){
+            return planDownstreamMapping(currentStage, followingStages);
         }
+
+        return null;
 
     }
 

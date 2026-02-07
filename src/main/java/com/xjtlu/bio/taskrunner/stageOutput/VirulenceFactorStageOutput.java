@@ -13,4 +13,10 @@ public class VirulenceFactorStageOutput implements StageOutput{
     public VirulenceFactorStageOutput(Path vfResult) {
         this.vfResult = vfResult;
     }
+
+    @Override
+    public Path getParentPath() {
+        // TODO Auto-generated method stub
+        return Path.of(vfResult).getParent();
+    }
 }

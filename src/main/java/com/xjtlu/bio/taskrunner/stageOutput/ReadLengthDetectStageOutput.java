@@ -1,5 +1,7 @@
 package com.xjtlu.bio.taskrunner.stageOutput;
 
+import java.nio.file.Path;
+
 public class ReadLengthDetectStageOutput implements StageOutput{
 
     private boolean isLongRead;
@@ -15,6 +17,17 @@ public class ReadLengthDetectStageOutput implements StageOutput{
     public ReadLengthDetectStageOutput(boolean isLongRead) {
         this.isLongRead = isLongRead;
     }
+
+
+
+    
+    @Override
+    public Path getParentPath() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+
 
     
 

@@ -1,5 +1,7 @@
 package com.xjtlu.bio.taskrunner.stageOutput;
 
+import java.nio.file.Path;
+
 public class AssemblyStageOutput implements StageOutput{
 
 
@@ -26,6 +28,12 @@ public class AssemblyStageOutput implements StageOutput{
         this.scaffoldPath = scaffoldPath;
     }
 
+
+    @Override
+    public Path getParentPath() {
+        // TODO Auto-generated method stub
+        return Path.of(contigPath).getParent();
+    }
     
 
 }

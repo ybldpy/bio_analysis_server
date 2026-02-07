@@ -1,5 +1,6 @@
 package com.xjtlu.bio.taskrunner.stageOutput;
 
+import java.nio.file.Path;
 
 public class MappingStageOutput implements StageOutput{
 
@@ -24,6 +25,12 @@ public class MappingStageOutput implements StageOutput{
     }
     public void setBamIndexPath(String bamIndexPath) {
         this.bamIndexPath = bamIndexPath;
+    }
+
+    @Override
+    public Path getParentPath() {
+        // TODO Auto-generated method stub
+        return Path.of(bamPath).getParent();
     }
     
 

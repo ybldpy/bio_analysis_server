@@ -50,6 +50,8 @@ import com.xjtlu.bio.service.StorageService.PutResult;
 import com.xjtlu.bio.taskrunner.PipelineStageTaskDispatcher;
 import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
+import com.xjtlu.bio.utils.StageOrchestrator;
+import com.xjtlu.bio.utils.StageOrchestrator.OrchestratePlan;
 
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
@@ -285,6 +287,9 @@ public class PipelineService {
 
     @Resource
     private Map<Integer, StageDoneHandler> stageDoneHandlerMap;
+
+    @Resource
+    private StageOrchestrator stageOrchestrator;
 
 
     public static final int PIPELINE_VIRUS = 0;
@@ -737,8 +742,22 @@ public class PipelineService {
             logger.info("{} execute failed {}", stageRunResult.getStage(), stageRunResult.getErrorLog());
             return;
         }
-        stageDoneHandler.handleStageDone(stageRunResult);
+
+        boolean handleRes = stageDoneHandler.handleStageDone(stageRunResult);
+        if(!handleRes){return;}
+        
     }
+
+
+    private void doNextStages(long curStageId){
+
+        
+
+
+    }
+
+
+    
 
     public int markStageFinish(BioPipelineStage bioPipelineStage, String outputUrl) {
         BioPipelineStage updateStage = new BioPipelineStage();

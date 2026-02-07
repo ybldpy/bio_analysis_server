@@ -6,6 +6,7 @@ import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 public interface StageDoneHandler<T extends StageOutput> {
 
     int getType();
-    void handleStageDone(StageRunResult<T> stageRunResult);
+    boolean handleStageDone(StageRunResult<T> stageRunResult);
+    
 
 }

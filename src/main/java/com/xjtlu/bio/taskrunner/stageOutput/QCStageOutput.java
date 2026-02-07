@@ -1,4 +1,7 @@
 package com.xjtlu.bio.taskrunner.stageOutput;
+
+import java.nio.file.Path;
+
 public class QCStageOutput implements StageOutput {
 
 
@@ -52,6 +55,13 @@ public class QCStageOutput implements StageOutput {
 
     private String jsonPath;
     private String htmlPath;
+
+
+    @Override
+    public Path getParentPath() {
+        // TODO Auto-generated method stub
+        return Path.of(r1Path).getParent();
+    }
 
 
 }

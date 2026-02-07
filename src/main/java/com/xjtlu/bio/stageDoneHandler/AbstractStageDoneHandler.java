@@ -1,5 +1,6 @@
 package com.xjtlu.bio.stageDoneHandler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -7,8 +8,11 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.utils.BioStageUtil;
+import com.xjtlu.bio.utils.JsonUtil;
+
 import jakarta.annotation.Resource;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -23,6 +27,7 @@ import java.util.Map;
 
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FAIL;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FINISHED;
+
 
 public abstract class AbstractStageDoneHandler<T extends StageOutput> implements StageDoneHandler<T>{
 
@@ -40,6 +45,82 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
     protected BioStageUtil bioStageUtil;
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
+
+
+    // protected abstract Map<String,String> createOutputUrlMap(StageRunResult<T> stageOutput);
+
+
+    
+
+    @Override
+    public boolean handleStageDone(StageRunResult<T> stageRunResult) {
+        // TODO Auto-generated method stub
+
+        
+        Pair<Map<String,String>, Map<String,Object>> uploadConfigAndOutputUrlMap = this.buildUploadConfigAndOutputUrlMap(stageRunResult);
+
+        Map<String,String> uploadConfig = uploadConfigAndOutputUrlMap.getLeft();
+        
+
+        if(uploadConfig!=null && !uploadConfig.isEmpty()){
+            if(!this.batchUploadObjectsFromLocal(uploadConfig)){
+                this.handleFail(stageRunResult.getStage(), stageRunResult.getStageOutput().getParentPath().toString());
+                return false;
+            }
+        }
+
+        Map<String,Object> outputMap = uploadConfigAndOutputUrlMap.getRight();
+        String serializedOutputMap = null; 
+        try {
+            serializedOutputMap = JsonUtil.toJson(outputMap);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            this.logger.error("{} parsing {} json exception", stageRunResult.getStage(), outputMap,e);
+            return false;
+        }
+
+        deleteStageResultDir(stageRunResult.getStageOutput().getParentPath());
+
+        BioPipelineStage runStage = stageRunResult.getStage();
+        BioPipelineStage updateStage = new BioPipelineStage();
+        updateStage.setOutputUrl(serializedOutputMap);
+        updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+        Date endDate = new Date();
+        updateStage.setEndTime(endDate);
+        updateStage.setVersion(runStage.getVersion()+1);
+        int updateRes = this.pipelineService.updateStageFromVersion(updateStage, runStage.getStageId(), runStage.getVersion());
+
+        runStage.setOutputUrl(serializedOutputMap);
+        runStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+        runStage.setEndTime(endDate);
+        runStage.setVersion(runStage.getVersion()+1);
+
+        return updateRes > 0;
+
+    }
+
+
+    protected abstract Pair<Map<String,String>, Map<String,Object>> buildUploadConfigAndOutputUrlMap(StageRunResult<T> stageRunResult);
+
+
+    private void deleteStageResultDir(Path p){
+
+        try {
+            FileUtils.deleteDirectory(p.toFile());
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            this.logger.error("delete dir {} exception", p, e);
+        }
+
+    }
+
+
+
+    
+
+    
+
+    // protected abstract boolean batchUploadObjectsFromLocal(StageRunResult<T> stageRunResult);
 
     protected String createStoreObjectName(BioPipelineStage pipelineStage, String name){
         return bioStageUtil.createStoreObjectName(pipelineStage, name);
