@@ -18,6 +18,6 @@ public interface BioAnalysisStageMapperExtension {
     public List<BioPipelineStage> selectStagesBySampleId(Long sampleId);
 
     @Select("SELECT * FROM bio_pipeline_stage WHERE pipeline_id = (SELECT pipeline_id FROM bio_pipeline_stage WHERE stage_id = #{stageId})")
-    public List<BioPipelineStage> selectAllStagesByStageId(Long stageId);
+    public List<BioPipelineStage> selectAllPipelineStagesByStageId(Long stageId);
 
 }

@@ -1,4 +1,4 @@
-package com.xjtlu.bio.common;
+package com.xjtlu.bio.taskrunner;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

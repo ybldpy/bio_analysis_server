@@ -24,7 +24,7 @@ import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
-import com.xjtlu.bio.parameters.CreateSampleRequest.PipelineStageParameters;
+import com.xjtlu.bio.requestParameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.StorageService.PutResult;
 import com.xjtlu.bio.utils.SampleReadLengthDetector;
 

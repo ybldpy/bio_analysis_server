@@ -1,22 +1,15 @@
 package com.xjtlu.bio.stageDoneHandler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.xjtlu.bio.common.StageRunResult;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.entity.BioPipelineStageExample;
-import com.xjtlu.bio.mapper.BioPipelineStageMapper;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.taskrunner.stageOutput.ReadLengthDetectStageOutput;
-import com.xjtlu.bio.utils.JsonUtil;
 
-import io.micrometer.common.util.StringUtils;
-import org.apache.ibatis.executor.BatchResult;
+import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.taskrunner.StageRunResult;
+import com.xjtlu.bio.taskrunner.stageOutput.ReadLengthDetectStageOutput;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
-import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
 public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler<ReadLengthDetectStageOutput> implements StageDoneHandler<ReadLengthDetectStageOutput>{
@@ -28,86 +21,100 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler<R
     }
 
     @Override
-    public void handleStageDone(StageRunResult<ReadLengthDetectStageOutput> stageRunResult) {
-        boolean longRead = stageRunResult.getStageOutput().isLongRead();
-        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+            StageRunResult<ReadLengthDetectStageOutput> stageRunResult) {
+        
 
-        BioPipelineStage updateStage = new BioPipelineStage();
-        updateStage.setEndTime(new Date());
-        updateStage.setOutputUrl(String.valueOf(longRead));
-        updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
-
-        int curVersion = bioPipelineStage.getVersion();
-        updateStage.setVersion(curVersion+1);
-        int updateRes = this.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(),
-                curVersion);
-
-        if (updateRes != 1) {
-            return;
-        }
-        BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
-        bioPipelineStageExample.createCriteria()
-                .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
-                .andStageIndexGreaterThan(bioPipelineStage.getStageIndex());
-
-        List<BioPipelineStage> nextStages = pipelineService.getStagesFromExample(bioPipelineStageExample);
-        if (nextStages == null || nextStages.isEmpty()) {
-            return;
-        }
-
-        List<BioPipelineStage> updateNextStages = new ArrayList<>();
-        BioPipelineStage nextRunStage = null;
-
-        for (BioPipelineStage nextStage : nextStages) {
-            if(nextStage.getStatus()!=PIPELINE_STAGE_STATUS_PENDING){
-                return;
-            }
-            Map<String, Object> params = null;
-            try {
-                params = JsonUtil.toMap(nextStage.getParameters());
-            } catch (JsonMappingException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                return;
-            } catch (JsonProcessingException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                return;
-            }
-
-            params = params == null ? new HashMap<>() : params;
-            params.put(PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY, longRead);
-            String serializedParams = null;
-            try {
-                serializedParams = JsonUtil.toJson(params);
-            } catch (JsonProcessingException e) {
-                // TODO Auto-generated catch block
-                logger.error("{} parsing exception exception", bioPipelineStage, e);
-                return;
-            }
-
-            BioPipelineStage nextUpdateStage = new BioPipelineStage();
-
-            nextUpdateStage.setParameters(serializedParams);
-            nextUpdateStage.setVersion(nextStage.getVersion());
-
-            if(bioPipelineStage.getStageIndex()+1 == nextStage.getStageIndex()){
-                nextRunStage = nextStage;
-                nextUpdateStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-                nextRunStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-                nextRunStage.setParameters(serializedParams);
-                nextRunStage.setVersion(nextStage.getVersion()+1);
-            }
-
-            nextUpdateStage.setStageId(nextStage.getStageId());
-            updateNextStages.add(nextUpdateStage);
-        }
-
-        updateRes = pipelineService.batchUpdateStages(updateNextStages);
-
-        if(updateRes == 1){
-            pipelineService.addStageTask(nextRunStage);
-        }
+        return Pair.of(
+            null,
+            Map.of(PipelineService.PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY, stageRunResult.getStageOutput().isLongRead())
+        );
 
     }
+
+    
+
+    // @Override
+    // public boolean handleStageDone(StageRunResult<ReadLengthDetectStageOutput> stageRunResult) {
+    //     boolean longRead = stageRunResult.getStageOutput().isLongRead();
+    //     BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+
+    //     BioPipelineStage updateStage = new BioPipelineStage();
+    //     updateStage.setEndTime(new Date());
+    //     updateStage.setOutputUrl(String.valueOf(longRead));
+    //     updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+
+    //     int curVersion = bioPipelineStage.getVersion();
+    //     updateStage.setVersion(curVersion+1);
+    //     int updateRes = this.updateStageFromVersion(updateStage, bioPipelineStage.getStageId(),
+    //             curVersion);
+
+    //     if (updateRes != 1) {
+    //         return false;
+    //     }
+    //     BioPipelineStageExample bioPipelineStageExample = new BioPipelineStageExample();
+    //     bioPipelineStageExample.createCriteria()
+    //             .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
+    //             .andStageIndexGreaterThan(bioPipelineStage.getStageIndex());
+
+    //     List<BioPipelineStage> nextStages = pipelineService.getStagesFromExample(bioPipelineStageExample);
+    //     if (nextStages == null || nextStages.isEmpty()) {
+    //         return false;
+    //     }
+
+    //     List<BioPipelineStage> updateNextStages = new ArrayList<>();
+    //     BioPipelineStage nextRunStage = null;
+
+    //     for (BioPipelineStage nextStage : nextStages) {
+    //         if(nextStage.getStatus()!=PIPELINE_STAGE_STATUS_PENDING){
+    //             return;
+    //         }
+    //         Map<String, Object> params = null;
+    //         try {
+    //             params = JsonUtil.toMap(nextStage.getParameters());
+    //         } catch (JsonMappingException e) {
+    //             // TODO Auto-generated catch block
+    //             e.printStackTrace();
+    //             return;
+    //         } catch (JsonProcessingException e) {
+    //             // TODO Auto-generated catch block
+    //             e.printStackTrace();
+    //             return;
+    //         }
+
+    //         params = params == null ? new HashMap<>() : params;
+    //         params.put(PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY, longRead);
+    //         String serializedParams = null;
+    //         try {
+    //             serializedParams = JsonUtil.toJson(params);
+    //         } catch (JsonProcessingException e) {
+    //             // TODO Auto-generated catch block
+    //             logger.error("{} parsing exception exception", bioPipelineStage, e);
+    //             return;
+    //         }
+
+    //         BioPipelineStage nextUpdateStage = new BioPipelineStage();
+
+    //         nextUpdateStage.setParameters(serializedParams);
+    //         nextUpdateStage.setVersion(nextStage.getVersion());
+
+    //         if(bioPipelineStage.getStageIndex()+1 == nextStage.getStageIndex()){
+    //             nextRunStage = nextStage;
+    //             nextUpdateStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
+    //             nextRunStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
+    //             nextRunStage.setParameters(serializedParams);
+    //             nextRunStage.setVersion(nextStage.getVersion()+1);
+    //         }
+
+    //         nextUpdateStage.setStageId(nextStage.getStageId());
+    //         updateNextStages.add(nextUpdateStage);
+    //     }
+
+    //     updateRes = pipelineService.batchUpdateStages(updateNextStages);
+
+    //     if(updateRes == 1){
+    //         pipelineService.addStageTask(nextRunStage);
+    //     }
+
+    // }
 }

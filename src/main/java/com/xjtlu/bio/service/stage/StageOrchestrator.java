@@ -1,4 +1,4 @@
-package com.xjtlu.bio.utils;
+package com.xjtlu.bio.service.stage;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
+import com.xjtlu.bio.utils.JsonUtil;
 
 import org.apache.commons.beanutils.PropertyUtils;
 import org.springframework.stereotype.Component;
@@ -31,33 +32,36 @@ public class StageOrchestrator {
     }
 
     public static class OrchestratePlan{
-        private final List<BioPipelineStage> updateStages;
-        private final List<Long> updateStageIds;
+
+
+
+
+        private final List<UpdateStageCommand> updateStageCommands;
+        private final List<BioPipelineStage> runStages;
+
         public final List<BioPipelineStage> getRunStages() {
             return runStages;
         }
 
-        public List<Long> getUpdateStageIds() {
-            return updateStageIds;
-        }
+        
 
         public OrchestratePlan() {
-            this.updateStages = new ArrayList<>();
-            this.updateStageIds = new ArrayList<>();
+            this.updateStageCommands = new ArrayList<>();
             this.runStages = new ArrayList<>();
         }
 
 
-        public List<BioPipelineStage> getUpdateStages() {
-            return updateStages;
+
+        public List<UpdateStageCommand> getUpdateStageCommands() {
+            return updateStageCommands;
         }
-        private List<BioPipelineStage> runStages;
+
+
+        
     }
 
     private static void copy(BioPipelineStage src, BioPipelineStage target) throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
-
         PropertyUtils.copyProperties(target, src);
-
     }
 
     private void applyUpdatesToUpdateStage(BioPipelineStage updateStage, BioPipelineStage stageInCache, String inputUrl, String params, int status, int currentVersion){
@@ -103,8 +107,7 @@ public class StageOrchestrator {
 
         Map<String,String> qcOutputMap = JsonUtil.toMap(qc.getOutputUrl(), String.class);
 
-        List<BioPipelineStage> updateStages = plan.getUpdateStages();
-        List<Long> updateStagesIds = plan.getUpdateStageIds();
+        List<UpdateStageCommand> updateStages = plan.getUpdateStageCommands(); 
         List<BioPipelineStage> nextRunStages = plan.getRunStages();
 
 
@@ -118,9 +121,11 @@ public class StageOrchestrator {
             nextRunStage = assembly;
             this.applyUpdatesToUpdateStage(updateStage, nextRunStage, serializedInput, null, PipelineService.PIPELINE_STAGE_STATUS_QUEUING,nextRunStage.getVersion());
             nextInputMap.clear();
-            updateStages.add(updateStage);
+
+
+            UpdateStageCommand assemblyUpdateCommand = new UpdateStageCommand(updateStage, nextRunStage.getStageId(), nextRunStage.getVersion());
+            updateStages.add(assemblyUpdateCommand);
             nextRunStages.add(assembly);
-            updateStagesIds.add(assembly.getStageId());
         }
 
 
@@ -136,9 +141,8 @@ public class StageOrchestrator {
         if(isMappingNextRunStage){
             nextRunStages.add(mapping);
         }
-        updateStages.add(updateStage);
-        updateStagesIds.add(mapping.getStageId());
 
+        updateStages.add(new UpdateStageCommand(updateStage, mapping.getStageId(), mapping.getVersion()));
 
         return plan;
     }
@@ -175,8 +179,7 @@ public class StageOrchestrator {
             String serializedInputMap = JsonUtil.toJson(inputUrlMap);
             boolean isNextRunStage = followingStage.getStageIndex() == nextRunIndex;
             applyUpdatesToUpdateStage(updateStage,  isNextRunStage?followingStage: null,serializedInputMap, null, isNextRunStage? PipelineService.PIPELINE_STAGE_STATUS_QUEUING:-1, followingStage.getVersion());
-            plan.getUpdateStages().add(updateStage);
-            plan.getUpdateStageIds().add(followingStage.getStageId());
+            plan.getUpdateStageCommands().add(new UpdateStageCommand(updateStage, followingStage.getStageId(), followingStage.getVersion()));
             if(isNextRunStage){
                 plan.getRunStages().add(followingStage);
             }
@@ -215,8 +218,8 @@ public class StageOrchestrator {
             if(isMapping){
                 plan.getRunStages().add(followingStage);
             }
-            plan.getUpdateStages().add(updateStage);
-            plan.getUpdateStageIds().add(followingStage.getStageId());
+
+            plan.getUpdateStageCommands().add(new UpdateStageCommand(updateStage, followingStage.getStageId(), followingStage.getVersion()));
         }
         return plan;
     }
@@ -240,9 +243,7 @@ public class StageOrchestrator {
         BioPipelineStage updateVarientStage = new BioPipelineStage();
         String serializedInputMap = JsonUtil.toJson(inputMap);
         this.applyUpdatesToUpdateStage(updateVarientStage, varientStage, serializedInputMap, null, PipelineService.PIPELINE_STAGE_STATUS_QUEUING, varientStage.getVersion());
-        
-        plan.updateStageIds.add(varientStage.getStageId());
-        plan.updateStages.add(updateVarientStage);
+        plan.getUpdateStageCommands().add(new UpdateStageCommand(updateVarientStage, varientStage.getStageId(), varientStage.getVersion()));
         plan.runStages.add(varientStage);
         return plan;
     }
@@ -266,10 +267,11 @@ public class StageOrchestrator {
         BioPipelineStage updateConsensusStage = new BioPipelineStage();
         this.applyUpdatesToUpdateStage(updateConsensusStage, consensusStage, serializedInputMap, null, PipelineService.PIPELINE_STAGE_STATUS_QUEUING, consensusStage.getVersion());
 
-
         plan.runStages.add(consensusStage);
-        plan.updateStageIds.add(consensusStage.getStageId());
-        plan.updateStages.add(updateConsensusStage);
+
+        plan.getUpdateStageCommands().add(new UpdateStageCommand(updateConsensusStage, consensusStage.getStageId(), consensusStage.getVersion()));
+        // plan.updateStageIds.add(consensusStage.getStageId());
+        // plan.updateStages.add(updateConsensusStage);
         return plan;
 
     }

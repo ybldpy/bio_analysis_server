@@ -1,4 +1,4 @@
-package com.xjtlu.bio.parameters;
+package com.xjtlu.bio.requestParameters;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;

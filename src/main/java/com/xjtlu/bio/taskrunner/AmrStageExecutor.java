@@ -1,7 +1,6 @@
 package com.xjtlu.bio.taskrunner;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
