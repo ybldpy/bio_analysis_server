@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
+import com.xjtlu.bio.service.stage.RefSeqConfig;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

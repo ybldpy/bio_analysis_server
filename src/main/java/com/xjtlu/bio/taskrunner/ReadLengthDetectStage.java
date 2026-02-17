@@ -15,7 +15,6 @@ import java.util.zip.GZIPInputStream;
 
 import org.springframework.stereotype.Component;
 
-import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;

@@ -2,10 +2,10 @@ package com.xjtlu.bio.stageDoneHandler;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.taskrunner.StageRunResult;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.utils.JsonUtil;
 

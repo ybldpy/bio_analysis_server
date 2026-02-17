@@ -19,10 +19,10 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.utils.JsonUtil;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.service.stage.RefSeqConfig;
 
 @Component
 public class MappingStageExecutor extends AbstractPipelineStageExector<MappingStageOutput>

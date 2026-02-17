@@ -1,4 +1,4 @@
-package com.xjtlu.bio.taskrunner.parameters;
+package com.xjtlu.bio.service.stage;
 
 public class RefSeqConfig {
 
