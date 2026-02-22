@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.xjtlu.bio.service.stage.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,17 +62,16 @@ public class JsonUtil {
 
     /**
      * 通用：转对象
+     * @throws JsonProcessingException 
+     * @throws JsonMappingException 
      */
-    public static <T> T toObject(String json, Class<T> clazz) {
+    public static <T> T toObject(String json, Class<T> clazz) throws JsonMappingException, JsonProcessingException {
         if (!StringUtils.hasText(json)) {
             return null;
         }
-        try {
-            return objectMapper.readValue(json, clazz);
-        } catch (Exception e) {
-            logger.error("JSON to Object failed. json: {}, class: {}", json, clazz.getName(), e);
-            return null;
-        }
+        
+        return objectMapper.readValue(json, clazz);
+        
     }
 
     /**

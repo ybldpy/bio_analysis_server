@@ -9,12 +9,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.taskrunner.stageOutput.*;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.*;
 import com.xjtlu.bio.entity.BioPipelineStage;
 
 @Component

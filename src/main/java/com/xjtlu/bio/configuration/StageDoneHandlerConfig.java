@@ -1,9 +1,10 @@
 package com.xjtlu.bio.configuration;
 
 
-import com.xjtlu.bio.stageDoneHandler.StageDoneHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 
 import java.util.HashMap;
 import java.util.List;
