@@ -12,10 +12,12 @@ import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_AMR;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_ASSEMBLY;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_ASSEMBLY_INPUT_R1;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_ASSEMBLY_INPUT_R2;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY;
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_CGMLST;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_CONSENSUS;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI;
@@ -24,6 +26,7 @@ import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_MAPPING_INPUT
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R2;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY;
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_MLST;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_QC;
@@ -31,7 +34,10 @@ import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_QC_OUTPUT_R1;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_QC_OUTPUT_R2;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_READ_LENGTH_DETECT;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_READ_LENGTH_DETECT_NAME;
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_SEROTYPE;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_QUEUING;
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_TAXONOMY;
+import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_TAXONOMY_INPUT;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_VARIANT_CALL;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY;
@@ -444,9 +450,6 @@ public class StageOrchestrator {
         Map<String,Object> varientParams = JsonUtil.toMap(varientStage.getParameters());
         
         
-
-
-
         Map<String,String> inputMap = new HashMap<>();
         Map<String,Object> paramsMap = new HashMap<>();
 
@@ -494,14 +497,71 @@ public class StageOrchestrator {
         return null;
     }
 
+
+    private List<BioPipelineStage> findUpstreamStages(List<BioPipelineStage> stages, BioPipelineStage stage){
+        
+        int stageType = stage.getStageType();
+        switch (stageType) {
+            case PIPELINE_STAGE_READ_LENGTH_DETECT:
+                return Collections.emptyList();
+            case PIPELINE_STAGE_QC:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).toList();
+            case PIPELINE_STAGE_ASSEMBLY:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_QC).toList();
+            case PIPELINE_STAGE_MAPPING:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC).toList();
+            case PIPELINE_STAGE_VARIANT_CALL:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_MAPPING || s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
+            case PIPELINE_STAGE_CONSENSUS:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_VARIANT_CALL || s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
+            case PIPELINE_STAGE_TAXONOMY:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
+            case PIPELINE_STAGE_CGMLST:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_TAXONOMY).toList();
+            case PIPELINE_STAGE_MLST:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_TAXONOMY).toList();
+            case PIPELINE_STAGE_SEROTYPE:
+                return stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_TAXONOMY).toList();
+            default:
+                break;
+        }
+
+        return null;
+    }
+
+
+    private OrchestratePlan planForTaxonomy(List<BioPipelineStage> upstreamStages, BioPipelineStage taxStage) throws JsonMappingException, JsonProcessingException{
+
+
+        OrchestratePlan plan = new OrchestratePlan();
+        BioPipelineStage patch = new BioPipelineStage();
+
+
+        BioPipelineStage assembly = upstreamStages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_ASSEMBLY).findFirst().orElse(null);
+
+        Map<String,String> assemblyOutputMap = JsonUtil.toMap(assembly.getOutputUrl(), String.class);
+        String contigPath = assemblyOutputMap.get(PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY);
+
+        Map<String,String> inputMap = new HashMap<>();
+        inputMap.put(PIPELINE_STAGE_TAXONOMY_INPUT, contigPath);
+
+        this.applyUpdatesToUpdateStage(patch, taxStage, inputMap, null, PIPELINE_STAGE_STATUS_QUEUING, taxStage.getVersion());
+
+        plan.runStages.add(taxStage);
+        plan.updateStageCommands.add(new UpdateStageCommand(patch, taxStage.getStageId(), taxStage.getVersion()-1));
+
+        return plan;
+        
+
+    }
+
     public OrchestratePlan makePlan(List<BioPipelineStage> stages, long runStageId)
             throws JsonMappingException, JsonProcessingException {
 
         // prerequisize: cannot be null
         BioPipelineStage startStage = stages.stream().filter(s -> s.getStageId() == runStageId).findFirst()
                 .orElse(null);
-        List<BioPipelineStage> upstreamStages = stages.stream()
-                .filter(s -> s.getStageIndex() < startStage.getStageIndex()).toList();
+        List<BioPipelineStage> upstreamStages = findUpstreamStages(stages, startStage);
 
         if (startStage.getStageType() == PIPELINE_STAGE_ASSEMBLY) {
             return this.planForAssembly(startStage, upstreamStages);
@@ -515,6 +575,8 @@ public class StageOrchestrator {
             return this.planForQc(startStage, upstreamStages);
         } else if (startStage.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT) {
             return this.planForReadLengDetect(startStage);
+        } else if(startStage.getStageType() == PIPELINE_STAGE_TAXONOMY){
+
         }
         return null;
 
@@ -534,6 +596,10 @@ public class StageOrchestrator {
             return planDownstreamAssembly(currentStage, followingStages);
         } else if (currentStage.getStageType() == PipelineService.PIPELINE_STAGE_MAPPING) {
             return planDownstreamMapping(currentStage, followingStages);
+        } else if(currentStage.getStageType() == PIPELINE_STAGE_VARIANT_CALL){
+            return planDownstreamVarientCall(currentStage, followingStages);
+        }else if(currentStage.getStageType() == PIPELINE_STAGE_AMR){
+
         }
 
         return null;

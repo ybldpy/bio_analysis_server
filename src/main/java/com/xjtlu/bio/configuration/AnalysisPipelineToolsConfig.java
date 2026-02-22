@@ -17,9 +17,18 @@ public class AnalysisPipelineToolsConfig {
     private List<String> amrfinder;
     private List<String> virulenceFactor;
     private List<String> mlst;
+    private List<String> kraken2;
 
     public List<String> getMlst() {
         return mlst;
+    }
+
+    public List<String> getKraken2() {
+        return kraken2;
+    }
+
+    public void setKraken2(List<String> kraken2) {
+        this.kraken2 = kraken2;
     }
 
     public void setMlst(List<String> mlst) {

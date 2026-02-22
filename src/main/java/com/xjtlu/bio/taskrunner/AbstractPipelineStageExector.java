@@ -20,14 +20,14 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xjtlu.bio.common.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.RefSeqService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
-import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
+import com.xjtlu.bio.service.stage.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -168,7 +168,18 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         stageExecutionInput.inputDir = inputDir;
         stageExecutionInput.workDir = workDir;
 
-        StageRunResult<T> stageRunResult = _execute(stageExecutionInput);
+        StageRunResult<T> stageRunResult = null;
+        try {
+            stageRunResult = _execute(stageExecutionInput);
+        } catch (JsonMappingException e) {
+            // TODO Auto-generated catch block
+            logger.error("JSON mapping exception while executing stage. input={}", stageExecutionInput, e);
+            stageRunResult = this.runException(bioPipelineStage, e);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            logger.error("JSON processing exception while executing stage. input={}", stageExecutionInput, e);
+            stageRunResult = this.runException(bioPipelineStage, e);
+        }
         postExecute(stageRunResult);
         return stageRunResult;
     }
@@ -178,7 +189,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
      * Any failure should be captured and returned as
      * {@link StageRunResult#fail(...)}.
      */
-    protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput);
+    protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException;
 
     protected StageRunResult<T> runException(BioPipelineStage bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());

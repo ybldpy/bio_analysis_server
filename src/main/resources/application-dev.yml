@@ -38,6 +38,8 @@ analysis-pipeline:
         amrfinder: ["${analysis-pipeline.conda}", "run", "-n", "amrfinder", "amrfinder"]
         virulenceFactor: ["${analysis-pipeline.conda}", "run", "-n", "virulence", "abricate"]
         mlst: ["${analysis-pipeline.conda}", "run", "-n", "mlst", "mlst"]
+        kraken2: ["${analysis-pipeline.conda}", "run", "-n", "bio-kraken", "kraken2", "--db", "~/refereceTmp/kraken_db"]
+        
 
     stage:
         baseInputDir: /home/jcy/bio_app_data/temp/stage/input

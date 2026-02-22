@@ -15,7 +15,6 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.xjtlu.bio.stageDoneHandler.StageDoneHandler;
-import com.xjtlu.bio.taskrunner.parameters.RefSeqConfig;
 import com.xjtlu.bio.taskrunner.stageOutput.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -47,6 +46,7 @@ import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.parameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.StorageService.PutResult;
+import com.xjtlu.bio.service.stage.RefSeqConfig;
 import com.xjtlu.bio.service.stage.StageOrchestrator;
 import com.xjtlu.bio.service.stage.UpdateStageCommand;
 import com.xjtlu.bio.service.stage.StageOrchestrator.OrchestratePlan;
@@ -375,6 +375,9 @@ public class PipelineService {
 
     public static final String PIPELINE_STAGE_MLST_INPUT = "contigs";
     public static final String PIPELINE_STAGE_MLST_OUTPUT = "mlstResult";
+
+    public static final String PIPELINE_STAGE_TAXONOMY_INPUT = "contig";
+    public static final String PIPELINE_STAGE_TAXONOMY_OUTPUT = "predictTaxonomy";
 
     public static final int PIPELINE_STAGE_QC = 0; // 质控 fastp
     public static final int PIPELINE_STAGE_TAXONOMY = 10; // 物种鉴定 Kraken2/Mash
