@@ -1,6 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.stageResult;
 
-public class QcResult {
+public class QcResult implements StageResult{
 
     private String cleanedR1;
     private String cleanedR2;
@@ -36,6 +36,12 @@ public class QcResult {
     }
     public void setReportJSON(String reportJSON) {
         this.reportJSON = reportJSON;
+    }
+    @Override
+    public int resultType() {
+        // TODO Auto-generated method stub
+        
+        
     }
 
 

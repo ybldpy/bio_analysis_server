@@ -1,6 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.stageResult;
 
-public class AssemblyResult {
+public class AssemblyResult implements StageResult{
 
     private String contigsUrl;
     private String scaffoldUrl;

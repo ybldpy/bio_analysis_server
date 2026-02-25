@@ -14,6 +14,46 @@ public class TaxonomyContext {
 
     }
 
+    public Integer getTaxid() {
+        return taxid;
+    }
+
+    public void setTaxid(Integer taxid) {
+        this.taxid = taxid;
+    }
+
+    public String getSpeciesName() {
+        return speciesName;
+    }
+
+    public void setSpeciesName(String speciesName) {
+        this.speciesName = speciesName;
+    }
+
+    public String getRank() {
+        return rank;
+    }
+
+    public void setRank(String rank) {
+        this.rank = rank;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Double getScore() {
+        return score;
+    }
+
+    public void setScore(Double score) {
+        this.score = score;
+    }
+
     public static TaxonomyContext of(TaxonomyResult r) {
         TaxonomyContext ctx = new TaxonomyContext();
         ctx.status = r.getStatus();

@@ -1,9 +1,15 @@
 package com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls;
 
-public class AMRInputUrls implements StageInputUrls{
-
+public class VFStageInputUrls implements StageInputUrls{
 
     private String contigsUrl;
+
+    public VFStageInputUrls(){
+    }
+
+    public VFStageInputUrls(String contigsUrl) {
+        this.contigsUrl = contigsUrl;
+    }
 
     public String getContigsUrl() {
         return contigsUrl;
@@ -12,4 +18,8 @@ public class AMRInputUrls implements StageInputUrls{
     public void setContigsUrl(String contigsUrl) {
         this.contigsUrl = contigsUrl;
     }
+
+    
+    
+
 }

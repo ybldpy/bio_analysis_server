@@ -1,6 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 
+import com.xjtlu.bio.analysisPipeline.stageResult.VarientCallStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.service.PipelineService;
@@ -26,7 +27,7 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
     }
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, VarientCallStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<VariantStageOutput> stageRunResult) {
         // TODO Auto-generated method stub
         VariantStageOutput variantStageOutput = stageRunResult.getStageOutput();
@@ -35,9 +36,16 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
 
         return Pair.of(
             Map.of(variantStageOutput.getVcfGz(), vcfGzUrl, variantStageOutput.getVcfTbi(), vcfTbiUrl),
-            Map.of(PipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ, vcfGzUrl, pipelineService.PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI, vcfTbiUrl)
+            new VarientCallStageResult(vcfGzUrl, vcfTbiUrl)
         );
     }
+
+    @Override
+    protected int serializedOutputType() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'serializedOutputType'");
+    }
+
 
     // @Override
     // public void handleStageDone(StageRunResult<VariantStageOutput> stageRunResult) {

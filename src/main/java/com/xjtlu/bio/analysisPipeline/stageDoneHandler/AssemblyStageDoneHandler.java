@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AssemblyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -55,7 +56,7 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
     // stageRunResult) {
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, AssemblyResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<AssemblyStageOutput> stageRunResult) {
 
         String contigUrl = this.createStoreObjectName(stageRunResult.getStage(), CONTIG_NAME);
@@ -63,8 +64,14 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getContigPath(), contigUrl, stageRunResult.getStageOutput().getScaffoldPath(), scaffoldUrl),
-            Map.of(PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY, contigUrl, PipelineService.PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY, scaffoldUrl)
+            new AssemblyResult(contigUrl, scaffoldUrl);
         );
+    }
+
+    @Override
+    public int serializedOutputType() {
+        // TODO Auto-generated method stub
+        return SERIALIZED_TYPE_URLS;
     }
 
     // AssemblyStageOutput assemblyStageOutput = (AssemblyStageOutput)

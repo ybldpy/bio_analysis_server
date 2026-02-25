@@ -1,6 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 
+import com.xjtlu.bio.analysisPipeline.stageResult.ReadLenStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadLengthDetectStageOutput;
 import com.xjtlu.bio.service.PipelineService;
@@ -21,16 +22,18 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler<R
     }
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, ReadLenStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<ReadLengthDetectStageOutput> stageRunResult) {
         
 
         return Pair.of(
             null,
-            Map.of(PipelineService.PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY, stageRunResult.getStageOutput().isLongRead())
+            new ReadLenStageResult(false);
         );
 
     }
+
+
 
     
 

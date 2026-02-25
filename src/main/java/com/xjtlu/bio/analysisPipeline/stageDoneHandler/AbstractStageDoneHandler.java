@@ -6,6 +6,7 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
+import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.utils.BioStageUtil;
@@ -51,14 +52,17 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
     // protected abstract Map<String,String> createOutputUrlMap(StageRunResult<T> stageOutput);
 
 
-    
+    private static int SERIALIZED_TYPE_URLS = 0;
+    private static int SERIALIZED_TYPE_VALUE = 1;
 
+
+    protected abstract int serializedOutputType();
     @Override
     public boolean handleStageDone(StageRunResult<T> stageRunResult) {
         // TODO Auto-generated method stub
 
         
-        Pair<Map<String,String>, Map<String,Object>> uploadConfigAndOutputUrlMap = this.buildUploadConfigAndOutputUrlMap(stageRunResult);
+        Pair<Map<String,String>, StageResult> uploadConfigAndOutputUrlMap = this.buildUploadConfigAndOutputUrlMap(stageRunResult);
 
         Map<String,String> uploadConfig = uploadConfigAndOutputUrlMap.getLeft();
         
@@ -70,7 +74,7 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
             }
         }
 
-        Map<String,Object> outputMap = uploadConfigAndOutputUrlMap.getRight();
+        StageResult outputMap = uploadConfigAndOutputUrlMap.getRight();
         String serializedOutputMap = null; 
         try {
             serializedOutputMap = JsonUtil.toJson(outputMap);
@@ -101,7 +105,7 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
     }
 
 
-    protected abstract Pair<Map<String,String>, Map<String,Object>> buildUploadConfigAndOutputUrlMap(StageRunResult<T> stageRunResult);
+    protected abstract Pair<Map<String,String>, ? extends StageResult> buildUploadConfigAndOutputUrlMap(StageRunResult<T> stageRunResult);
 
 
     private void deleteStageResultDir(Path p){

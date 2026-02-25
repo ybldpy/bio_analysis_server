@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageResult.MappingResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -46,7 +47,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
 
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, MappingResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<MappingStageOutput> stageRunResult) {
 
         String bamUrl = this.createStoreObjectName(stageRunResult.getStage(),BAM_NAME);
@@ -54,9 +55,12 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getBamPath(), bamUrl, stageRunResult.getStageOutput().getBamIndexPath(), bamIndexUrl),
-            Map.of(PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY, bamUrl, PipelineService.PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexUrl)
+            new MappingResult(bamUrl, bamIndexUrl);
         );
     }
+
+
+
 
     // @Override
     // public void handleStageDone(StageRunResult<MappingStageOutput> stageRunResult) {

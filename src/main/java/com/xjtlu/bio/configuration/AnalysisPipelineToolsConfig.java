@@ -19,6 +19,48 @@ public class AnalysisPipelineToolsConfig {
     private List<String> mlst;
     private List<String> kraken2;
 
+    private List<String> seqsero2;
+
+    public List<String> getEctyper() {
+        return ectyper;
+    }
+
+    public void setEctyper(List<String> ectyper) {
+        this.ectyper = ectyper;
+    }
+
+    public List<String> getKaptive() {
+        return kaptive;
+    }
+
+    public void setKaptive(List<String> kaptive) {
+        this.kaptive = kaptive;
+    }
+
+    public List<String> getSeroBA() {
+        return seroBA;
+    }
+
+    public void setSeroBA(List<String> seroBA) {
+        this.seroBA = seroBA;
+    }
+
+    private List<String> ectyper;
+
+    private List<String> kaptive;
+
+    private List<String> seroBA;
+    
+     
+
+    public List<String> getSeqsero2() {
+        return seqsero2;
+    }
+
+    public void setSeqsero2(List<String> seqsero2) {
+        this.seqsero2 = seqsero2;
+    }
+
     public List<String> getMlst() {
         return mlst;
     }

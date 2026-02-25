@@ -2,7 +2,7 @@ package com.xjtlu.bio.analysisPipeline.stageResult;
 
 import java.util.List;
 
-public class TaxonomyResult {
+public class TaxonomyResult implements StageResult{
 
     public class Taxon {
 
@@ -95,5 +95,11 @@ public class TaxonomyResult {
                 ", best=" + best +
                 ", candidates=" + candidates +
                 '}';
+    }
+
+    @Override
+    public int resultType() {
+        // TODO Auto-generated method stub
+        return RESULT_TYPE_VALUE;
     }
 }

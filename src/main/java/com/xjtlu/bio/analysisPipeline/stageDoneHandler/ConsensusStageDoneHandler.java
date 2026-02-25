@@ -1,6 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageResult.ConsensusStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -31,14 +32,21 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
 
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, ConsensusStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<ConsensusStageOutput> stageRunResult) {
         String consensusUrl = this.createStoreObjectName(stageRunResult.getStage(), CONSENSUS_FA_NAME);
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getConsensusFa(), consensusUrl),
-            Map.of(PipelineService.PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA, consensusUrl)
+            new ConsensusStageResult(consensusUrl)
         );
     }
+
+
+    // @Override
+    // public int serializedOutputType() {
+    //     // TODO Auto-generated method stub
+    //     return SERIALIZED_TYPE_URLS;
+    // }
 
 
     // @Override

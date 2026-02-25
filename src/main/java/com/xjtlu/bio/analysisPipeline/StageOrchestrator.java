@@ -4,10 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.AMRParamters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.TaxonomyContext;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VFParameters;
 import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -699,11 +701,10 @@ public class StageOrchestrator {
         plan.updateStageCommands.addAll(virusFactorPlan.getUpdateStageCommands());
         plan.updateStageCommands.addAll(MLSTPlan.getUpdateStageCommands());
         return plan;
-
     }
 
-    
 
+    
 
     private OrchestratePlan planForAMR(List<BioPipelineStage> upstreamStages, BioPipelineStage amrStage) throws JsonMappingException, JsonProcessingException{
 
@@ -735,6 +736,37 @@ public class StageOrchestrator {
     }
 
 
+    private OrchestratePlan planForVirulenFactorStage(List<BioPipelineStage> upstreamStages, BioPipelineStage vfStage) throws JsonMappingException, JsonProcessingException{
+
+        BioPipelineStage taxonomy = findStageFromStages(upstreamStages, PIPELINE_STAGE_TAXONOMY);
+        BioPipelineStage assembly = findStageFromStages(upstreamStages, PIPELINE_STAGE_ASSEMBLY);
+
+        AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
+        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(), TaxonomyResult.class);
+
+        TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
+
+        BioPipelineStage patch = new BioPipelineStage();
+
+        VFParameters vfParameters = JsonUtil.toObject(vfStage.getParameters(), VFParameters.class);
+        vfParameters.setTaxonomyContext(taxonomyContext);
+
+        VFStageInputUrls vfStageInputUrls = new VFStageInputUrls(assemblyResult.getContigsUrl());
+
+        String serializedInput = JsonUtil.toJson(vfStageInputUrls);
+        String serializedParams = JsonUtil.toJson(vfParameters);
+
+        this.applyUpdatesToUpdateStage(patch, vfStage, serializedInput, serializedParams, PIPELINE_STAGE_STATUS_QUEUING, vfStage.getVersion());
+        
+        OrchestratePlan plan = new OrchestratePlan();
+        plan.runStages.add(vfStage);
+        plan.updateStageCommands.add(new UpdateStageCommand(patch, vfStage.getStageId(),vfStage.getVersion()-1));
+
+        return plan;
+
+    }
+
+
     private OrchestratePlan makePlanDownstreamTaxonomy(List<BioPipelineStage> allStages, BioPipelineStage taxonomyStage) throws JsonMappingException, JsonProcessingException{
         BioPipelineStage amrStage = findStageFromStages(allStages, PIPELINE_STAGE_AMR);
         BioPipelineStage mlstStage = findStageFromStages(allStages, PIPELINE_STAGE_MLST);
@@ -744,8 +776,7 @@ public class StageOrchestrator {
         List<BioPipelineStage> upstreamStages = findUpstreamStages(allStages, amrStage);
         OrchestratePlan amrPlan = planForAMR(upstreamStages, amrStage);
         OrchestratePlan mlstPlan = planForMLST(upstreamStages, mlstStage);
-        OrchestratePlan virulenceFactorStagePlan = null;
-
+        OrchestratePlan virulenceFactorStagePlan = planForVirulenFactorStage(upstreamStages, virulenceFactorStage);
         
         OrchestratePlan plan = new OrchestratePlan();
         plan.runStages.addAll(amrPlan.runStages);

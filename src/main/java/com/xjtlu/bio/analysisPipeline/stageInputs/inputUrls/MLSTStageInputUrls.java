@@ -4,7 +4,7 @@ import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_MLST_INPUT;
 
 import com.xjtlu.bio.service.PipelineService;
 
-public class MLSTStageInputUrls {
+public class MLSTStageInputUrls implements StageInputUrls{
 
 
     private String contigUrl;

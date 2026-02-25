@@ -435,24 +435,17 @@ public class PipelineService {
             return new Result<Boolean>(Result.SUCCESS, null, null);
         }
 
-        int curVersion = firstStage.getVersion();
+        int res = scheduleStage(firstStage, stages);
 
-        BioPipelineStage updatedFirstStage = new BioPipelineStage();
-        updatedFirstStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-        firstStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-
-        updatedFirstStage.setVersion(firstStage.getVersion() + 1);
-        firstStage.setVersion(firstStage.getVersion() + 1);
-        int updateRes = this.updateStageFromVersion(
-                new UpdateStageCommand(updatedFirstStage, firstStage.getStageId(), firstStage.getVersion()));
-        if (updateRes < 0) {
-            return new Result<Boolean>(Result.INTERNAL_FAIL, false, "流水线启动失败");
+        if(res == OK){
+            return new Result<Boolean>(Result.SUCCESS, true, null);
         }
 
-        if (updateRes == 1) {
-            this.pipelineStageTaskDispatcher.addTask(firstStage);
-        }
-        return new Result<Boolean>(Result.SUCCESS, true, null);
+        
+        return new Result<Boolean>(Result.INTERNAL_FAIL, false, "内部错误");
+        
+
+        
     }
 
     @Async

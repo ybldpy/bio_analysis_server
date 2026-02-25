@@ -15,6 +15,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.Taxon;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
@@ -163,11 +164,13 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
     }
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, StageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<TaxonomyStageOutput> stageRunResult) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'buildUploadConfigAndOutputUrlMap'");
     }
+
+
 
     
 

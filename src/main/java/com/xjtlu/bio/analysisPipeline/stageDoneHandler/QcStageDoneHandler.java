@@ -1,6 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageResult.QcResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -51,7 +52,7 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
 
 
     @Override
-    protected Pair<Map<String, String>, Map<String, Object>> buildUploadConfigAndOutputUrlMap(
+    protected Pair<Map<String, String>, QcResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<QCStageOutput> stageRunResult) {
         String r1Url = this.createStoreObjectName(stageRunResult.getStage(), OUTPUT_R1_NAME);
         String r2Url = stageRunResult.getStageOutput().getR2Path() == null?null:this.createStoreObjectName(stageRunResult.getStage(), OUTPUT_R2_NAME);
@@ -74,7 +75,7 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
 
         return Pair.of(
             uploadConfig,
-            outputUrlMap
+            new QcResult(r1Url, r2Url, htmlUrl, jsonUrl);
         );
     }
 
