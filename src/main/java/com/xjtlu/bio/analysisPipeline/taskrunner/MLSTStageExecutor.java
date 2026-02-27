@@ -5,14 +5,14 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MLSTStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import org.springframework.stereotype.Component;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MLST;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -53,6 +53,6 @@ public class MLSTStageExecutor extends AbstractPipelineStageExector<MLSTStageOut
 
     @Override
     public int id() {
-        return PipelineService.PIPELINE_STAGE_MLST;
+        return PIPELINE_STAGE_MLST;
     }
 }

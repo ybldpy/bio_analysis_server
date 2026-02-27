@@ -1,10 +1,13 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VirulenceFactorStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.utils.JsonUtil;
 
 import org.springframework.stereotype.Component;
+
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_VIRULENCE;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,14 +22,15 @@ public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<V
     protected StageRunResult<VirulenceFactorStageOutput> _execute(StageExecutionInput stageExecutionInput) {
         BioPipelineStage stage = stageExecutionInput.bioPipelineStage;
 
-        Map<String,String> inputUrlMap = this.loadInputUrlMap(stage);
-        if (inputUrlMap == null){
-            return runFail(stage, "load input failed");
-        }
+        // Map<String,String> inputUrlMap = this.loadInputUrlMap(stage);
+        // if (inputUrlMap == null){
+        //     return runFail(stage, "load input failed");
+        // }
+        VFStageInputUrls vfStageInputUrls = JsonUtil.toObject(stage.getInputUrl(), VFStageInputUrls.class);
 
 
 
-        String inputContigsUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VIRULENCE_FACTOR_INPUT);
+        String inputContigsUrl = vfStageInputUrls.getContigsUrl();
         Path inputContigPath = stageExecutionInput.inputDir.resolve("in.contig");
 
         boolean success = this.loadInput(Map.of(inputContigsUrl, inputContigPath));
@@ -62,6 +66,6 @@ public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<V
 
     @Override
     public int id() {
-        return PipelineService.PIPELINE_STAGE_VIRULENCE;
+        return PIPELINE_STAGE_VIRULENCE;
     }
 }

@@ -37,12 +37,6 @@ public class QcResult implements StageResult{
     public void setReportJSON(String reportJSON) {
         this.reportJSON = reportJSON;
     }
-    @Override
-    public int resultType() {
-        // TODO Auto-generated method stub
-        
-        
-    }
 
 
 

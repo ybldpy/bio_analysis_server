@@ -1,12 +1,15 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AmrStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.utils.JsonUtil;
 import org.springframework.stereotype.Component;
+
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_AMR;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -26,19 +29,12 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
 
 
     @Override
-    protected StageRunResult<AmrStageOutput> _execute(StageExecutionInput stageExecutionInput) {
+    protected StageRunResult<AmrStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         BioPipelineStage stage = stageExecutionInput.bioPipelineStage;
-        Map<String,String> inputUrlMap = null;
-        try {
-            inputUrlMap = JsonUtil.toMap(stage.getInputUrl(),String.class);
-        } catch (JsonProcessingException e) {
-            logErr("解析失败",e);
-            return runException(stage,e);
-        }
+        AMRInputUrls amrInputUrls = JsonUtil.toObject(stage.getInputUrl(), AMRInputUrls.class);
 
 
-
-        String inputUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_AMR_INPUT_SAMPLE);
+        String inputUrl = amrInputUrls.getContigsUrl();
 
         Path inputSamplePath = stageExecutionInput.inputDir.resolve(inputUrl.substring(inputUrl.lastIndexOf("/")+1));
         StorageService.GetObjectResult getObjectResult = this.storageService.getObject(inputUrl, inputSamplePath.toString());
@@ -72,6 +68,6 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
 
     @Override
     public int id() {
-        return PipelineService.PIPELINE_STAGE_AMR;
+        return PIPELINE_STAGE_AMR;
     }
 }

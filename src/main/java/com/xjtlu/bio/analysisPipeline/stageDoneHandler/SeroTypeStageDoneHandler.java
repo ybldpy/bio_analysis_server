@@ -6,7 +6,6 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.SeroTypeResult;
-import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SeroTypingStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -44,7 +43,7 @@ public class SeroTypeStageDoneHandler extends AbstractStageDoneHandler<SeroTypin
             Map.of(resultPath.toString(), url), 
             new SeroTypeResult(url)
         );
-        
+
         
     }
 

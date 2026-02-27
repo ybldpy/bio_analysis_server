@@ -18,7 +18,7 @@ public class SeroTypingStageOutput implements StageOutput{
     @Override
     public Path getParentPath() {
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getParentPath'");
+        return resultPath.getParent();
     }
 
 

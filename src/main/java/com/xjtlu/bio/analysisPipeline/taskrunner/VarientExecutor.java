@@ -11,11 +11,14 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VarientCallInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.utils.JsonUtil;
 
 
 @Component
@@ -31,18 +34,10 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrls = bioPipelineStage.getInputUrl();
-        Map<String, String> inputUrlMap = null;
-        Map<String,Object> params = null;
-        try {
-            inputUrlMap = this.objectMapper.readValue(inputUrls, Map.class);
-            params = this.objectMapper.readValue(bioPipelineStage.getParameters(), Map.class);
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return this.parseError(bioPipelineStage);
-        }
+        VarientCallInputUrls varientCallInputUrls = JsonUtil.toObject(bioPipelineStage.getInputUrl(), VarientCallInputUrls.class);
+        VarientCallParameters varientCallParameters = JsonUtil.toObject(bioPipelineStage.getParameters(), VarientCallParameters.class);
 
-        RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(params);
+        RefSeqConfig refSeqConfig = varientCallParameters.getRefSeqConfig();
         if(refSeqConfig == null){
             logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage.getStageId(), params);
             return StageRunResult.fail("未能加载参考基因文件",bioPipelineStage, null);
@@ -55,8 +50,8 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
             refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
         }
 
-        String bamPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY);
-        String bamIndexPath = inputUrlMap.get(PipelineService.PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY);
+        String bamPath = varientCallInputUrls.getBamUrl();
+        String bamIndexPath = varientCallInputUrls.getBamIndexUrl();
 
         Path inputTempDir = stageExecutionInput.inputDir;
         // 结果目录

@@ -36,13 +36,6 @@ public class VarientCallStageResult implements StageResult{
 
 
 
-
-    @Override
-    public int resultType() {
-        // TODO Auto-generated method stub
-        return RESULT_TYPE_FILE_URL;
-    }
-
     
 
 }

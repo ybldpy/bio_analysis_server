@@ -1,15 +1,18 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_TAXONOMY;
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_TAXONOMY_INPUT;
+
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_TAXONOMY;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -26,12 +29,18 @@ public class TaxonomyStageExecutor extends AbstractPipelineStageExector<Taxonomy
         Path workDirPath = stageExecutionInput.workDir;
 
         Map<String, String> inputMap = JsonUtil.toMap(bioPipelineStage.getInputUrl(), String.class);
+        TaxonomyStageInputUrls taxonomyStageInputUrls = JsonUtil.toObject(bioPipelineStage.getInputUrl(), TaxonomyStageInputUrls.class);
 
-        String contigUrl = inputMap.get(PIPELINE_STAGE_TAXONOMY_INPUT);
+        String r1Url = taxonomyStageInputUrls.getR1();
+        String r2Url = taxonomyStageInputUrls.getR2();
 
-        Path contigPath = inputDirPath.resolve("sample.contig");
 
-        boolean loadResult = this.loadInput(Map.of(contigUrl, contigPath));
+
+        Path r1Path = inputDirPath.resolve("r1.fastq");
+        Path r2Path = StringUtils.isBlank(r2Url)?null:inputDirPath.resolve("r2.fastq");
+
+        boolean loadResult = r2Path == null?this.loadInput(Map.of(r1Url, r1Path)):this.loadInput(Map.of(r1Url, r1Path, r2Url, r2Path));
+
 
         if(!loadResult){
             return this.runFail(bioPipelineStage, "加载input失败");
@@ -43,7 +52,11 @@ public class TaxonomyStageExecutor extends AbstractPipelineStageExector<Taxonomy
 
         List<String> runCmd = new ArrayList<>();
         runCmd.addAll(this.analysisPipelineToolsConfig.getKraken2());
-        runCmd.add(contigPath.toString());
+        runCmd.add(r1Path.toString());
+        if(r2Path!=null){
+            runCmd.add(r2Path.toString());
+            runCmd.add("--paired");
+        }
         runCmd.add("--report");
         runCmd.add(reportPath.toString());
         runCmd.add("--output");

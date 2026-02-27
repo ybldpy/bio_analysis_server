@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_ASSEMBLY;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,10 +17,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AssemblyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
 public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput> {
@@ -33,17 +37,10 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrl = bioPipelineStage.getInputUrl();
-        Map<String, String> inputUrlMap = null;
-        try {
-            inputUrlMap = this.objectMapper.readValue(inputUrl, Map.class);
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return parseError(bioPipelineStage);
-        }
+        AssemblyInputUrls assemblyInputUrls = JsonUtil.toObject(inputUrl, AssemblyInputUrls.class);
 
-        String r1 = inputUrlMap.get(PipelineService.PIPELINE_STAGE_QC_INPUT_R1);
-        String r2 = inputUrlMap.get(PipelineService.PIPELINE_STAGE_QC_INPUT_R2);
+        String r1 = assemblyInputUrls.getRead1Url();
+        String r2 = assemblyInputUrls.getRead2Url();
 
         Path tempInputDir = stageExecutionInput.inputDir;
         Path workDir = stageExecutionInput.workDir;
@@ -57,11 +54,10 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
             r2Path = tempInputDir.resolve(r2.substring(r2.lastIndexOf("/")+1));
         }
 
-        Map<String,GetObjectResult> getR1AndR2Results = this.loadInput(r2!=null?Map.of(r1, r1Path, r2, r2Path):Map.of(r1,r1Path));
+        boolean res = this.loadInput(r2!=null?Map.of(r1, r1Path, r2, r2Path):Map.of(r1,r1Path));
 
-        String failedLoadRead = findFailedLoadingObject(getR1AndR2Results);
-        if(failedLoadRead!=null){
-            return this.runFail(bioPipelineStage, "加载"+failedLoadRead+"失败", getR1AndR2Results.get(failedLoadRead).e());
+        if(!res){
+            return this.runFail(bioPipelineStage, "load fail");
         }
 
         List<String> cmd = new ArrayList<>();
@@ -119,7 +115,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_ASSEMBLY;
+        return PIPELINE_STAGE_ASSEMBLY;
     }
 
 }

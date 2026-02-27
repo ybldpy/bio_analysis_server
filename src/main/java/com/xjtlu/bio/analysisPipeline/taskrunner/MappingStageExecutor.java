@@ -1,5 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MAPPING;
 import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG;
 
 import java.io.File;
@@ -10,6 +11,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
@@ -19,6 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -31,29 +35,20 @@ public class MappingStageExecutor extends AbstractPipelineStageExector<MappingSt
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_MAPPING;
+        return PIPELINE_STAGE_MAPPING;
     }
 
 
     @Override
-    public StageRunResult<MappingStageOutput> _execute(StageExecutionInput stageExecutionInput) {
+    public StageRunResult<MappingStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrls = bioPipelineStage.getInputUrl();
-        Map<String, String> inputUrlJson = null;
-        Map<String, Object> params = null;
-        try {
-            inputUrlJson = JsonUtil.toMap(inputUrls, String.class);
-            params = JsonUtil.toMap(bioPipelineStage.getParameters());
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return StageRunResult.fail(PARSE_JSON_ERROR, bioPipelineStage, null);
-        }
+        MappingInputUrls mappingInputUrls = JsonUtil.toObject(inputUrls, MappingInputUrls.class);
+        MappingParameters parameters = JsonUtil.toObject(bioPipelineStage.getParameters(), MappingParameters.class);
 
-        RefSeqConfig refSeqConfig = JsonUtil.mapToPojo(
-                (Map<String, Object>) params.get(PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG), RefSeqConfig.class);
+        RefSeqConfig refSeqConfig = parameters.getRefSeqConfig();
 
         if (refSeqConfig == null) {
             return StageRunResult.fail("未能加载参考基因", bioPipelineStage, null);
@@ -66,8 +61,8 @@ public class MappingStageExecutor extends AbstractPipelineStageExector<MappingSt
             return StageRunResult.fail("参考基因组加载失败", bioPipelineStage, null);
         }
 
-        String inputR1Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R1);
-        String inputR2Url = inputUrlJson.get(PipelineService.PIPELINE_STAGE_MAPPING_INPUT_R2);
+        String inputR1Url = mappingInputUrls.getR1Url();
+        String inputR2Url = mappingInputUrls.getR2Url();
 
         Path inputTmpPath = stageExecutionInput.inputDir;
         Path workDir = stageExecutionInput.workDir;

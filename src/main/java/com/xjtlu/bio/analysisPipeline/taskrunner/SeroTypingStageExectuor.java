@@ -27,6 +27,9 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
     private static final int TAX_ID_KLEBSIELLA_PNEUMONIAE = 573;
     private static final int TAX_ID_STREPTOCOCCUS_PNEUMONIAE = 1313;
 
+    public static final int INPUT_TYPE_READS = 0;
+    public static final int INPUT_TYPE_CONTIGS = 1;
+
     public static final Set<Integer> SUPPORTED_SEROTYPE_TAXID = Set.of(
             TAX_ID_ESCHERICHIA_COLI, // Salmonella enterica
             TAX_ID_KLEBSIELLA_PNEUMONIAE, // E. coli
@@ -54,6 +57,24 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
         }
 
         return SUPPORTED_SEROTYPE_TAXID.contains(taxid);
+    }
+
+    public static int inputType(TaxonomyContext ctx) {
+
+        int taxid = ctx.getTaxid();
+
+        switch (taxid) {
+
+            case TAX_ID_SALMONELLA: // SeqSero2 推荐 reads
+            case TAX_ID_STREPTOCOCCUS_PNEUMONIAE:
+                return INPUT_TYPE_READS; // seroBA 必须 reads
+
+            case TAX_ID_ESCHERICHIA_COLI:
+            case TAX_ID_KLEBSIELLA_PNEUMONIAE:
+                return INPUT_TYPE_CONTIGS; // contig 工具
+            default:
+                return INPUT_TYPE_CONTIGS;
+        }
     }
 
     private StageRunResult<SeroTypingStageOutput> executeSalmonellaType(StageExecutionInput stageExecutionInput,
@@ -126,7 +147,7 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
         cmd.addAll(this.analysisPipelineToolsConfig.getSeroBA());
 
         cmd.add(r1Path.toString());
-        if(r2Path!=null){
+        if (r2Path != null) {
             cmd.add(r2Path.toString());
         }
         cmd.add(stageExecutionInput.workDir.toString());

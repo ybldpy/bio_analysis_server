@@ -1,30 +1,28 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_QC;
+
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
-import com.xjtlu.bio.analysisPipeline.taskrunner.parameters.QcStageExecutorInput;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
-import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 
-import jakarta.annotation.Resource;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
 public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput> implements PipelineStageExecutor<QCStageOutput> {
@@ -34,44 +32,27 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
     private static final Logger logger = LoggerFactory.getLogger(QcStageExecutor.class);
 
     @Override
-    public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) {
+    public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrlsJson = bioPipelineStage.getInputUrl();
-        Map<String, String> inputUrls = null;
+        QcStageInputUrls qcStageInputUrls = JsonUtil.toObject(inputUrlsJson, QcStageInputUrls.class);
 
-        try {
-            inputUrls = objectMapper.readValue(inputUrlsJson, Map.class);
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            logger.error("{}解析input出错", bioPipelineStage, e);
-            return StageRunResult.fail("解析输入参数错误", bioPipelineStage, e);
-        }
+        
 
-        String inputUrl1 = inputUrls.get(PipelineService.PIPELINE_STAGE_INPUT_READ1_KEY);
+        String inputUrl1 = qcStageInputUrls.getRead1();
         String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
-        String inputUrl2 = inputUrls.size() > 1 ? inputUrls.get(PipelineService.PIPELINE_STAGE_INPUT_READ2_KEY) : null;
+        String inputUrl2 =  StringUtils.isBlank(qcStageInputUrls.getRead2()) ? qcStageInputUrls.getRead2() : null;
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
         Path outputDir = stageExecutionInput.workDir;
         Path inputDir = stageExecutionInput.inputDir;
 
         String params = bioPipelineStage.getParameters();
-        Map<String, Object> qcParams;
-        try {
-            qcParams = this.objectMapper.readValue(params, Map.class);
-        } catch (JsonMappingException e) {
-            // TODO Auto-generated catch block
-            logger.error("{} 解析input出错", bioPipelineStage, e);
-            return this.runFail(bioPipelineStage,String.format("解析%\ns\n错误", params), e);
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            logger.error("{} 解析input出错", bioPipelineStage, e);
-            return this.runFail(bioPipelineStage,String.format("解析%\ns\n错误", params), e);
-        }
+        QcParameters qcParams = JsonUtil.toObject(bioPipelineStage.getParameters(), QcParameters.class);
 
-        boolean isLongRead = (Boolean) qcParams.get(PipelineService.PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY);
+        
 
 
         QCStageOutput qcStageOutput = this.bioStageUtil.qcStageOutput(outputDir, inputUrl2 != null);
@@ -178,7 +159,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_QC;
+        return PIPELINE_STAGE_QC;
     }
 
 }

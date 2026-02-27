@@ -57,6 +57,8 @@ import com.xjtlu.bio.service.StorageService.PutResult;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
 import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
+
 
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
@@ -105,134 +107,6 @@ public class PipelineService {
     public static final int PIPELINE_VIRUS = 0;
     public static final int PIPELINE_VIRUS_COVID = 1;
     public static final int PIPELINE_VIRUS_BACKTERIA = 2;
-
-    // public static final int PIPELINE_STAGE_STATUS_NOT_READY = -1;
-    public static final int PIPELINE_STAGE_STATUS_PENDING = 0;
-    public static final int PIPELINE_STAGE_STATUS_QUEUING = 1;
-    public static final int PIPELINE_STAGE_STATUS_RUNNING = 2;
-    public static final int PIPELINE_STAGE_STATUS_FAIL = 3;
-    public static final int PIPELINE_STAGE_STATUS_FINISHED = 4;
-    public static final int PIPELINE_STAGE_STATUS_ACTION_REQUIRED = 5;
-
-    public static final String PIPELINE_REFSEQ_ACCESSION_KEY = "refSeq";
-
-    public static final String PIPELINE_STAGE_NAME_QC = "质控 (QC)";
-    public static final String PIPELINE_STAGE_NAME_ASSEMBLY = "组装 (Assembly)";
-    public static final String PIPELINE_STAGE_NAME_MAPPING = "有参比对 (Mapping)";
-    public static final String PIPELINE_STAGE_NAME_VARIANT = "变异检测 (Variant calling)";
-
-    public static final String PIPELINE_STAGE_INPUT_READ1_KEY = "r1";
-    public static final String PIPELINE_STAGE_INPUT_READ2_KEY = "r2";
-
-    public static final String PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG = "refseq_config";
-    public static final String PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY = "refseq";
-    public static final String PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER = "inner";
-
-    // 物种鉴定
-    public static final String PIPELINE_STAGE_NAME_TAXONOMY = "物种鉴定 (Taxonomy)";
-
-    // 比对 / 组装相关
-    public static final String PIPELINE_STAGE_NAME_ASSEMBLY_POLISH = "组装抛光 (Polishing)";
-    public static final String PIPELINE_STAGE_NAME_CONSENSUS = "一致性序列 (Consensus)";
-    public static final String PIPELINE_STAGE_NAME_DEPTH_COVERAGE = "深度分布图 (Depth / Coverage)";
-
-    // 功能注释
-    public static final String PIPELINE_STAGE_NAME_FUNC_ANNOTATION = "功能注释 (Functional annotation)";
-
-    // 细菌病原学特征
-    public static final String PIPELINE_STAGE_NAME_AMR = "耐药基因分析 (AMR)";
-    public static final String PIPELINE_STAGE_NAME_VIRULENCE = "毒力因子分析 (Virulence)";
-    public static final String PIPELINE_STAGE_NAME_MLST = "MLST 分型";
-    public static final String PIPELINE_STAGE_NAME_CGMLST = "cgMLST 分型";
-    public static final String PIPELINE_STAGE_NAME_SEROTYPE = "血清型预测 (Serotyping)";
-
-    // SNP / 溯源
-    public static final String PIPELINE_STAGE_NAME_SNP_SINGLE = "单样本 SNP 分析";
-    public static final String PIPELINE_STAGE_NAME_SNP_CORE = "核心 SNP 分析 / 建树";
-
-    public static final String PIPELINE_STAGE_QC_INPUT_R1 = "r1";
-    public static final String PIPELINE_STAGE_QC_INPUT_R2 = "r2";
-
-    public static final String PIPELINE_STAGE_QC_OUTPUT_R1 = "trimmed_r1";
-    public static final String PIPELINE_STAGE_QC_OUTPUT_R2 = "trimmed_r2";
-    public static final String PIPELINE_STAGE_QC_OUTPUT_JSON = "qc_json";
-    public static final String PIPELINE_STAGE_QC_OUTPUT_HTML = "qc_html";
-
-    public static final String PIPELINE_STAGE_ASSEMBLY_INPUT_R1 = "r1";
-    public static final String PIPELINE_STAGE_ASSEMBLY_INPUT_R2 = "r2";
-
-    public static final String PIPELINE_STAGE_MAPPING_INPUT_R1 = "r1";
-    public static final String PIPELINE_STAGE_MAPPING_INPUT_R2 = "r2";
-
-    public static final String PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY = "bam";
-    public static final String PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY = "bamIndex";
-
-    public static final String PIPELINE_STAGE_ASSEMBLY_OUTPUT_CONTIGS_KEY = "contigs";
-    public static final String PIPELINE_STAGE_ASSEMBLY_OUTPUT_SCAFFOLDS_KEY = "scaffold";
-
-    public static final String PIPELINE_STAGE_VARIENT_OUTPUT_VCF_GZ = "vcf.gz";
-    public static final String PIPELINE_STAGE_VARIENT_OUTPUT_VCF_TBI = "vcf.tbi";
-
-    public static final String PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ = "vcfGz";
-    public static final String PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI = "vcfGzTbi";
-
-    public static final String PIPELINE_STAGE_CONSENSUS_OUTPUT_CONSENSUSFA = "consensus";
-
-    public static final String PIPELINE_STAGE_AMR_INPUT_SAMPLE = "reads";
-    public static final String PIPELINE_STAGE_AMR_OUTPUT_RESULT = "amr_result";
-
-    public static final String PIPELINE_STAGE_MLST_INPUT = "contigs";
-    public static final String PIPELINE_STAGE_MLST_OUTPUT = "mlstResult";
-
-    public static final String PIPELINE_STAGE_TAXONOMY_INPUT = "contig";
-    public static final String PIPELINE_STAGE_TAXONOMY_OUTPUT = "predictTaxonomy";
-
-    public static final int PIPELINE_STAGE_QC = 0; // 质控 fastp
-    public static final int PIPELINE_STAGE_TAXONOMY = 10; // 物种鉴定 Kraken2/Mash
-
-    // 比对 / 组装
-    public static final int PIPELINE_STAGE_MAPPING = 20; // 有参比对 minimap2/bwa
-    public static final int PIPELINE_STAGE_ASSEMBLY = 30; // 无参拼装 SPAdes/Flye
-    public static final int PIPELINE_STAGE_ASSEMBLY_POLISH = 31; // 抛光 Pilon/Racon/Medaka
-
-    // 变异 / 一致性 / 深度（病毒常用）
-    public static final int PIPELINE_STAGE_VARIANT_CALL = 40; // 变异调用 bcftools/snippy
-    public static final int PIPELINE_STAGE_CONSENSUS = 41; // 一致性序列 bcftools consensus
-    public static final int PIPELINE_STAGE_DEPTH_COVERAGE = 42; // 覆盖度/深度图 mosdepth
-
-    public static final String PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY = "bam";
-    public static final String PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY = "bamIndex";
-    public static final String PIPELINE_STAGE_VARIENT_CALL_INPUT_REFSEQ_KEY = "refseq";
-
-    public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_INPUT = "contigs";
-    public static final String PIPELINE_STAGE_VIRULENCE_FACTOR_OUTPUT = "vfResult";
-
-    public static final String PIPELINE_STAGE_SEROTYPING_INPUT = "contigs";
-    public static final String PIPELINE_STAGE_SEROTYPING_OUTPUT = "serotypingResult";
-
-    // 功能注释（可选通用）
-    public static final int PIPELINE_STAGE_FUNC_ANNOTATION = 50; // Prokka/Bakta/eggNOG
-
-    // 病原学特征（细菌模块）
-    public static final int PIPELINE_STAGE_AMR = 60; // 耐药基因 AMRFinder/ResFinder
-    public static final int PIPELINE_STAGE_VIRULENCE = 61; // 毒力因子 VFDB/abricate
-    public static final int PIPELINE_STAGE_MLST = 62; // MLST 分型
-    public static final int PIPELINE_STAGE_CGMLST = 63; // cgMLST chewBBACA
-    public static final int PIPELINE_STAGE_SEROTYPE = 64; // 血清型（ECTyper/SeqSero2/Kaptive等）
-
-    // SNP & 溯源
-    public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP
-    public static final int PIPELINE_STAGE_SNP_CORE = 71; // 多样本核心SNP/建树
-
-    public static final int PIPELINE_STAGE_READ_LENGTH_DETECT = 80;
-    public static final String PIPELINE_STAGE_READ_LENGTH_DETECT_NAME = "读长与格式识别";
-
-    public static final String PIPELINE_STAGE_PARAMETERS_LONG_READ_KEY = "isLongRead";
-
-    public static final String stageOutputFormat = "stageOutput/%d/%d/%s";
-
-
-
 
     //for genetic
     private static final int OK = 0;
@@ -397,7 +271,7 @@ public class PipelineService {
 
 
 
-        int res = scheduleStage(lastStage, allStages);
+        int res = scheduleStage(startStage, allStages);
 
         if(res == INTERNAL_FAIL || res == NO_EFFECTIVE_UPDATE){
             return new Result<Boolean>(Result.INTERNAL_FAIL, false, "内部错误");

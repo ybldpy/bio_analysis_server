@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_CONSENSUS;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,11 +14,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.utils.JsonUtil;
 
 
 @Component
@@ -32,20 +37,10 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
         String inputUrls = bioPipelineStage.getInputUrl();
-        Map<String,String> inputUrlMap = null;
-        Map<String,Object> paramsMap = null;
-        
-        try {
-            inputUrlMap = this.objectMapper.readValue(inputUrls,Map.class);
-            paramsMap = this.objectMapper.readValue(bioPipelineStage.getParameters(), Map.class);
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return this.parseError(bioPipelineStage);
-        }
+        ConsensusStageInputUrls consensusStageInputUrls = JsonUtil.toObject(inputUrls, ConsensusStageInputUrls.class);
+        ConsensusStageParameters consensusStageParameters = JsonUtil.toObject(bioPipelineStage.getParameters(), ConsensusStageParameters.class);
 
-
-        RefSeqConfig refSeqConfig = this.getRefSeqConfigFromParams(paramsMap);
+        RefSeqConfig refSeqConfig = consensusStageParameters.getRefSeqConfig();
 
 
         if (refSeqConfig == null) {
@@ -67,17 +62,16 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         Path inputTmpDir = stageExecutionInput.inputDir;
         Path resultDir = stageExecutionInput.workDir;
 
-        String vcfGzUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ);
-        String vcfTbiUrl = inputUrlMap.get(PipelineService.PIPELINE_STAGE_CONSENSUS_INPUT_VCFGZ_TBI);
+        String vcfGzUrl = consensusStageInputUrls.getVcfGz();
+        String vcfTbiUrl = consensusStageInputUrls.getVcfTbi();
 
         Path vcfGzTmpPath = inputTmpDir.resolve("vcf.gz");
         Path vcfTbiTmpPath = inputTmpDir.resolve("vcf.gz.tbi");
 
         
-        Map<String, GetObjectResult> getResults = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
-        String objectFailLoad = findFailedLoadingObject(getResults);
-        if(objectFailLoad!=null){
-            return this.runFail(bioPipelineStage, "加载文件"+objectFailLoad+"失败", getResults.get(objectFailLoad).e());
+       boolean loadRes = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
+        if(!loadRes){
+            return this.runFail(bioPipelineStage, "load failed");
         }
 
         
@@ -128,7 +122,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_CONSENSUS;
+        return PIPELINE_STAGE_CONSENSUS;
     }
 
 }
