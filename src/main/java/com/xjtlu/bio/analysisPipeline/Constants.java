@@ -23,6 +23,9 @@ public class Constants {
 
         // 比对 / 组装
         public static final int PIPELINE_STAGE_MAPPING = 20; // 有参比对 minimap2/bwa
+        public static final int PIPELINE_STAGE_MAPPING_NO_REFSEQ = 21;
+        
+
         public static final int PIPELINE_STAGE_ASSEMBLY = 30; // 无参拼装 SPAdes/Flye
         public static final int PIPELINE_STAGE_ASSEMBLY_POLISH = 31; // 抛光 Pilon/Racon/Medaka
 
