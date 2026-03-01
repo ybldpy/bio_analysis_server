@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.xjtlu.bio.service.PipelineService.*;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MAPPING;
 
 @Component
 public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingStageOutput> implements StageDoneHandler<MappingStageOutput>{
@@ -29,7 +29,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
 
     @Override
     public int getType() {
-        return PipelineService.PIPELINE_STAGE_MAPPING;
+        return PIPELINE_STAGE_MAPPING;
     }
 
 
@@ -55,7 +55,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getBamPath(), bamUrl, stageRunResult.getStageOutput().getBamIndexPath(), bamIndexUrl),
-            new MappingResult(bamUrl, bamIndexUrl);
+            new MappingResult(bamUrl, bamIndexUrl)
         );
     }
 

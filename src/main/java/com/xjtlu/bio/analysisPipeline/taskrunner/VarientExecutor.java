@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_VARIANT_CALL;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,6 +13,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VarientCallInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
@@ -29,7 +32,7 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
 
 
     @Override
-    public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput) {
+    public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
@@ -39,7 +42,7 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
 
         RefSeqConfig refSeqConfig = varientCallParameters.getRefSeqConfig();
         if(refSeqConfig == null){
-            logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage.getStageId(), params);
+            logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage.getStageId());
             return StageRunResult.fail("未能加载参考基因文件",bioPipelineStage, null);
         }
 
@@ -191,7 +194,7 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_VARIANT_CALL;
+        return PIPELINE_STAGE_VARIANT_CALL;
     }
 
 }

@@ -1,6 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.stageResult;
 
-public class ConsensusStageResult {
+public class ConsensusStageResult implements StageResult{
 
     private String consensusUrl;
 

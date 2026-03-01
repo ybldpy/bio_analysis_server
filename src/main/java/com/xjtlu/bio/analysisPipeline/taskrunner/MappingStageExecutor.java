@@ -1,7 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MAPPING;
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG;
+
 
 import java.io.File;
 import java.io.IOException;

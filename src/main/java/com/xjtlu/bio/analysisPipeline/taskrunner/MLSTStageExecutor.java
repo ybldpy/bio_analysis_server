@@ -7,6 +7,7 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MLSTStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MLST;
@@ -18,6 +19,13 @@ import java.util.Map;
 
 @Component
 public class MLSTStageExecutor extends AbstractPipelineStageExector<MLSTStageOutput> implements PipelineStageExecutor<MLSTStageOutput>{
+
+
+
+
+    @Value("${analysis-pipeline.stage.mlst.tsvFileName}")
+    private String mlstFileName;
+
     @Override
     protected StageRunResult<MLSTStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         BioPipelineStage stage = stageExecutionInput.bioPipelineStage;

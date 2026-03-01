@@ -22,6 +22,6 @@ public class AmrStageOutput implements StageOutput{
     @Override
     public Path getParentPath() {
         // TODO Auto-generated method stub
-        return Path.of(AmrResultPath).getParent();
+        return AmrResultPath.getParent();
     }
 }

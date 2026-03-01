@@ -7,6 +7,8 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AmrStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.utils.JsonUtil;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_AMR;
@@ -25,7 +27,8 @@ import java.util.Map;
 public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutput> implements PipelineStageExecutor<AmrStageOutput>{
 
 
-
+    @Value("${analysis-pipeline.stage.amr.tsvFileName}")
+    private String amrResultFileName;
 
 
     @Override
@@ -44,7 +47,7 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
             return runFail(stage, "load input failed");
         }
 
-        Path resultPath = stageExecutionInput.workDir.resolve("amrResult.tsv");
+        Path resultPath = stageExecutionInput.workDir.resolve(amrResultFileName);
 
         List<String> runCmd = new ArrayList<>();
         runCmd.addAll(this.analysisPipelineToolsConfig.getAmrfinder());

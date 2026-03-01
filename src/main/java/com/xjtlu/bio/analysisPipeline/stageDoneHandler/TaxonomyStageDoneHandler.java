@@ -1,6 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FINISHED;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAGE_STATUS_FINISHED;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_TAXONOMY;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -122,7 +123,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
     @Override
     public int getType() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_TAXONOMY;
+        return PIPELINE_STAGE_TAXONOMY;
     }
 
     @Override

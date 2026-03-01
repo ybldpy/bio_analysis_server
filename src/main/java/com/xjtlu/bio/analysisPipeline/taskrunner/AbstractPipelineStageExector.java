@@ -1,6 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -455,37 +455,37 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         return null;
     }
 
-    protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
+    // protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
 
-        Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
-        if (refseqConfigObj == null || !(refseqConfigObj instanceof Map)) {
-            return null;
-        }
+    //     Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
+    //     if (refseqConfigObj == null || !(refseqConfigObj instanceof Map)) {
+    //         return null;
+    //     }
 
-        try {
-            RefSeqConfig refSeqConfig = JsonUtil.mapToPojo((Map) refseqConfigObj, RefSeqConfig.class);
-            return refSeqConfig;
-        } catch (Exception e) {
-            logger.error("converting {} to RefseqConfigException", refseqConfigObj);
-            return null;
-        }
+    //     try {
+    //         RefSeqConfig refSeqConfig = JsonUtil.mapToPojo((Map) refseqConfigObj, RefSeqConfig.class);
+    //         return refSeqConfig;
+    //     } catch (Exception e) {
+    //         logger.error("converting {} to RefseqConfigException", refseqConfigObj);
+    //         return null;
+    //     }
 
-    }
+    // }
 
-    protected Object substractRefseqFromMap(Map<String, Object> params) {
-        Object refseq = params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
-        Object isInnerRefseq = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+    // protected Object substractRefseqFromMap(Map<String, Object> params) {
+    //     Object refseq = params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+    //     Object isInnerRefseq = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
 
-        if (refseq == null) {
-            return null;
-        }
-        if (isInnerRefseq == null && !(refseq instanceof Integer)) {
-            return null;
-        }
+    //     if (refseq == null) {
+    //         return null;
+    //     }
+    //     if (isInnerRefseq == null && !(refseq instanceof Integer)) {
+    //         return null;
+    //     }
 
-        return refseq;
+    //     return refseq;
 
-    }
+    // }
 
     protected File[] moveSampleReadFilesToTmpPath(String r1Url, Path r1TmpPath, String r2Url, Path r2TmpPath) {
 

@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
@@ -29,10 +30,19 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
 
 
 
+    @Value("analysis-pipeline.stage.consensus.fastaFileName")
+    private String consensusFastaFileName;
+
+
+    @Value("analysis-pipeline.stage.varient.vcfFileName")
+    private String vcfFileName;
+
+    @Value("analysis-pipeline.stage.varient.vcfIndexFileName")
+    private String vcfTbiFileName;
 
 
     @Override
-    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) {
+    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
@@ -65,8 +75,8 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         String vcfGzUrl = consensusStageInputUrls.getVcfGz();
         String vcfTbiUrl = consensusStageInputUrls.getVcfTbi();
 
-        Path vcfGzTmpPath = inputTmpDir.resolve("vcf.gz");
-        Path vcfTbiTmpPath = inputTmpDir.resolve("vcf.gz.tbi");
+        Path vcfGzTmpPath = inputTmpDir.resolve(vcfFileName);
+        Path vcfTbiTmpPath = inputTmpDir.resolve(vcfTbiFileName);
 
         
        boolean loadRes = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
@@ -75,9 +85,11 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         }
 
         
-        ConsensusStageOutput consensusStageOutput = bioStageUtil.consensusOutput(bioPipelineStage, resultDir);
+        
         String consensus = "consensus";
-        Path consensusPath = Path.of(consensusStageOutput.getConsensusFa());
+        Path consensusPath = Path.of(consensusFastaFileName);
+
+        ConsensusStageOutput consensusStageOutput = new ConsensusStageOutput(stageExecutionInput.workDir.resolve(consensusFastaFileName).toString());
 
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());

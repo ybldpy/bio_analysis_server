@@ -11,6 +11,8 @@ public class AssemblyResult implements StageResult{
     public String getContigsUrl() {
         return contigsUrl;
     }
+    public AssemblyResult() {
+    }
     public void setContigsUrl(String contigsUrl) {
         this.contigsUrl = contigsUrl;
     }

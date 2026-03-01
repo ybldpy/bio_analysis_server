@@ -9,6 +9,7 @@ import com.xjtlu.bio.service.PipelineService;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_VARIANT_CALL;
 
 import java.util.Map;
 
@@ -23,7 +24,7 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
 
     @Override
     public int getType() {
-        return PipelineService.PIPELINE_STAGE_VARIANT_CALL;
+        return PIPELINE_STAGE_VARIANT_CALL;
     }
 
     @Override

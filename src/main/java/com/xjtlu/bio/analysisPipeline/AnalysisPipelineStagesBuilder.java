@@ -4,32 +4,56 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
-import com.xjtlu.bio.analysisPipeline.stageResult.QcResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.requestParameters.CreateSampleRequest.PipelineStageParameters;
-import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 public class AnalysisPipelineStagesBuilder {
 
-    private static Map<String, Object> substractStageParams(String stageName, Map<String, Object> pipelineStageParams) {
-        Object obj = pipelineStageParams.get(stageName);
-        if (obj == null) {
-            return new HashMap<>();
+
+
+
+    public static class PipelineInput {
+
+        private String r1;
+        private String r2;
+
+
+        
+        public PipelineInput(String r1, String r2) {
+            this.r1 = r1;
+            this.r2 = r2;
         }
-        return (Map) obj;
+
+
+
+        public String getR1() {
+            return r1;
+        }
+
+
+
+        public String getR2() {
+            return r2;
+        }
+
+
+
+        public void setR1(String r1) {
+            this.r1 = r1;
+        }
+        public void setR2(String r2) {
+            this.r2 = r2;
+        }
     }
 
     public static List<BioPipelineStage> buildBacteriaStages() {
@@ -37,15 +61,15 @@ public class AnalysisPipelineStagesBuilder {
         return null;
     }
 
-    public static List<BioPipelineStage> buildBacteriaPipeline(long pid, BioSample bioSample, PipelineStageParameters pipelineStageParameters) throws JsonProcessingException{
+    public static List<BioPipelineStage> buildBacteriaPipeline(long pid, PipelineInput pipelineInput, PipelineStageParameters pipelineStageParameters) throws JsonProcessingException{
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>();
         
 
         BioPipelineStage qc = new BioPipelineStage();
         QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
-        qcStageInputUrls.setRead1(bioSample.getRead1Url());
-        qcStageInputUrls.setRead2(bioSample.getRead2Url());
+        qcStageInputUrls.setRead1(pipelineInput.getR1());
+        qcStageInputUrls.setRead2(pipelineInput.getR2());
         qc.setStageType(PIPELINE_STAGE_QC);
         qc.setInputUrl(JsonUtil.toJson(qcStageInputUrls));
         stages.add(qc);
@@ -97,12 +121,12 @@ public class AnalysisPipelineStagesBuilder {
         
     }
 
-    public static List<BioPipelineStage> buildVirusStages(long pid, boolean requireSNP, boolean requiredDepth, BioSample bioSample,
+    public static List<BioPipelineStage> buildVirusStages(long pid, boolean requireSNP, boolean requiredDepth, PipelineInput pipelineInput, 
             PipelineStageParameters pipelineStageParams) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
-        String qcInputRead1 = bioSample.getRead1Url();
-        String qcInputRead2 = bioSample.getRead2Url();
+        String qcInputRead1 = pipelineInput.getR1();
+        String qcInputRead2 = pipelineInput.getR2();
 
         Long refseqId = pipelineStageParams.getRefseq();
         RefSeqConfig refSeqConfig = new RefSeqConfig();

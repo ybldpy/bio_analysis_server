@@ -43,7 +43,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
 
         String inputUrl1 = qcStageInputUrls.getRead1();
         String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
-        String inputUrl2 =  StringUtils.isBlank(qcStageInputUrls.getRead2()) ? qcStageInputUrls.getRead2() : null;
+        String inputUrl2 =  StringUtils.isBlank(qcStageInputUrls.getRead2()) ? null : qcStageInputUrls.getRead2();
         String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
 
         Path outputDir = stageExecutionInput.workDir;
@@ -53,7 +53,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
         QcParameters qcParams = JsonUtil.toObject(bioPipelineStage.getParameters(), QcParameters.class);
 
         
-
 
         QCStageOutput qcStageOutput = this.bioStageUtil.qcStageOutput(outputDir, inputUrl2 != null);
 

@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_SEROTYPE;
+
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -19,7 +21,7 @@ public class SeroTypeStageDoneHandler extends AbstractStageDoneHandler<SeroTypin
     @Override
     public int getType() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_SEROTYPE;
+        return PIPELINE_STAGE_SEROTYPE;
     }
 
     @Override

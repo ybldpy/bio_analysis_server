@@ -1,6 +1,8 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_AMR;
+
+
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_AMR;
 
 import java.util.Map;
 

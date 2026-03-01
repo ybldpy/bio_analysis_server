@@ -73,13 +73,14 @@ public class Constants {
         public static final String PIPELINE_STAGE_NAME_ASSEMBLY = "组装 (Assembly)";
         public static final String PIPELINE_STAGE_NAME_MAPPING = "有参比对 (Mapping)";
         public static final String PIPELINE_STAGE_NAME_VARIANT = "变异检测 (Variant calling)";
+        
 
         public static final Map<Integer, String> STAGE_NAME_MAP = Map.ofEntries(
                 Map.entry(PIPELINE_STAGE_QC, PIPELINE_STAGE_NAME_QC),
                 Map.entry(PIPELINE_STAGE_ASSEMBLY, PIPELINE_STAGE_NAME_ASSEMBLY),
                 Map.entry(PIPELINE_STAGE_MAPPING, PIPELINE_STAGE_NAME_MAPPING),
                 Map.entry(PIPELINE_STAGE_VARIANT_CALL, PIPELINE_STAGE_NAME_VARIANT),
-                Map.entry(PIPELINE_STAGE_CONSENSUS, PIPELINE_STAGE_NAME_CONSENSU)S,
+                Map.entry(PIPELINE_STAGE_CONSENSUS, PIPELINE_STAGE_NAME_CONSENSUS),
                 Map.entry(PIPELINE_STAGE_TAXONOMY, PIPELINE_STAGE_NAME_TAXONOMY),
                 Map.entry(PIPELINE_STAGE_MLST, PIPELINE_STAGE_NAME_MLST),
                 Map.entry(PIPELINE_STAGE_AMR, PIPELINE_STAGE_NAME_AMR),

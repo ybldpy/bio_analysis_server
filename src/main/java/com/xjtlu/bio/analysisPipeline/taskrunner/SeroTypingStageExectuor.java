@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_SEROTYPE;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -221,7 +223,7 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_SEROTYPE;
+        return PIPELINE_STAGE_SEROTYPE;
     }
 
 }

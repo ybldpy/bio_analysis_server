@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Path;
 import java.util.*;
 
-import static com.xjtlu.bio.service.PipelineService.*;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_ASSEMBLY;
 
 @Component
 public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyStageOutput>
@@ -29,7 +29,7 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
 
     @Override
     public int getType() {
-        return PipelineService.PIPELINE_STAGE_ASSEMBLY;
+        return PIPELINE_STAGE_ASSEMBLY;
     }
 
     // @Override
@@ -64,15 +64,10 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getContigPath(), contigUrl, stageRunResult.getStageOutput().getScaffoldPath(), scaffoldUrl),
-            new AssemblyResult(contigUrl, scaffoldUrl);
+            new AssemblyResult(contigUrl, scaffoldUrl)
         );
     }
 
-    @Override
-    public int serializedOutputType() {
-        // TODO Auto-generated method stub
-        return SERIALIZED_TYPE_URLS;
-    }
 
     // AssemblyStageOutput assemblyStageOutput = (AssemblyStageOutput)
     // stageRunResult.getStageOutput();

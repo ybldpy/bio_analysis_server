@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_READ_LENGTH_DETECT;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -94,7 +96,7 @@ public class ReadLengthDetectStage extends AbstractPipelineStageExector<ReadLeng
     @Override
     public int id() {
         // TODO Auto-generated method stub
-        return PipelineService.PIPELINE_STAGE_READ_LENGTH_DETECT;
+        return PIPELINE_STAGE_READ_LENGTH_DETECT;
     }
 
 

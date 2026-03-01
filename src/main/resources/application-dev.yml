@@ -49,6 +49,36 @@ analysis-pipeline:
         baseInputDir: /home/jcy/bio_app_data/temp/stage/input
         baseWorkDir: /home/jcy/bio_app_data//temp/stage/work
 
+        qc: 
+            r1FileName: "cleaned_r1.fastq.gz"
+            r2FileName: "cleaned_r2.fastq.gz"
+            HTMLFileName: "cleaned.html"
+            JSONFileName: "cleaned.json"
+        assembly:
+            contigsFileName: "contigs.fasta"
+            scaffoldFileName: "scaffolds.fasta"
+        mapping:
+            bamFileName: "result.bam"
+            bamIndexFileName: "result.bam.bai"
+        variant:
+            vcfFileName: "variants.vcf.gz"
+            vcfIndexFileName: "variants.vcf.gz.tbi"
+        consensus:
+            fastaFileName: "consensus.fasta"
+            maskBedFileName: "consensus.mask.bed"   # 可选
+            qcFileName: "consensus.qc.json"         # 可选（覆盖率/缺失率）
+        mlst:
+            tsvFileName: "mlst.tsv"
+            jsonFileName: "mlst.json"
+        amr:
+            tsvFileName: "amr.tsv"
+            jsonFileName: "amr.json"
+            summaryFileName: "amr.summary.json"
+        
+        
+        
+        
+
 
 
 

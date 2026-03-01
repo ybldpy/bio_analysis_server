@@ -11,6 +11,8 @@ import com.xjtlu.bio.utils.JsonUtil;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_CONSENSUS;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,7 +20,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.xjtlu.bio.service.PipelineService.*;
 
 @Component
 public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<ConsensusStageOutput> implements StageDoneHandler<ConsensusStageOutput>{
@@ -27,7 +28,7 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
     private static final String CONSENSUS_FA_NAME = "consensus.fa";
     @Override
     public int getType() {
-        return PipelineService.PIPELINE_STAGE_CONSENSUS;
+        return PIPELINE_STAGE_CONSENSUS;
     }
 
 

@@ -39,7 +39,6 @@ import com.xjtlu.bio.analysisPipeline.StageOrchestrator.MissingUpstreamException
 import com.xjtlu.bio.analysisPipeline.StageOrchestrator.OrchestratePlan;
 import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
-import com.xjtlu.bio.analysisPipeline.taskrunner.PipelineStageTaskDispatcher;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.*;
 import com.xjtlu.bio.common.Result;
@@ -58,6 +57,7 @@ import com.xjtlu.bio.service.command.UpdateStageCommand;
 import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
+import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineInput;
 
 
 import io.micrometer.common.util.StringUtils;
@@ -224,7 +224,10 @@ public class PipelineService {
                 || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {
             try {
                 List<BioPipelineStage> stages = AnalysisPipelineStagesBuilder.buildVirusStages(
-                        bioAnalysisPipeline.getPipelineId(), bioAnalysisPipeline.getPipelineType(), bioSample,
+                        bioAnalysisPipeline.getPipelineId(), 
+                        false,
+                        false,  
+                        new PipelineInput(bioSample.getRead1Url(), bioSample.getRead2Url()), 
                         pipelineParams);
                 return stages;
             } catch (JsonProcessingException e) {
@@ -247,7 +250,6 @@ public class PipelineService {
         }
 
         BioPipelineStage startStage = null;
-        BioPipelineStage lastStage = null;
         for (BioPipelineStage stage : allStages) {
             if (stage.getStageId() == stageId) {
                 startStage = stage;
@@ -287,7 +289,7 @@ public class PipelineService {
 
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    //@Transactional(rollbackFor = Exception.class)
     public Result<Boolean> pipelineStart(long sampleId) {
 
         List<BioPipelineStage> stages = this.bioAnalysisStageMapperExtension.selectStagesBySampleId(sampleId);
@@ -306,7 +308,7 @@ public class PipelineService {
             return new Result<Boolean>(Result.BUSINESS_FAIL, false, "未能找到初始任务");
         }
         if (firstStage.getStatus() != PIPELINE_STAGE_STATUS_PENDING) {
-            return new Result<Boolean>(Result.SUCCESS, null, null);
+            return new Result<Boolean>(Result.SUCCESS, true, null);
         }
 
         int res = scheduleStage(firstStage, stages);
@@ -370,7 +372,7 @@ public class PipelineService {
         }
 
         int res = this.batchUpdateStages(plan.getUpdateStageCommands());
-        if (res > 0) {
+        if (res == OK) {
             for (BioPipelineStage runStage : plan.getRunStages()) {
                 this.pipelineStageTaskDispatcher.addTask(runStage);
             }
@@ -471,7 +473,8 @@ public class PipelineService {
                     int currentVersion = updateStageCommand.getCurrentVersion();
                     updateStage.setVersion(currentVersion + 1);
                     long stageId = updateStageCommand.getStageId();
-                    updateStage.setStageId(null);
+
+
                     conditionExample.createCriteria().andStageIdEqualTo(stageId).andVersionEqualTo(currentVersion);
                     batchUpdateMapper.updateByExampleSelective(updateStage, conditionExample);
                 }

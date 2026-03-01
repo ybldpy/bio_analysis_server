@@ -9,6 +9,8 @@ import com.xjtlu.bio.service.PipelineService;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_READ_LENGTH_DETECT;
+
 import java.util.*;
 
 
@@ -18,7 +20,7 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler<R
 
     @Override
     public int getType() {
-        return PipelineService.PIPELINE_STAGE_READ_LENGTH_DETECT;
+        return PIPELINE_STAGE_READ_LENGTH_DETECT;
     }
 
     @Override
@@ -28,7 +30,7 @@ public class ReadLengthDetectStageDoneHandler extends AbstractStageDoneHandler<R
 
         return Pair.of(
             null,
-            new ReadLenStageResult(false);
+            new ReadLenStageResult(false)
         );
 
     }

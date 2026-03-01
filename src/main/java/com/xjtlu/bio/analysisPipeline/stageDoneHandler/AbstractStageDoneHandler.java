@@ -27,8 +27,9 @@ import java.nio.file.Path;
 import java.util.Date;
 import java.util.Map;
 
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FAIL;
-import static com.xjtlu.bio.service.PipelineService.PIPELINE_STAGE_STATUS_FINISHED;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
+
 
 
 public abstract class AbstractStageDoneHandler<T extends StageOutput> implements StageDoneHandler<T>{
@@ -56,13 +57,13 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
     private static int SERIALIZED_TYPE_VALUE = 1;
 
 
-    protected abstract int serializedOutputType();
+    protected int serializedOutputType(){return -1;};
     @Override
     public boolean handleStageDone(StageRunResult<T> stageRunResult) {
         // TODO Auto-generated method stub
 
         
-        Pair<Map<String,String>, StageResult> uploadConfigAndOutputUrlMap = this.buildUploadConfigAndOutputUrlMap(stageRunResult);
+        Pair<Map<String,String>, ? extends StageResult> uploadConfigAndOutputUrlMap = this.buildUploadConfigAndOutputUrlMap(stageRunResult);
 
         Map<String,String> uploadConfig = uploadConfigAndOutputUrlMap.getLeft();
         
@@ -94,7 +95,7 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
         updateStage.setEndTime(endDate);
         updateStage.setVersion(runStage.getVersion()+1);
 
-        int updateRes = this.pipelineService.updateStageFromVersion(new UpdateStageCommand(updateStage, runStage.getStageId(), runStage.getVersion()))
+        int updateRes = this.pipelineService.updateStageFromVersion(new UpdateStageCommand(updateStage, runStage.getStageId(), runStage.getVersion()));
         runStage.setOutputUrl(serializedOutputMap);
         runStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         runStage.setEndTime(endDate);

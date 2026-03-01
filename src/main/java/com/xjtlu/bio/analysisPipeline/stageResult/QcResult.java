@@ -10,6 +10,8 @@ public class QcResult implements StageResult{
     public String getCleanedR1() {
         return cleanedR1;
     }
+    public QcResult() {
+    }
     public QcResult(String cleanedR1, String cleanedR2, String reportHTML, String reportJSON) {
         this.cleanedR1 = cleanedR1;
         this.cleanedR2 = cleanedR2;

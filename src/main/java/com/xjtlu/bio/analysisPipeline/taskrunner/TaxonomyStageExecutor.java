@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -17,6 +18,8 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
+
+@Component
 public class TaxonomyStageExecutor extends AbstractPipelineStageExector<TaxonomyStageOutput>
         implements PipelineStageExecutor<TaxonomyStageOutput> {
 

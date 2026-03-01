@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.taskrunner;
+package com.xjtlu.bio.service;
 
 import java.util.Map;
 import java.util.Set;
@@ -10,8 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.xjtlu.bio.analysisPipeline.taskrunner.PipelineStageExecutor;
+import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;

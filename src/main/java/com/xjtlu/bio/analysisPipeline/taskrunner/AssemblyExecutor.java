@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AssemblyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -28,11 +29,16 @@ import com.xjtlu.bio.utils.JsonUtil;
 public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput> {
 
 
+    @Value("analysis-pipeline.stage.contigsFileName")
+    private String contigsFileName;
+
+    @Value("analysis-pipeline.stage.scaffoldFileName")
+    private String scaffoldsFileName;
 
     
 
     @Override
-    public StageRunResult<AssemblyStageOutput> _execute(StageExecutionInput stageExecutionInput) {
+    public StageRunResult<AssemblyStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
         BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
@@ -82,18 +88,17 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
         }
 
 
-        AssemblyStageOutput assemblyStageOutput = bioStageUtil.assemblyOutput(bioPipelineStage, workDir);
+        
 
-        Path contigs = Path.of(assemblyStageOutput.getContigPath());
-        Path scaffolds = Path.of(assemblyStageOutput.getScaffoldPath());
+        Path contigs = workDir.resolve(contigsFileName);
+        Path scaffolds = workDir.resolve(scaffoldsFileName);
+        AssemblyStageOutput assemblyStageOutput = new AssemblyStageOutput(contigs.toString(), scaffolds.toString());
+
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(contigs);
         
         if(!errOutputValidationResults.isEmpty()){
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
         }
-        
-
-
 
         boolean hasScaffold = true;
         try{
@@ -109,7 +114,6 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
             assemblyStageOutput.setScaffoldPath(null);
         }
         return StageRunResult.OK(assemblyStageOutput, bioPipelineStage);
-        
     }
 
     @Override

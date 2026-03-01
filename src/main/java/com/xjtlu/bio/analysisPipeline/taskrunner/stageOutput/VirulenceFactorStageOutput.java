@@ -17,6 +17,6 @@ public class VirulenceFactorStageOutput implements StageOutput{
     @Override
     public Path getParentPath() {
         // TODO Auto-generated method stub
-        return Path.of(vfResult).getParent();
+        return vfResult.getParent();
     }
 }

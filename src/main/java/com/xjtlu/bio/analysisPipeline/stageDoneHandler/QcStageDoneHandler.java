@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_QC;
 import static com.xjtlu.bio.service.PipelineService.*;
 
 
@@ -33,7 +34,7 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
 
     @Override
     public int getType() {
-        return PipelineService.PIPELINE_STAGE_QC;
+        return PIPELINE_STAGE_QC;
     }
 
     // @Override
@@ -62,20 +63,16 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
         HashMap<String,String> uploadConfig = new HashMap<>();
         HashMap<String,Object> outputUrlMap = new HashMap<>();
         uploadConfig.put(stageRunResult.getStageOutput().getR1Path(), r1Url);
-        outputUrlMap.put(PipelineService.PIPELINE_STAGE_QC_INPUT_R1, r1Url);
         if(r2Url!=null){
             uploadConfig.put(stageRunResult.getStageOutput().getR2Path(), r2Url);
-            outputUrlMap.put(PipelineService.PIPELINE_STAGE_QC_OUTPUT_R2, r2Url);
         }
         uploadConfig.put(stageRunResult.getStageOutput().getJsonPath(), jsonUrl);
-        outputUrlMap.put(PipelineService.PIPELINE_STAGE_QC_OUTPUT_JSON, jsonUrl);
 
         uploadConfig.put(stageRunResult.getStageOutput().getHtmlPath(), htmlUrl);
-        outputUrlMap.put(PipelineService.PIPELINE_STAGE_QC_OUTPUT_HTML, htmlUrl);
 
         return Pair.of(
             uploadConfig,
-            new QcResult(r1Url, r2Url, htmlUrl, jsonUrl);
+            new QcResult(r1Url, r2Url, htmlUrl, jsonUrl)
         );
     }
 
