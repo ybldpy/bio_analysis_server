@@ -29,10 +29,10 @@ import com.xjtlu.bio.utils.JsonUtil;
 public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput> {
 
 
-    @Value("analysis-pipeline.stage.contigsFileName")
+    @Value("${analysis-pipeline.stage.assembly.contigsFileName}")
     private String contigsFileName;
 
-    @Value("analysis-pipeline.stage.scaffoldFileName")
+    @Value("${analysis-pipeline.stage.assembly.scaffoldFileName}")
     private String scaffoldsFileName;
 
     

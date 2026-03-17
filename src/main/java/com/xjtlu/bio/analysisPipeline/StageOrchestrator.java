@@ -238,7 +238,7 @@ public class StageOrchestrator {
 
         BioPipelineStage vcStage = findStageFromStages(
             allStages,
-            PIPELINE_STAGE_CONSENSUS
+            PIPELINE_STAGE_VARIANT_CALL
         );
 
         return makePlan(allStages, vcStage.getStageId());
@@ -769,6 +769,11 @@ public class StageOrchestrator {
 
     }
 
+
+    private OrchestratePlan makeDownstreamPlanConsensus(List<BioPipelineStage> allStages, BioPipelineStage consensusStage){
+        return noDownstreamPlan();
+    }
+
     public OrchestratePlan makeDownstreamPlan(BioPipelineStage currentStage, List<BioPipelineStage> allStages)
             throws InvocationTargetException, IllegalAccessException, NoSuchMethodException, JsonProcessingException, MissingUpstreamException {
 
@@ -789,6 +794,8 @@ public class StageOrchestrator {
             return this.makePlanDownstreamMLST(allStages, currentStage);
         }else if (currentStage.getStageType() == PIPELINE_STAGE_VIRULENCE) {
             return this.makePlanDownstreamVisurFactor(allStages, currentStage);
+        }else if(currentStage.getStageType() == PIPELINE_STAGE_CONSENSUS){
+            return this.makeDownstreamPlanConsensus(allStages, currentStage);
         }
         return null;
 

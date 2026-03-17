@@ -27,7 +27,6 @@ import java.nio.file.Path;
 import java.util.Date;
 import java.util.Map;
 
-import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
 
 

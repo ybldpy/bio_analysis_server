@@ -9,15 +9,11 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_CONSENSUS;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 
 
@@ -25,7 +21,9 @@ import java.util.Map;
 public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<ConsensusStageOutput> implements StageDoneHandler<ConsensusStageOutput>{
 
 
-    private static final String CONSENSUS_FA_NAME = "consensus.fa";
+
+    @Value("${analysis-pipeline.stage.consensus.fastaFileName}")
+    private String consensusOutputFileName;
     @Override
     public int getType() {
         return PIPELINE_STAGE_CONSENSUS;
@@ -35,7 +33,7 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
     @Override
     protected Pair<Map<String, String>, ConsensusStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<ConsensusStageOutput> stageRunResult) {
-        String consensusUrl = this.createStoreObjectName(stageRunResult.getStage(), CONSENSUS_FA_NAME);
+        String consensusUrl = this.createStoreObjectName(stageRunResult.getStage(), consensusOutputFileName);
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getConsensusFa(), consensusUrl),
             new ConsensusStageResult(consensusUrl)

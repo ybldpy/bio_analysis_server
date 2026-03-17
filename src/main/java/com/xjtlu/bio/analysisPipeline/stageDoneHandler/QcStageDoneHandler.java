@@ -10,6 +10,7 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -25,11 +26,22 @@ import static com.xjtlu.bio.service.PipelineService.*;
 @Component
 public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> implements StageDoneHandler<QCStageOutput>{
 
+    @Value("${analysis-pipeline.stage.qc.r1FileName}")
+    private String r1OutputName;
+    @Value("${analysis-pipeline.stage.qc.r1FileGzName}")
+    private String r1GzOutputName;
 
-    private static final String OUTPUT_R1_NAME = "cleaned_r1.fastq";
-    private static final String OUTPUT_R2_NAME = "cleaned_r2.fastq";
-    private static final String OUTPUT_JSON_NAME = "cleaned.json";
-    private static final String OUTPUT_HTML_NAME = "cleaned.html";
+    @Value("${analysis-pipeline.stage.qc.r2FileName}")
+    private String r2OutputName;
+    @Value("${analysis-pipeline.stage.qc.r2FileGzName}")
+    private String r2GzOutputName;
+
+
+    @Value("${analysis-pipeline.stage.qc.HTMLFileName}")
+    private String htmlFileName;
+
+    @Value("${analysis-pipeline.stage.qc.JSONFileName}")
+    private String jsonFileName;
 
 
     @Override
@@ -55,10 +67,12 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
     @Override
     protected Pair<Map<String, String>, QcResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<QCStageOutput> stageRunResult) {
-        String r1Url = this.createStoreObjectName(stageRunResult.getStage(), OUTPUT_R1_NAME);
-        String r2Url = stageRunResult.getStageOutput().getR2Path() == null?null:this.createStoreObjectName(stageRunResult.getStage(), OUTPUT_R2_NAME);
-        String jsonUrl = this.createStoreObjectName(stageRunResult.getStage(), OUTPUT_JSON_NAME);
-        String htmlUrl = this.createStoreObjectName(stageRunResult.getStage(), OUTPUT_HTML_NAME);
+
+        boolean isGz = stageRunResult.getStageOutput().isGz();
+        String r1Url = this.createStoreObjectName(stageRunResult.getStage(), isGz? r1GzOutputName:r1OutputName);
+        String r2Url = stageRunResult.getStageOutput().getR2Path() == null?null:this.createStoreObjectName(stageRunResult.getStage(), isGz? r2GzOutputName:r2OutputName);
+        String jsonUrl = this.createStoreObjectName(stageRunResult.getStage(), jsonFileName);
+        String htmlUrl = this.createStoreObjectName(stageRunResult.getStage(), htmlFileName);
 
         HashMap<String,String> uploadConfig = new HashMap<>();
         HashMap<String,Object> outputUrlMap = new HashMap<>();

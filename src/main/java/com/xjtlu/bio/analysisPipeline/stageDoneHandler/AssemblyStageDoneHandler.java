@@ -10,7 +10,10 @@ import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
+import jakarta.validation.Valid;
+
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -24,8 +27,14 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
 
 
 
-    private static final String CONTIG_NAME = "assembly.contig";
-    private static final String SCAFFOLD_NAME = "scaffold.fna";
+    // private static final String CONTIG_NAME = "assembly.contig";
+    // private static final String SCAFFOLD_NAME = "scaffold.fna";
+
+    @Value("${analysis-pipeline.stage.assembly.contigsFileName}")
+    private String contigsFileName;
+
+    @Value("${analysis-pipeline.stage.assembly.scaffoldFileName}")
+    private String scaffoldFileName;
 
     @Override
     public int getType() {
@@ -59,8 +68,8 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
     protected Pair<Map<String, String>, AssemblyResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<AssemblyStageOutput> stageRunResult) {
 
-        String contigUrl = this.createStoreObjectName(stageRunResult.getStage(), CONTIG_NAME);
-        String scaffoldUrl = this.createStoreObjectName(stageRunResult.getStage(), SCAFFOLD_NAME);
+        String contigUrl = this.createStoreObjectName(stageRunResult.getStage(), contigsFileName);
+        String scaffoldUrl = this.createStoreObjectName(stageRunResult.getStage(), scaffoldFileName);
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getContigPath(), contigUrl, stageRunResult.getStageOutput().getScaffoldPath(), scaffoldUrl),

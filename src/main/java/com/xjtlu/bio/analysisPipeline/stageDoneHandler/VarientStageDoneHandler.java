@@ -4,9 +4,9 @@ package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.stageResult.VarientCallStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
-import com.xjtlu.bio.service.PipelineService;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_VARIANT_CALL;
@@ -19,8 +19,13 @@ import java.util.Map;
 public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantStageOutput> implements StageDoneHandler<VariantStageOutput>{
 
 
-    private static final String VCFGZ_NAME = "vcfGz";
-    private static final String VCFTBI_NAME = "vcfTbi";
+    // private static final String VCFGZ_NAME = "vcfGz";
+    // private static final String VCFTBI_NAME = "vcfTbi";
+
+    @Value("${analysis-pipeline.stage.varient.vcfFileName}")
+    private String vcfFileName;
+    @Value("${analysis-pipeline.stage.varient.vcfIndexFileName}")
+    private String vcfFileIndexFileName;
 
     @Override
     public int getType() {
@@ -32,8 +37,8 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
             StageRunResult<VariantStageOutput> stageRunResult) {
         // TODO Auto-generated method stub
         VariantStageOutput variantStageOutput = stageRunResult.getStageOutput();
-        String vcfGzUrl = this.createStoreObjectName(stageRunResult.getStage(), VCFGZ_NAME);
-        String vcfTbiUrl = this.createStoreObjectName(stageRunResult.getStage(), VCFTBI_NAME);
+        String vcfGzUrl = this.createStoreObjectName(stageRunResult.getStage(), vcfFileName);
+        String vcfTbiUrl = this.createStoreObjectName(stageRunResult.getStage(), vcfFileIndexFileName);
 
         return Pair.of(
             Map.of(variantStageOutput.getVcfGz(), vcfGzUrl, variantStageOutput.getVcfTbi(), vcfTbiUrl),

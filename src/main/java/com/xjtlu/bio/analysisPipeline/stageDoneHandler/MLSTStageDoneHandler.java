@@ -5,6 +5,7 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.MLSTStageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
@@ -16,7 +17,10 @@ public class MLSTStageDoneHandler extends AbstractStageDoneHandler<MLSTStageOutp
 
 
     //TODO
-    private static final String MLST_NAME = "";
+
+
+    @Value("${analysis-pipeline.stage.mlst.tsvFileName}")
+    private String mlstOutputFileName;
 
     @Override
     public int getType() {
@@ -37,7 +41,7 @@ public class MLSTStageDoneHandler extends AbstractStageDoneHandler<MLSTStageOutp
         BioPipelineStage stage = stageRunResult.getStage();
         MLSTStageOutput mlstStageOutput = stageRunResult.getStageOutput();
 
-        String url = this.createStoreObjectName(stage, MLST_NAME);
+        String url = this.createStoreObjectName(stage, mlstOutputFileName);
         return Pair.of(
             Map.of(mlstStageOutput.getMlstPath().toString(), url),
             new MLSTStageResult(url)

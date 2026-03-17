@@ -57,8 +57,7 @@ public class SampleService {
     public static final int SAMPLE_UPLOAD_STATUS_READY = 2;
     public static final int SAMPLE_UPLOAD_STATUS_ERROR = 3;
 
-    private Set<String> bioSampleOpeartion = ConcurrentHashMap.newKeySet();
-    private Set<String> bioSampleCreationSet = ConcurrentHashMap.newKeySet();
+    
 
     private static String substractPostfixFromFileName(String filename) {
         int index = filename.indexOf(".");

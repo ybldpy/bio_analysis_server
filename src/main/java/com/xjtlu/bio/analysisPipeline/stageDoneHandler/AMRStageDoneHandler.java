@@ -7,6 +7,8 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.AMRStageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
@@ -14,11 +16,15 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AmrStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 
+
+@Component
 public class AMRStageDoneHandler extends AbstractStageDoneHandler<AmrStageOutput> implements StageDoneHandler<AmrStageOutput>{
 
 
 
-    private static String AMR_OUTPUT_NAME = "amr_out.tsv";
+
+    @Value("${analysis-pipeline.stage.amr.tsvFileName}")
+    private String amrOutputName;
     @Override
     public int getType() {
         // TODO Auto-generated method stub
@@ -40,7 +46,7 @@ public class AMRStageDoneHandler extends AbstractStageDoneHandler<AmrStageOutput
         AmrStageOutput amrStageOutput = stageRunResult.getStageOutput();
 
 
-        String amrResultFileUrl = this.createStoreObjectName(bioPipelineStage, AMR_OUTPUT_NAME);
+        String amrResultFileUrl = this.createStoreObjectName(bioPipelineStage, amrOutputName);
         Map<String,String> uploadSpec = Map.of(amrStageOutput.getAmrResultPath().toString(), amrResultFileUrl);
 
         return Pair.of(

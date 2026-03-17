@@ -3,8 +3,6 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_CONSENSUS;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +18,6 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParam
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.utils.JsonUtil;
 
 
@@ -30,14 +26,14 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
 
 
 
-    @Value("analysis-pipeline.stage.consensus.fastaFileName")
+    @Value("${analysis-pipeline.stage.consensus.fastaFileName}")
     private String consensusFastaFileName;
 
 
-    @Value("analysis-pipeline.stage.varient.vcfFileName")
+    @Value("${analysis-pipeline.stage.varient.vcfFileName}")
     private String vcfFileName;
 
-    @Value("analysis-pipeline.stage.varient.vcfIndexFileName")
+    @Value("${analysis-pipeline.stage.varient.vcfIndexFileName}")
     private String vcfTbiFileName;
 
 
@@ -87,14 +83,14 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         
         
         String consensus = "consensus";
-        Path consensusPath = Path.of(consensusFastaFileName);
+        Path consensusPath = stageExecutionInput.workDir.resolve(consensusFastaFileName);
 
         ConsensusStageOutput consensusStageOutput = new ConsensusStageOutput(stageExecutionInput.workDir.resolve(consensusFastaFileName).toString());
 
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.addAll(List.of(
-                consensus,
+            consensus,
             "-f",
             refseqFile.getAbsolutePath(),
             "-H",

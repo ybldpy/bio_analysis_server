@@ -42,15 +42,15 @@ public class BioStageUtil {
         );
     }
 
-    public QCStageOutput qcStageOutput(Path dir, boolean hasR2){
+    // public QCStageOutput qcStageOutput(Path dir, boolean hasR2){
 
-        return new QCStageOutput(
-            dir.resolve(QCStageOutput.R1).toString(),
-            hasR2?dir.resolve(QCStageOutput.R2).toString():null,
-            dir.resolve(QCStageOutput.JSON).toString(),
-            dir.resolve(QCStageOutput.HTML).toString()
-        );
-    }
+    //     return new QCStageOutput(
+    //         dir.resolve(QCStageOutput.R1).toString(),
+    //         hasR2?dir.resolve(QCStageOutput.R2).toString():null,
+    //         dir.resolve(QCStageOutput.JSON).toString(),
+    //         dir.resolve(QCStageOutput.HTML).toString()
+    //     );
+    // }
 
     public AssemblyStageOutput assemblyOutput(BioPipelineStage bioPipelineStage, Path dir){
         Path config = dir.resolve(AssemblyStageOutput.CONTIG);

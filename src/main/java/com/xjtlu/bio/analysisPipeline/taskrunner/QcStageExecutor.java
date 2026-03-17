@@ -16,6 +16,7 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -26,7 +27,6 @@ import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
 public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput> implements PipelineStageExecutor<QCStageOutput> {
-
 
 
     private static final Logger logger = LoggerFactory.getLogger(QcStageExecutor.class);
@@ -50,11 +50,15 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
         Path inputDir = stageExecutionInput.inputDir;
 
         String params = bioPipelineStage.getParameters();
-        QcParameters qcParams = JsonUtil.toObject(bioPipelineStage.getParameters(), QcParameters.class);
+        QcParameters qcParams = JsonUtil.toObject(params, QcParameters.class);
 
-        
 
-        QCStageOutput qcStageOutput = this.bioStageUtil.qcStageOutput(outputDir, inputUrl2 != null);
+        boolean isGz = input1FileName.endsWith(".gz");
+        QCStageOutput qcStageOutput = new QCStageOutput(outputDir.resolve(input1FileName).toString(), 
+        input2FileName == null?null:outputDir.resolve(input2FileName).toString(), 
+        outputDir.resolve("cleaned.html").toString(),
+        outputDir.resolve("cleaned.json").toString(), 
+        isGz);
 
         Path trimmedR1Path = Path.of(qcStageOutput.getR1Path());
         Path trimmedR2Path = inputUrl2 == null ? null

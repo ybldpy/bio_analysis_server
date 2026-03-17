@@ -11,6 +11,7 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -24,8 +25,12 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_
 @Component
 public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingStageOutput> implements StageDoneHandler<MappingStageOutput>{
 
-    private static final String BAM_NAME = "mapping.bam";
-    private static final String BAM_INDEX_NAME = "mapping.bam.bai";
+
+    @Value("${analysis-pipeline.stage.mapping.bamFileName}")
+    private String bamFileName;
+
+    @Value("${analysis-pipeline.stage.mapping.bamIndexFileName}")
+    private String bamIndexFileName;
 
     @Override
     public int getType() {
@@ -50,8 +55,8 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
     protected Pair<Map<String, String>, MappingResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<MappingStageOutput> stageRunResult) {
 
-        String bamUrl = this.createStoreObjectName(stageRunResult.getStage(),BAM_NAME);
-        String bamIndexUrl = this.createStoreObjectName(stageRunResult.getStage(), BAM_INDEX_NAME);
+        String bamUrl = this.createStoreObjectName(stageRunResult.getStage(),bamFileName);
+        String bamIndexUrl = this.createStoreObjectName(stageRunResult.getStage(), bamIndexFileName);
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getBamPath(), bamUrl, stageRunResult.getStageOutput().getBamIndexPath(), bamIndexUrl),

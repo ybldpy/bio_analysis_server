@@ -4,16 +4,13 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.requestParameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.utils.JsonUtil;
 

@@ -10,17 +10,21 @@ public class QCStageOutput implements StageOutput {
     public static final String JSON = "qc.json";
     public static final String HTML = "qc.html";
 
+    private boolean gz;
+
+
     private String r1Path;
 
     public String getR1Path() {
         return r1Path;
     }
 
-    public QCStageOutput(String r1Path, String r2Path, String jsonPath, String htmlPath) {
+    public QCStageOutput(String r1Path, String r2Path, String jsonPath, String htmlPath, boolean gz) {
         this.r1Path = r1Path;
         this.r2Path = r2Path;
         this.jsonPath = jsonPath;
         this.htmlPath = htmlPath;
+        this.gz = gz;
     }
 
     public void setR1Path(String r1Path) {
@@ -33,6 +37,10 @@ public class QCStageOutput implements StageOutput {
 
     public void setR2Path(String r2Path) {
         this.r2Path = r2Path;
+    }
+
+    public boolean isGz() {
+        return gz;
     }
 
     public String getJsonPath() {
