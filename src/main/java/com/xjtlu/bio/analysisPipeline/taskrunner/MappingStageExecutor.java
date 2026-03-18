@@ -54,8 +54,14 @@ public class MappingStageExecutor extends AbstractPipelineStageExector<MappingSt
             return StageRunResult.fail("未能加载参考基因", bioPipelineStage, null);
         }
 
-        File refSeq = refSeqConfig.getRefseqId() >= 0 ? this.refSeqService.getRefseq(refSeqConfig.getRefseqId())
-                : this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+        File refSeq = null;
+        try {
+            refSeq = refSeqConfig.getRefseqId() >= 0 ? this.refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId())
+                    : this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            this.logErr("参考基因组加载失败", e);
+        }
 
         if (refSeq == null) {
             return StageRunResult.fail("参考基因组加载失败", bioPipelineStage, null);

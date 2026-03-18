@@ -48,7 +48,8 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
 
         File refseq = null;
         if(refSeqConfig.getRefseqId()>=0){
-            refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqId());
+            refseq = this.refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId());
+            
         }else {
             refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
         }

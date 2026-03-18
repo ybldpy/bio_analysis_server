@@ -18,7 +18,7 @@ refSeqService:
     nonInnerRefSeqDir: ${refSeqService.base}/nonInnerRefSeqDir
     temporaryPath: ${refSeqService.base}/temp
     refSeqIndexDir: ${refSeqService.base}/index
-    refseqsDir: /home/jcy/bioData/refseq
+    virusRefseqsDir: ${refSeqService.base}/virus/refseqs
     virusIndexPath: ${refSeqService.base}/
 
 

@@ -20,7 +20,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.xjtlu.bio.entity.BioRefseq;
+import com.xjtlu.bio.entity.BioRefseqExample;
 import com.xjtlu.bio.entity.BioRefseqMeta;
+import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioRefseqMetaMapper;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
@@ -30,8 +33,8 @@ import jakarta.annotation.Resource;
 @Service
 public class RefSeqService {
 
-    @Value("${refSeqService.refseqsDir}")
-    private String refseqsDir;
+    @Value("${refSeqService.virusRefseqsDir}")
+    private String virusRefseqsDir;
 
     public final static int VIRUS_TYPE = 1;
     public final static int BACTERIA_TYPE = 2;
@@ -40,6 +43,8 @@ public class RefSeqService {
     private StorageService storageService;
     @Resource
     private BioRefseqMetaMapper refseqMetaMapper;
+    @Resource
+    private BioRefseqMapper bioRefseqMapper;
 
 
     @Value("${refSeqService.nonInnerRefSeqDir}")
@@ -163,6 +168,7 @@ public class RefSeqService {
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException)
                 Thread.currentThread().interrupt();
+            logger.error("creating refseq index exception", e);
             return null;
         } finally {
             try {
@@ -182,12 +188,12 @@ public class RefSeqService {
             return Paths.get(this.refSeqIndexDir, "inner", String.valueOf(refseqId) + ".fai").toFile();
         }
 
-        BioRefseqMeta refseqMeta = refseqMetaMapper.selectByPrimaryKey(refseqId);
-        if (refseqMeta == null) {
+        BioRefseq refseq = bioRefseqMapper.selectByPrimaryKey(refseqId);
+        if (refseq == null) {
             return null;
         }
-        String refseqPath = refseqMeta.getPath();
-        File refseqFile = new File(refseqPath);
+        String refseqPath = refseq.getRefseqPath();
+        File refseqFile = Path.of(this.virusRefseqsDir, refseqPath).toFile();
 
         if (!refseqFile.exists() || refseqFile.length() <= 0) {
             return null;
@@ -240,20 +246,26 @@ public class RefSeqService {
         return refseqMeta != null;
     }
 
-    public File getRefSeqByRefSeqId(long refId) throws Exception {
+    public File getRefSeqByRefSeqId(long refId) {
         // todo
-        BioRefseqMeta bioRefseqMeta = null;
+        // BioRefseqMeta bioRefseqMeta = null;
 
-        bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refId);
+        // bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refId);
 
-        if (bioRefseqMeta == null) {
-            return null;
-        }
+        // if (bioRefseqMeta == null) {
+        //     return null;
+        // }
 
-        String refPath = bioRefseqMeta.getPath();
+        // String refPath = bioRefseqMeta.getPath();
 
-        File f = new File(refseqsDir + "/" + refPath);
-        return f.exists() ? f : null;
+        // File f = new File(refseqsDir + "/" + refPath);
+        // return f.exists() ? f : null;
+
+        BioRefseq bioRefseq = bioRefseqMapper.selectByPrimaryKey(refId);
+        String path = bioRefseq.getRefseqPath();
+        Path refseqPath = Path.of(this.virusRefseqsDir, path);
+        File refseqFile = refseqPath.toFile();
+        return refseqFile.exists()?refseqFile:null;
     }
 
     public File getRefseq(String refseqObjName) {
@@ -276,28 +288,7 @@ public class RefSeqService {
     }
 
     public File getRefseq(long refseqId) {
-
-        BioRefseqMeta bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refseqId);
-
-        if (bioRefseqMeta == null) {
-            return null;
-        }
-
-        String path = bioRefseqMeta.getPath();
-        int refseqType = bioRefseqMeta.getOrgType();
-
-        if (refseqType == VIRUS_TYPE) {
-            File f = new File(this.refseqsDir + "/" + path);
-            if (f.exists() && f.length() > 0) {
-                return f;
-            }
-            return null;
-        } else if (refseqType == BACTERIA_TYPE) {
-            // todo
-            return null;
-        }
-
-        return null;
+        return getRefSeqByRefSeqId(refseqId);
     }
 
 }

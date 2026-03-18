@@ -128,6 +128,7 @@ public class AnalysisPipelineStagesBuilder {
         Long refseqId = pipelineStageParams.getRefseq();
         RefSeqConfig refSeqConfig = new RefSeqConfig();
         refSeqConfig.setRefseqId(refseqId == null || refseqId == -1?-1:refseqId);
+        refSeqConfig.setInnerRefSeq(refseqId!=null);
         BaseStageParams baseStageParams = new BaseStageParams(refSeqConfig, null);
         
 

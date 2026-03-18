@@ -53,11 +53,17 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
             return this.runFail(bioPipelineStage, "未找到参考基因文件");
         }
 
-        File refseqFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefseq(refSeqConfig.getRefseqId()):this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+        // File refseqFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefseq(refSeqConfig.getRefseqId()):this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+        File refseqFile = null;
 
+        if(refSeqConfig.isInnerRefSeq()){
+            refseqFile = refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId());
+        }else {
+            refseqFile = refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
+        }
 
         if(refseqFile == null){
-            return this.runFail(bioPipelineStage, "未找到参考基因文件");
+            return this.runFail(bioPipelineStage, "未能加载参考基因文件");
         }
         File refSeqIndexFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
         if (refSeqIndexFile==null || !refSeqIndexFile.exists()) {
