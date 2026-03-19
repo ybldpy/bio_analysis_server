@@ -8,11 +8,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import org.apache.commons.io.FileUtils;
@@ -41,17 +43,23 @@ import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
+import com.xjtlu.bio.entity.BioRefseq;
+import com.xjtlu.bio.entity.BioRefseqExample;
 import com.xjtlu.bio.entity.BioSample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
+import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.requestParameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
 import com.xjtlu.bio.utils.BioStageUtil;
-import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
-import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineInput;
+import com.xjtlu.bio.utils.JsonUtil;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
+
+import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineConfigurations;
+import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineInput;
 
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
@@ -71,6 +79,9 @@ public class PipelineService {
 
     @Resource
     private BioSampleMapper bioSampleMapper;
+
+    @Resource
+    private BioRefseqMapper bioRefseqMapper;
 
     @Resource
     private BioAnalysisPipelineMapper bioAnalysisPipelineMapper;
@@ -101,18 +112,15 @@ public class PipelineService {
     public static final int PIPELINE_VIRUS_COVID = 1;
     public static final int PIPELINE_VIRUS_BACKTERIA = 2;
 
-    //for genetic
+    // for genetic
     private static final int OK = 0;
     private static final int INTERNAL_FAIL = -1;
 
-
-    //for genetic update
+    // for genetic update
     private static final int NO_EFFECTIVE_UPDATE = 100;
 
-
-    //for scedule purpose
+    // for scedule purpose
     private static final int SCHEDULE_UPSTREAM_NOT_READY = 300;
-    
 
     private boolean isLegalPipelineType(int pipelineType) {
         return pipelineType == PIPELINE_VIRUS || pipelineType == PIPELINE_VIRUS_COVID
@@ -188,13 +196,13 @@ public class PipelineService {
         int insertRes = this.bioAnalysisPipelineMapper.insert(bioAnalysisPipeline);
         if (insertRes < 1) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
         }
 
         List<BioPipelineStage> stages = this.buildPipelineStages(bioSample, bioAnalysisPipeline, pipelineStageParams);
         if (stages == null || stages.isEmpty()) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
         }
 
         for (BioPipelineStage stage : stages) {
@@ -204,24 +212,104 @@ public class PipelineService {
         insertRes = this.bioAnalysisStageMapperExtension.batchInsert(stages);
         if (insertRes != stages.size()) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线错误");
+            return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
         }
 
         return new Result<Long>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(), null);
     }
 
+    private BioRefseq getBestCandicateRefSeqs(List<BioRefseq> candiatesRefseqs)
+            throws JsonMappingException, JsonProcessingException {
+
+        boolean hasSegment = false;
+
+        for (BioRefseq bioRefseq : candiatesRefseqs) {
+            if (bioRefseq.getIsSegment()) {
+                hasSegment = true;
+                break;
+            }
+        }
+        List<BioRefseq> candidates = candiatesRefseqs.stream().filter((refseq) -> refseq.getIsSegment()).toList();
+        List<BioRefseq> originalCandicatesPointer = candiatesRefseqs;
+        if (candidates.isEmpty()) {
+            candidates = originalCandicatesPointer;
+        }
+
+        originalCandicatesPointer = candidates;
+
+        candidates = candidates.stream().filter((refseq) -> refseq.getSourceDb().toLowerCase().equals("refseq"))
+                .toList();
+        if (candidates.isEmpty()) {
+            candidates = originalCandicatesPointer;
+        }
+
+        originalCandicatesPointer = candidates;
+
+        HashMap<Long, Integer> candiatesNCPrefixNumMap = new HashMap<>();
+        HashMap<Long, Integer> candiatesAccessionsListLengthMap = new HashMap<>();
+        HashMap<Long, Integer> candiateAccessionLengthMap = new HashMap<>();
+
+        int accessionSourceWeight = 5;
+
+
+        for (BioRefseq bioRefseq : candidates) {
+            List<String> accessions = JsonUtil.toObject(bioRefseq.getAccessions(), List.class);
+            candiatesAccessionsListLengthMap.put(bioRefseq.getRefId(), accessions.size());
+            int num = 0;
+            for (String accession : accessions) {
+                if (accession.trim().startsWith("NC_")) {
+                    num += 1;
+                }
+            }
+            candiatesNCPrefixNumMap.put(bioRefseq.getRefId(), num);
+
+            if(!hasSegment){
+                Map<String,Object> meta = JsonUtil.toMap(bioRefseq.getMeta());
+                int len = (Integer) meta.getOrDefault("length", 1000);
+                candiateAccessionLengthMap.put(bioRefseq.getRefId(), len);
+            }
+        }
+
+        if (hasSegment) {
+            candidates.sort((refseq1, refseq2) -> {
+                int refseq1Score = candiatesNCPrefixNumMap.get(refseq1.getRefId()) * accessionSourceWeight
+                        + candiatesAccessionsListLengthMap.get(refseq1.getRefId());
+                int refseq2Score = candiatesNCPrefixNumMap.get(refseq2.getRefId()) * accessionSourceWeight
+                        + candiatesAccessionsListLengthMap.get(refseq2.getRefId());
+
+                return Integer.compare(refseq2Score, refseq1Score);
+            });
+
+            return candidates.get(0);
+        }
+
+        candidates.sort((refseq1, refseq2)->{
+            int refseq1Score = candiatesNCPrefixNumMap.get(refseq1.getRefId()) * accessionSourceWeight + candiateAccessionLengthMap.get(refseq1.getRefId());
+            int refseq2Score = candiatesNCPrefixNumMap.get(refseq2.getRefId()) * accessionSourceWeight + candiateAccessionLengthMap.get(refseq2.getRefId());
+            return Integer.compare(refseq2Score, refseq1Score);
+        });
+        return candidates.get(0);
+    }
+
     private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline,
-            PipelineStageParameters pipelineParams) {
+            List<BioRefseq> candicateRefSeqs) {
 
         if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS
                 || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {
             try {
+
+                // prefer NC prefix
+                BioRefseq bioRefseq = getBestCandicateRefSeqs(candicateRefSeqs);
+
+                PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
+                pipelineConfigurations.setRefId(bioRefseq.getRefId());
+
                 List<BioPipelineStage> stages = AnalysisPipelineStagesBuilder.buildVirusStages(
-                        bioAnalysisPipeline.getPipelineId(), 
+                        bioAnalysisPipeline.getPipelineId(),
                         false,
-                        false,  
-                        new PipelineInput(bioSample.getRead1Url(), bioSample.getRead2Url()), 
-                        pipelineParams);
+                        false,
+                        new PipelineInput(bioSample.getRead1Url(), bioSample.getRead2Url()),
+                        pipelineConfigurations);
                 return stages;
             } catch (JsonProcessingException e) {
                 // TODO Auto-generated catch block
@@ -264,25 +352,21 @@ public class PipelineService {
             return new Result<Boolean>(Result.BUSINESS_FAIL, false, "不能启动状态为非等待的分析阶段");
         }
 
-
-
         int res = scheduleStage(startStage, allStages);
 
-        if(res == INTERNAL_FAIL || res == NO_EFFECTIVE_UPDATE){
+        if (res == INTERNAL_FAIL || res == NO_EFFECTIVE_UPDATE) {
             return new Result<Boolean>(Result.INTERNAL_FAIL, false, "内部错误");
         }
 
-        if(res == SCHEDULE_UPSTREAM_NOT_READY){
+        if (res == SCHEDULE_UPSTREAM_NOT_READY) {
             return new Result<Boolean>(Result.BUSINESS_FAIL, false, "上游阶段未完成, 无法启动此阶段");
         }
 
         return new Result<Boolean>(Result.SUCCESS, true, null);
 
-        
-
     }
 
-    //@Transactional(rollbackFor = Exception.class)
+    // @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> pipelineStart(long sampleId) {
 
         List<BioPipelineStage> stages = this.bioAnalysisStageMapperExtension.selectStagesBySampleId(sampleId);
@@ -306,15 +390,12 @@ public class PipelineService {
 
         int res = scheduleStage(firstStage, stages);
 
-        if(res == OK){
+        if (res == OK) {
             return new Result<Boolean>(Result.SUCCESS, true, null);
         }
 
-        
         return new Result<Boolean>(Result.INTERNAL_FAIL, false, "内部错误");
-        
 
-        
     }
 
     @Async
@@ -466,7 +547,6 @@ public class PipelineService {
                     int currentVersion = updateStageCommand.getCurrentVersion();
                     updateStage.setVersion(currentVersion + 1);
                     long stageId = updateStageCommand.getStageId();
-
 
                     conditionExample.createCriteria().andStageIdEqualTo(stageId).andVersionEqualTo(currentVersion);
                     batchUpdateMapper.updateByExampleSelective(updateStage, conditionExample);

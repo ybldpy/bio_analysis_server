@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class CreateSampleRequest {
 
     public static class PipelineStageParameters {
-        private Long refseq;
+        private Integer taxId;
 
         Map<String, Object> extraParams;
 
@@ -17,17 +17,34 @@ public class CreateSampleRequest {
             return extraParams;
         }
 
-        public Long getRefseq() {
-            return refseq;
+        
+
+        public PipelineStageParameters(Integer taxId, Map<String, Object> extraParams) {
+            this.taxId = taxId;
+            this.extraParams = extraParams;
         }
 
-        public void setRefseq(Long refseq) {
-            this.refseq = refseq;
-        }
+
 
         public void setExtraParams(Map<String, Object> extraParams) {
             this.extraParams = extraParams;
         }
+
+
+
+        public Integer getTaxId() {
+            return taxId;
+        }
+
+
+
+        public void setTaxId(Integer taxId) {
+            this.taxId = taxId;
+        }
+
+
+
+        
 
     }
 

@@ -19,6 +19,25 @@ public class AnalysisPipelineStagesBuilder {
 
 
 
+
+    public static class PipelineConfigurations{
+        private long refId;
+
+        public long getRefId() {
+            return refId;
+        }
+
+        public void setRefId(long refId) {
+            this.refId = refId;
+        }
+
+        
+
+        
+
+    }
+
+
     public static class PipelineInput {
 
         private String r1;
@@ -58,7 +77,7 @@ public class AnalysisPipelineStagesBuilder {
         return null;
     }
 
-    public static List<BioPipelineStage> buildBacteriaPipeline(long pid, PipelineInput pipelineInput, PipelineStageParameters pipelineStageParameters) throws JsonProcessingException{
+    public static List<BioPipelineStage> buildBacteriaPipeline(long pid, PipelineInput pipelineInput, PipelineConfigurations pipelineConfigurations) throws JsonProcessingException{
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>();
         
@@ -119,16 +138,18 @@ public class AnalysisPipelineStagesBuilder {
     }
 
     public static List<BioPipelineStage> buildVirusStages(long pid, boolean requireSNP, boolean requiredDepth, PipelineInput pipelineInput, 
-            PipelineStageParameters pipelineStageParams) throws JsonProcessingException {
+            PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
         String qcInputRead1 = pipelineInput.getR1();
         String qcInputRead2 = pipelineInput.getR2();
 
-        Long refseqId = pipelineStageParams.getRefseq();
+
+
+        long refseqId = pipelineConfigurations.getRefId();
         RefSeqConfig refSeqConfig = new RefSeqConfig();
-        refSeqConfig.setRefseqId(refseqId == null || refseqId == -1?-1:refseqId);
-        refSeqConfig.setInnerRefSeq(refseqId!=null);
+        refSeqConfig.setRefseqId(refseqId);
+        refSeqConfig.setInnerRefSeq(refseqId >= 0);
         BaseStageParams baseStageParams = new BaseStageParams(refSeqConfig, null);
         
 
