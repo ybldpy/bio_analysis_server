@@ -17,6 +17,8 @@ import java.util.zip.GZIPInputStream;
 
 import org.springframework.stereotype.Component;
 
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadLengthDetectStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
@@ -26,12 +28,23 @@ import jakarta.annotation.Resource;
 
 
 @Component
-public class ReadLengthDetectStage extends AbstractPipelineStageExector<ReadLengthDetectStageOutput> implements PipelineStageExecutor<ReadLengthDetectStageOutput>{
+public class ReadLengthDetectStage extends AbstractPipelineStageExector<ReadLengthDetectStageOutput, StageInputUrls, BaseStageParams> implements PipelineStageExecutor<ReadLengthDetectStageOutput>{
 
 
     // 你可以按需调整
     private static final int DEFAULT_SAMPLE_READS = 2000;
 
+
+
+    @Override
+    protected Class<StageInputUrls> stageInputType() {
+        return StageInputUrls.class;
+    }
+
+    @Override
+    protected Class<BaseStageParams> stageParameterType() {
+        return BaseStageParams.class;
+    }
 
 
     private boolean isLongRead(Path localReadFile, int sampleReads) throws IOException {
@@ -68,29 +81,30 @@ public class ReadLengthDetectStage extends AbstractPipelineStageExector<ReadLeng
 
 
 
-        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
-        Path inputDir = stageExecutionInput.inputDir;
+    
+        // Path inputDir = stageExecutionInput.inputDir;
 
 
-        String readUrl = bioPipelineStage.getInputUrl();
+        // String readUrl = bioPipelineStage.getInputUrl();
 
-        GetObjectResult getReadResult = this.storageService.getObject(readUrl, inputDir.resolve("r.fastq").toString());
-        if(!getReadResult.success()){
-            return this.runFail(bioPipelineStage, "加载reads文件失败", getReadResult.e());
-        }
+        // GetObjectResult getReadResult = this.storageService.getObject(readUrl, inputDir.resolve("r.fastq").toString());
+        // if(!getReadResult.success()){
+        //     return this.runFail(bioPipelineStage, "加载reads文件失败", getReadResult.e());
+        // }
 
-        File readFile = getReadResult.objectFile();
+        // File readFile = getReadResult.objectFile();
 
-        boolean longRead;
+        // boolean longRead;
 
-        try {
-            longRead = isLongRead(readFile.toPath(), DEFAULT_SAMPLE_READS);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return this.runFail(bioPipelineStage, "检测读长失败", e);
-        }
-        return StageRunResult.OK(new ReadLengthDetectStageOutput(longRead), bioPipelineStage);
+        // try {
+        //     longRead = isLongRead(readFile.toPath(), DEFAULT_SAMPLE_READS);
+        // } catch (IOException e) {
+        //     // TODO Auto-generated catch block
+        //     e.printStackTrace();
+        //     return this.runFail(bioPipelineStage, "检测读长失败", e);
+        // }
+        // return StageRunResult.OK(new ReadLengthDetectStageOutput(longRead), bioPipelineStage);
+        return null;
     }
 
     @Override

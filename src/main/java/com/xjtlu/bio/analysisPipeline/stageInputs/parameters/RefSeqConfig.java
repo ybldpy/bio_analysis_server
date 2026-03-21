@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
 
+import java.util.List;
+
 public class RefSeqConfig {
 
     private boolean isInnerRefSeq;
@@ -36,6 +38,16 @@ public class RefSeqConfig {
     }
     private String refseqObjectName;
     private long refseqId;
+    
+
+    //for locate gff file
+    private List<String> accessions;
+    public List<String> getAccessions() {
+        return accessions;
+    }
+    public void setAccessions(List<String> accessions) {
+        this.accessions = accessions;
+    }
 
     
 }

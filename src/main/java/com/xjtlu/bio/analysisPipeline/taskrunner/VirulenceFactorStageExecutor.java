@@ -3,6 +3,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VirulenceFactorStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -17,28 +18,39 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<VirulenceFactorStageOutput> implements PipelineStageExecutor<VirulenceFactorStageOutput>{
+public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<VirulenceFactorStageOutput, VFStageInputUrls, BaseStageParams> implements PipelineStageExecutor<VirulenceFactorStageOutput>{
+
+
+
 
 
     @Override
-    protected StageRunResult<VirulenceFactorStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
-        BioPipelineStage stage = stageExecutionInput.bioPipelineStage;
+    protected Class<VFStageInputUrls> stageInputType() {
+        return VFStageInputUrls.class;
+    }
+
+
+    @Override
+    protected Class<BaseStageParams> stageParameterType() {
+        return BaseStageParams.class;
+    }
+    @Override
+    protected StageRunResult<VirulenceFactorStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
+        long stage = stageExecutionInput.stageId;
 
         // Map<String,String> inputUrlMap = this.loadInputUrlMap(stage);
         // if (inputUrlMap == null){
         //     return runFail(stage, "load input failed");
         // }
-        VFStageInputUrls vfStageInputUrls = JsonUtil.toObject(stage.getInputUrl(), VFStageInputUrls.class);
+        VFStageInputUrls vfStageInputUrls = stageExecutionInput.input;
 
 
 
         String inputContigsUrl = vfStageInputUrls.getContigsUrl();
         Path inputContigPath = stageExecutionInput.inputDir.resolve("in.contig");
 
-        boolean success = this.loadInput(Map.of(inputContigsUrl, inputContigPath));
-        if(!success){
-            return this.runFail(stage, "load input fail");
-        }
+        this.loadInput(Map.of(inputContigsUrl, inputContigPath));
+        
 
         Path resultPath = stageExecutionInput.workDir.resolve("vf.tsv");
         List<String> runCmd = new ArrayList<>();

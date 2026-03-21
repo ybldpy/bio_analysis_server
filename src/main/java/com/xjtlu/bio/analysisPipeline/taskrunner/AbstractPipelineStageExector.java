@@ -1,7 +1,5 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
-
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -15,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SeroTypingStageOutput;
@@ -36,7 +36,8 @@ import com.xjtlu.bio.utils.JsonUtil;
 
 import jakarta.annotation.Resource;
 
-public abstract class AbstractPipelineStageExector<T extends StageOutput> implements PipelineStageExecutor<T> {
+public abstract class AbstractPipelineStageExector<T extends StageOutput, Input extends StageInputUrls, StageParameters extends BaseStageParams>
+        implements PipelineStageExecutor<T> {
 
     protected static class StageOutputValidationResult {
 
@@ -71,8 +72,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         }
     }
 
-    protected static class StageExecutionInput {
-        BioPipelineStage bioPipelineStage;
+    protected class StageExecutionInput {
+        // BioPipelineStage bioPipelineStage;
+        long stageId;
+        Input input;
+        StageParameters stageParameters;
         Path workDir;
         Path inputDir;
     }
@@ -115,6 +119,28 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         resetDirectory(this.stageInputPath(bioPipelineStage));
     }
 
+    protected static class LoadFailException extends Exception {
+
+        public Exception causeException;
+
+        public LoadFailException(String message, Exception causeException) {
+            super(message);
+            this.causeException = causeException;
+        }
+
+        public LoadFailException(Exception caException) {
+            this(null, caException);
+        }
+
+        public LoadFailException() {
+
+        }
+    }
+
+    protected abstract Class<Input> stageInputType();
+
+    protected abstract Class<StageParameters> stageParameterType();
+
     private void resetDirectory(Path path) throws IOException {
         File dir = path.toFile();
 
@@ -140,7 +166,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
             logger.error("{} parsing input json exception", bioPipelineStage);
         }
         return null;
-
     }
 
     protected void postExecute(StageRunResult stageRunResult) {
@@ -151,23 +176,23 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         }
     }
 
+    protected boolean _execute(List<String> runCmd, Path redirectOutputStream, StageExecutionInput stageExecutionInput,
+            Path... toValidateFiles) {
 
-    protected boolean _execute(List<String> runCmd, Path redirectOutputStream, StageExecutionInput stageExecutionInput, Path... toValidateFiles){
+        ExecuteResult executeResult = redirectOutputStream == null ? _execute(runCmd, stageExecutionInput.workDir)
+                : _execute(runCmd, stageExecutionInput.workDir, redirectOutputStream, null);
 
-        ExecuteResult executeResult = redirectOutputStream ==null ? _execute(runCmd, stageExecutionInput.workDir): _execute(runCmd, stageExecutionInput.workDir, redirectOutputStream, null);
-
-        if(!executeResult.success()){
-            logExecutionFailed(executeResult, stageExecutionInput.bioPipelineStage);
+        if (!executeResult.success()) {
+            logExecutionFailed(executeResult, stageExecutionInput.stageId);
             return false;
         }
-        
+
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(toValidateFiles);
-        if(!stageOutputValidationResults.isEmpty()){
-               logNoOutput(stageOutputValidationResults, stageExecutionInput.bioPipelineStage);
-               return false;
+        if (!stageOutputValidationResults.isEmpty()) {
+            logNoOutput(stageOutputValidationResults, stageExecutionInput.stageId);
+            return false;
         }
         return true;
-
     }
 
     @Override
@@ -176,7 +201,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
             preExecute(bioPipelineStage);
         } catch (Exception e) {
             logger.error("{} exception happens at preExecute", bioPipelineStage, e);
-            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", bioPipelineStage, e);
+            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", bioPipelineStage.getStageId(), e);
             postExecute(stageRunResult);
             return stageRunResult;
         }
@@ -185,21 +210,28 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         Path inputDir = this.stageInputPath(bioPipelineStage);
 
         StageExecutionInput stageExecutionInput = new StageExecutionInput();
-        stageExecutionInput.bioPipelineStage = bioPipelineStage;
+        stageExecutionInput.stageId = bioPipelineStage.getStageId();
         stageExecutionInput.inputDir = inputDir;
         stageExecutionInput.workDir = workDir;
 
         StageRunResult<T> stageRunResult = null;
         try {
+
+            stageExecutionInput.input = JsonUtil.toObject(bioPipelineStage.getInputUrl(), stageInputType());
+            stageExecutionInput.stageParameters = JsonUtil.toObject(bioPipelineStage.getParameters(),
+                    stageParameterType());
             stageRunResult = _execute(stageExecutionInput);
         } catch (JsonMappingException e) {
             // TODO Auto-generated catch block
             logger.error("JSON mapping exception while executing stage. input={}", stageExecutionInput, e);
-            stageRunResult = this.runException(bioPipelineStage, e);
+            stageRunResult = this.runException(bioPipelineStage.getStageId(), e);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("JSON processing exception while executing stage. input={}", stageExecutionInput, e);
-            stageRunResult = this.runException(bioPipelineStage, e);
+            stageRunResult = this.runException(bioPipelineStage.getStageId(), e);
+        } catch (LoadFailException e) {
+            logger.error("stage = {} load failed. ", bioPipelineStage.getStageId(), e.causeException);
+            stageRunResult = this.runException(bioPipelineStage.getStageId(), e);
         }
         postExecute(stageRunResult);
         return stageRunResult;
@@ -211,17 +243,17 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
      * {@link StageRunResult#fail(...)}.
      */
     protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput)
-            throws JsonMappingException, JsonProcessingException;
+            throws JsonMappingException, JsonProcessingException, LoadFailException;
 
-    protected StageRunResult<T> runException(BioPipelineStage bioPipelineStage, Exception e) {
+    protected StageRunResult<T> runException(long bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());
     }
 
-    protected StageRunResult<T> runFail(BioPipelineStage bioPipelineStage, String errorMsg, Exception e) {
-        return StageRunResult.fail(errorMsg, bioPipelineStage, e);
+    protected StageRunResult<T> runFail(long stageId, String errorMsg, Exception e) {
+        return StageRunResult.fail(errorMsg, stageId, e);
     }
 
-    protected StageRunResult<T> runFail(BioPipelineStage bioPipelineStage, String msg) {
+    protected StageRunResult<T> runFail(long bioPipelineStage, String msg) {
         return runFail(bioPipelineStage, msg, null);
     }
 
@@ -245,15 +277,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     }
 
-    protected void logNoOutput(List<StageOutputValidationResult> results, BioPipelineStage stage) {
+    protected void logNoOutput(List<StageOutputValidationResult> results,long stage) {
         if (results == null || results.isEmpty()) {
             logger.error(
-                    "Stage output validation failed (no details). stageId={}, pipelineId={}, stageIndex={}, stageName={}, stageType={}",
-                    stage.getStageId(),
-                    stage.getPipelineId(),
-                    stage.getStageIndex(),
-                    stage.getStageName(),
-                    stage.getStageType());
+                    "Stage output validation failed (no details). stageId={}",
+                    stage);
             return;
         }
 
@@ -272,23 +300,15 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
         if (!emptyPaths.isEmpty()) {
             logger.error(
-                    "Stage output missing/empty. stageId={}, pipelineId={}, stageIndex={}, stageName={}, stageType={}, outputs=[{}]",
-                    stage.getStageId(),
-                    stage.getPipelineId(),
-                    stage.getStageIndex(),
-                    stage.getStageName(),
-                    stage.getStageType(),
+                    "Stage output missing/empty. stageId={}, path={}",
+                    stage,
                     emptyPaths);
         }
 
         for (StageOutputValidationResult r : ioErrors) {
             logger.error(
-                    "Stage output validation IO error. stageId={}, pipelineId={}, stageIndex={}, stageName={}, stageType={}, path={}",
-                    stage.getStageId(),
-                    stage.getPipelineId(),
-                    stage.getStageIndex(),
-                    stage.getStageName(),
-                    stage.getStageType(),
+                    "Stage output validation IO error. stageId={}, path={}",
+                    stage, 
                     r.path,
                     r.ioException);
         }
@@ -296,12 +316,8 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         // 如果没有 emptyPaths 也没有 ioErrors，说明 results 里可能都是 null 或 empty=false
         if (emptyPaths.isEmpty() && ioErrors.isEmpty()) {
             logger.error(
-                    "Stage output validation failed (unexpected state). stageId={}, pipelineId={}, stageIndex={}, stageName={}, stageType={}, resultCount={}",
-                    stage.getStageId(),
-                    stage.getPipelineId(),
-                    stage.getStageIndex(),
-                    stage.getStageName(),
-                    stage.getStageType(),
+                    "Stage output validation failed (unexpected state). stageId={}, resultCount={}",
+                    stage,
                     results.size());
         }
     }
@@ -347,11 +363,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     }
 
-    protected StageRunResult<T> runFail(BioPipelineStage bioPipelineStage, String errorMessge, Exception e,
+    protected StageRunResult<T> runFail(long stageId, String errorMessge, Exception e,
             Path inputDir,
             Path workDir) {
         this.deleteTmpFiles(List.of(inputDir.toFile(), workDir.toFile()));
-        return this.runFail(bioPipelineStage, errorMessge, e);
+        return this.runFail(stageId, errorMessge, e);
     }
 
     protected static String appendSuffixBeforeExtensions(String fileName, String suffix) {
@@ -405,7 +421,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
 
     public abstract int id();
 
-    protected StageRunResult parseError(BioPipelineStage bioPipelineStage) {
+    protected StageRunResult parseError(long bioPipelineStage) {
         return runFail(bioPipelineStage, PARSE_JSON_ERROR);
     }
 
@@ -413,24 +429,22 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         return (obj != null) && obj instanceof Map;
     }
 
-
-    protected void logExecutionFailed(ExecuteResult failResult, BioPipelineStage stage){
+    protected void logExecutionFailed(ExecuteResult failResult, long stage) {
         logger.error(
-                "Stage execution failed. stageId={}, pipelineId={}, stageName={}, runCode={}, error={}",
-                stage.getStageId(),
-                stage.getPipelineId(),
-                stage.getStageName(),
+                "Stage execution failed. stageId={}, runCode={}, error={}",
+                stage, 
                 failResult.runCode,
                 failResult.ex == null ? "unknown" : failResult.ex.getMessage(),
                 failResult.ex);
     }
 
-    // protected StageRunResult<T> runFail(ExecuteResult failResult, BioPipelineStage stage) {
-    //     logExecutionFailed(failResult, stage);
-    //     return this.runFail(stage, "execution failed");
+    // protected StageRunResult<T> runFail(ExecuteResult failResult,
+    // BioPipelineStage stage) {
+    // logExecutionFailed(failResult, stage);
+    // return this.runFail(stage, "execution failed");
     // }
 
-    protected boolean loadInput(Map<String, Path> objectAndWriteToPath) {
+    protected void loadInput(Map<String, Path> objectAndWriteToPath) throws LoadFailException {
 
         HashMap<String, GetObjectResult> inputMap = new HashMap<>();
         for (Map.Entry<String, Path> item : objectAndWriteToPath.entrySet()) {
@@ -438,10 +452,9 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
             inputMap.put(item.getKey(), getObjectResult);
             if (!getObjectResult.success()) {
                 logger.error("load input {} failed", item.getKey(), getObjectResult.e());
-                return false;
+                throw new LoadFailException(getObjectResult.e());
             }
         }
-        return true;
     }
 
     protected String findFailedLoadingObject(Map<String, GetObjectResult> getResultMap) {
@@ -455,35 +468,40 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput> implem
         return null;
     }
 
-    // protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params) {
+    // protected RefSeqConfig getRefSeqConfigFromParams(Map<String, Object> params)
+    // {
 
-    //     Object refseqConfigObj = params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
-    //     if (refseqConfigObj == null || !(refseqConfigObj instanceof Map)) {
-    //         return null;
-    //     }
+    // Object refseqConfigObj =
+    // params.get(PipelineService.PIPELINE_STAGE_PARAMETER_REFSEQ_CONFIG);
+    // if (refseqConfigObj == null || !(refseqConfigObj instanceof Map)) {
+    // return null;
+    // }
 
-    //     try {
-    //         RefSeqConfig refSeqConfig = JsonUtil.mapToPojo((Map) refseqConfigObj, RefSeqConfig.class);
-    //         return refSeqConfig;
-    //     } catch (Exception e) {
-    //         logger.error("converting {} to RefseqConfigException", refseqConfigObj);
-    //         return null;
-    //     }
+    // try {
+    // RefSeqConfig refSeqConfig = JsonUtil.mapToPojo((Map) refseqConfigObj,
+    // RefSeqConfig.class);
+    // return refSeqConfig;
+    // } catch (Exception e) {
+    // logger.error("converting {} to RefseqConfigException", refseqConfigObj);
+    // return null;
+    // }
 
     // }
 
     // protected Object substractRefseqFromMap(Map<String, Object> params) {
-    //     Object refseq = params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
-    //     Object isInnerRefseq = params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
+    // Object refseq =
+    // params.get(PipelineService.PIPLEINE_STAGE_PARAMETERS_REFSEQ_KEY);
+    // Object isInnerRefseq =
+    // params.get(PipelineService.PIPELINE_STAGE_PARAMETERS_REFSEQ_IS_INNER);
 
-    //     if (refseq == null) {
-    //         return null;
-    //     }
-    //     if (isInnerRefseq == null && !(refseq instanceof Integer)) {
-    //         return null;
-    //     }
+    // if (refseq == null) {
+    // return null;
+    // }
+    // if (isInnerRefseq == null && !(refseq instanceof Integer)) {
+    // return null;
+    // }
 
-    //     return refseq;
+    // return refseq;
 
     // }
 

@@ -39,14 +39,15 @@ public class StageRunResult<T extends StageOutput> {
         this.stageOutput = stageOutput;
     }
     private BioPipelineStage stage;
+    private long runStageId;
 
 
 
-    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, BioPipelineStage stage, Exception e) {
+    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, long runStageId, Exception e) {
         this.success = success;
         this.failReason = failReason;
         this.outputPath = outputPath;
-        this.stage = stage;
+        this.runStageId = runStageId;
         this.e = e;
     }
 
@@ -67,16 +68,16 @@ public class StageRunResult<T extends StageOutput> {
         this.stage = stage;
     }
 
-    public static StageRunResult OK(Map<String,String> outputPath, BioPipelineStage stage){
+    public static StageRunResult OK(Map<String,String> outputPath, long stage){
         return new StageRunResult(true, null,outputPath, stage,null);
     }
 
-    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, BioPipelineStage stage){
-        StageRunResult<T> stageRunResult = new StageRunResult<>(true, null, null, stage, null);
+    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, long stageId){
+        StageRunResult<T> stageRunResult = new StageRunResult<>(true, null, null, stageId, null);
         stageRunResult.setStageOutput(stageOutput);
         return stageRunResult;
     }
-    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, BioPipelineStage stage,Exception e){
+    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, long stage,Exception e){
         return new StageRunResult<>(false, failReason, null, stage, e);
     }
 

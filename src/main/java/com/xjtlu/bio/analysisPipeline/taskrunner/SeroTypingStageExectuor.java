@@ -21,7 +21,8 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
-public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTypingStageOutput>
+public class SeroTypingStageExectuor
+        extends AbstractPipelineStageExector<SeroTypingStageOutput, SeroTypeStageInputUrls, SeroTypingStageParameters>
         implements PipelineStageExecutor<SeroTypingStageOutput> {
 
     private static final int TAX_ID_SALMONELLA = 28901;
@@ -79,6 +80,16 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
         }
     }
 
+    @Override
+    protected Class<SeroTypeStageInputUrls> stageInputType() {
+        return SeroTypeStageInputUrls.class;
+    }
+
+    @Override
+    protected Class<SeroTypingStageParameters> stageParameterType() {
+        return SeroTypingStageParameters.class;
+    }
+
     private StageRunResult<SeroTypingStageOutput> executeSalmonellaType(StageExecutionInput stageExecutionInput,
             Path r1Path, Path r2Path) {
         List<String> cmd = new ArrayList<>();
@@ -98,9 +109,9 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
 
         if (!res) {
-            return this.runFail(stageExecutionInput.bioPipelineStage, "未成功执行");
+            return this.runFail(stageExecutionInput.stageId, "未成功执行");
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.bioPipelineStage);
+        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageId);
     }
 
     private StageRunResult<SeroTypingStageOutput> executeECoilType(StageExecutionInput stageExecutionInput,
@@ -117,9 +128,9 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
 
         if (!res) {
-            return this.runFail(stageExecutionInput.bioPipelineStage, "未成功执行");
+            return this.runFail(stageExecutionInput.stageId, "未成功执行");
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.bioPipelineStage);
+        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageId);
 
     }
 
@@ -138,9 +149,9 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
 
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
         if (!res) {
-            return this.runFail(stageExecutionInput.bioPipelineStage, "未成功执行");
+            return this.runFail(stageExecutionInput.stageId, "未成功执行");
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.bioPipelineStage);
+        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageId);
     }
 
     private StageRunResult<SeroTypingStageOutput> executeStreptococcusType(StageExecutionInput stageExecutionInput,
@@ -157,38 +168,33 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
         Path resultFile = stageExecutionInput.workDir.resolve("pred.tsv");
 
         return _execute(cmd, null, stageExecutionInput, resultFile)
-                ? this.runFail(stageExecutionInput.bioPipelineStage, "未执行成功")
-                : StageRunResult.OK(new SeroTypingStageOutput(resultFile), stageExecutionInput.bioPipelineStage);
+                ? this.runFail(stageExecutionInput.stageId, "未执行成功")
+                : StageRunResult.OK(new SeroTypingStageOutput(resultFile), stageExecutionInput.stageId);
 
     }
 
     @Override
     protected StageRunResult<SeroTypingStageOutput> _execute(StageExecutionInput stageExecutionInput)
-            throws JsonMappingException, JsonProcessingException {
+            throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
-        BioPipelineStage stage = stageExecutionInput.bioPipelineStage;
+        long stage = stageExecutionInput.stageId;
         Path inputDir = stageExecutionInput.inputDir;
         Path outputDir = stageExecutionInput.workDir;
 
-        SeroTypeStageInputUrls seroTypeStageInputUrls = JsonUtil.toObject(stage.getInputUrl(),
-                SeroTypeStageInputUrls.class);
+        SeroTypeStageInputUrls seroTypeStageInputUrls = stageExecutionInput.input;
 
         String contigUrl = seroTypeStageInputUrls.getContigsUrl();
         String r1Url = seroTypeStageInputUrls.getR1Url();
         String r2Url = seroTypeStageInputUrls.getR2Url();
 
-        SeroTypingStageParameters parameters = JsonUtil.toObject(stage.getParameters(),
-                SeroTypingStageParameters.class);
+        SeroTypingStageParameters parameters = stageExecutionInput.stageParameters;
 
         Path contigLocalPath = inputDir.resolve("input.contig");
         Path r1Path = inputDir.resolve("r1.fastq.gz");
         Path r2Path = inputDir.resolve("r2.fastq.gz");
         Map<String, Path> loadInputMap = contigUrl != null ? Map.of(contigUrl, contigLocalPath)
                 : (r2Path != null ? Map.of(r1Url, r1Path) : Map.of(r1Url, r1Path, r2Url, r2Path));
-        boolean loadRes = loadInput(loadInputMap);
-        if (!loadRes) {
-            return this.runFail(stage, "failed to load");
-        }
+        loadInput(loadInputMap);
 
         TaxonomyContext taxonomyCtx = parameters.getTaxonomyContext();
         int taxId = taxonomyCtx.getTaxid();
@@ -206,10 +212,8 @@ public class SeroTypingStageExectuor extends AbstractPipelineStageExector<SeroTy
                 return executeStreptococcusType(stageExecutionInput, r1Path, r2Url == null ? null : r2Path);
             default:
                 logger.warn(
-                        "No suitable serotyping tool matched. stageId={}, pipelineId={}, stageName={}, taxId={}, species={}, rank={}, status={}",
-                        stage.getStageId(),
-                        stage.getPipelineId(),
-                        stage.getStageName(),
+                        "No suitable serotyping tool matched. stageId={}, taxId={}, species={}, rank={}, status={}",
+                        stage,
                         taxId,
                         taxonomyCtx.getSpeciesName(),
                         taxonomyCtx.getRank(),

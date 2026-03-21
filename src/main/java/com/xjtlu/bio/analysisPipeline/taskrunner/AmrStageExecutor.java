@@ -3,6 +3,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.AMRParamters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AmrStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.StorageService;
@@ -24,7 +25,7 @@ import java.util.Map;
  */
 
 @Component
-public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutput> implements PipelineStageExecutor<AmrStageOutput>{
+public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutput, AMRInputUrls, AMRParamters> implements PipelineStageExecutor<AmrStageOutput>{
 
 
     @Value("${analysis-pipeline.stage.amr.tsvFileName}")
@@ -32,20 +33,24 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
 
 
     @Override
-    protected StageRunResult<AmrStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
-        BioPipelineStage stage = stageExecutionInput.bioPipelineStage;
-        AMRInputUrls amrInputUrls = JsonUtil.toObject(stage.getInputUrl(), AMRInputUrls.class);
+    protected StageRunResult<AmrStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
 
+        long stage = stageExecutionInput.stageId;
+        AMRInputUrls amrInputUrls = stageExecutionInput.input;
 
         String inputUrl = amrInputUrls.getContigsUrl();
 
         Path inputSamplePath = stageExecutionInput.inputDir.resolve(inputUrl.substring(inputUrl.lastIndexOf("/")+1));
-        StorageService.GetObjectResult getObjectResult = this.storageService.getObject(inputUrl, inputSamplePath.toString());
-        if (!getObjectResult.success()){
-            Exception e=getObjectResult.e();
-            logger.error("{} load input failed", stage, e);
-            return runFail(stage, "load input failed");
-        }
+        // StorageService.GetObjectResult getObjectResult = this.storageService.getObject(inputUrl, inputSamplePath.toString());
+        // if (!getObjectResult.success()){
+        //     Exception e=getObjectResult.e();
+        //     logger.error("{} load input failed", stageExecutionInput, e);
+        //     return runFail(stage, "load input failed");
+        // }
+
+        loadInput(Map.of(inputUrl, inputSamplePath));
+
+        
 
         Path resultPath = stageExecutionInput.workDir.resolve(amrResultFileName);
 
@@ -58,7 +63,7 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
 
         ExecuteResult executeResult = this._execute(runCmd, stageExecutionInput.workDir);
         if (!executeResult.success()){
-            logger.error("{} amr run failed. run code = {}. ", stage, executeResult.runCode, executeResult.ex);
+            logger.error("{} amr run failed. run code = {}. ", stageExecutionInput.stageId, executeResult.runCode, executeResult.ex);
             return this.runFail(stage, "amr run failed");
         }
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(resultPath);
@@ -72,5 +77,16 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
     @Override
     public int id() {
         return PIPELINE_STAGE_AMR;
+    }
+
+    @Override
+    protected Class<AMRInputUrls> stageInputType() {
+        return AMRInputUrls.class;
+    }
+
+    @Override
+    protected Class<AMRParamters> stageParameterType() {
+        // TODO Auto-generated method stub
+        return AMRParamters.class;
     }
 }

@@ -1,26 +1,17 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.stageResult.QcResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.entity.BioPipelineStageExample;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.utils.JsonUtil;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Path;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_QC;
-import static com.xjtlu.bio.service.PipelineService.*;
 
 
 @Component

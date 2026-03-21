@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
@@ -19,35 +18,41 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.utils.JsonUtil;
 
 
 @Component
-public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOutput> implements PipelineStageExecutor<VariantStageOutput>{
+public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOutput, VarientCallInputUrls, VarientCallParameters> implements PipelineStageExecutor<VariantStageOutput>{
 
 
 
+@Override
+protected Class<VarientCallInputUrls> stageInputType() {
+    return VarientCallInputUrls.class;
+}
 
+@Override
+protected Class<VarientCallParameters> stageParameterType() {
+    return VarientCallParameters.class;
+}
 
     @Override
     public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
-        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
-        String inputUrls = bioPipelineStage.getInputUrl();
-        VarientCallInputUrls varientCallInputUrls = JsonUtil.toObject(bioPipelineStage.getInputUrl(), VarientCallInputUrls.class);
-        VarientCallParameters varientCallParameters = JsonUtil.toObject(bioPipelineStage.getParameters(), VarientCallParameters.class);
+        long bioPipelineStage = stageExecutionInput.stageId;
+        VarientCallInputUrls varientCallInputUrls = stageExecutionInput.input;
+        VarientCallParameters varientCallParameters = stageExecutionInput.stageParameters;
 
         RefSeqConfig refSeqConfig = varientCallParameters.getRefSeqConfig();
         if(refSeqConfig == null){
-            logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage.getStageId());
+            logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage);
             return StageRunResult.fail("未能加载参考基因文件",bioPipelineStage, null);
         }
 
         File refseq = null;
-        if(refSeqConfig.getRefseqId()>=0){
+        if(refSeqConfig.isInnerRefSeq()){
             refseq = this.refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId());
             
         }else {
@@ -105,9 +110,9 @@ public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOu
 
         // 中间与最终产物
         Path bcfRaw = workDir.resolve("raw.bcf");
-        VariantStageOutput variantStageOutput = bioStageUtil.varientOutput(bioPipelineStage, workDir);
-        Path vcfGz = Path.of(variantStageOutput.getVcfGz());
-        Path vcfTbi = Path.of(variantStageOutput.getVcfTbi());
+        
+        Path vcfGz = stageExecutionInput.workDir.resolve(VariantStageOutput.VCF_GZ);
+        Path vcfTbi = stageExecutionInput.workDir.resolve(VariantStageOutput.VCF_TBI);
 
         // ---------- 1) mpileup: BAM -> BCF ----------
         // -Ou 输出未压缩 BCF 到 stdout（这里我们直接 -o 写文件，避免管道）

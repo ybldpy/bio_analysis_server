@@ -1,6 +1,5 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
-
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_TAXONOMY;
 
 import java.nio.file.Path;
@@ -14,25 +13,36 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
-
 @Component
-public class TaxonomyStageExecutor extends AbstractPipelineStageExector<TaxonomyStageOutput>
+public class TaxonomyStageExecutor
+        extends AbstractPipelineStageExector<TaxonomyStageOutput, TaxonomyStageInputUrls, BaseStageParams>
         implements PipelineStageExecutor<TaxonomyStageOutput> {
 
     @Override
-    protected StageRunResult<TaxonomyStageOutput> _execute(StageExecutionInput stageExecutionInput)
-            throws JsonMappingException, JsonProcessingException {
+    protected Class<TaxonomyStageInputUrls> stageInputType() {
+        return TaxonomyStageInputUrls.class;
+    }
 
-        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
+    @Override
+    protected Class<BaseStageParams> stageParameterType() {
+        return BaseStageParams.class;
+    }
+
+    @Override
+    protected StageRunResult<TaxonomyStageOutput> _execute(StageExecutionInput stageExecutionInput)
+            throws JsonMappingException, JsonProcessingException, LoadFailException {
+
+        long bioPipelineStage = stageExecutionInput.stageId;
         Path inputDirPath = stageExecutionInput.inputDir;
         Path workDirPath = stageExecutionInput.workDir;
 
-        Map<String, String> inputMap = JsonUtil.toMap(bioPipelineStage.getInputUrl(), String.class);
-        TaxonomyStageInputUrls taxonomyStageInputUrls = JsonUtil.toObject(bioPipelineStage.getInputUrl(), TaxonomyStageInputUrls.class);
+        // Map<String, String> inputMap = JsonUtil.toMap(bioPipelineStage.getInputUrl(), String.class);
+        TaxonomyStageInputUrls taxonomyStageInputUrls = stageExecutionInput.input;
 
         String r1Url = taxonomyStageInputUrls.getR1();
         String r2Url = taxonomyStageInputUrls.getR2();
@@ -42,12 +52,13 @@ public class TaxonomyStageExecutor extends AbstractPipelineStageExector<Taxonomy
         Path r1Path = inputDirPath.resolve("r1.fastq");
         Path r2Path = StringUtils.isBlank(r2Url)?null:inputDirPath.resolve("r2.fastq");
 
-        boolean loadResult = r2Path == null?this.loadInput(Map.of(r1Url, r1Path)):this.loadInput(Map.of(r1Url, r1Path, r2Url, r2Path));
-
-
-        if(!loadResult){
-            return this.runFail(bioPipelineStage, "加载input失败");
+        if(r2Path == null){
+            this.loadInput(Map.of(r1Url, r1Path));
+        }else {
+            this.loadInput(Map.of(r1Url, r1Path, r2Url, r2Path));
         }
+
+        
 
 
         Path reportPath = workDirPath.resolve("taxonomny.report");

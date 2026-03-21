@@ -4,7 +4,6 @@ package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.stageResult.ReadLenStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadLengthDetectStageOutput;
-import com.xjtlu.bio.service.PipelineService;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;

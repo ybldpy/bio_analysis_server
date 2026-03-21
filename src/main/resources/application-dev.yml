@@ -45,6 +45,10 @@ analysis-pipeline:
         seroBA: ["${analysis-pipeline.conda}", "run", "-n", "seroba", "seroba"]
         
 
+
+
+    covid2RefSeq:
+        accession: "NC_045512.2"
     stage:
         baseInputDir: /home/jcy/bio_app_data/temp/stage/input
         baseWorkDir: /home/jcy/bio_app_data//temp/stage/work
@@ -76,7 +80,9 @@ analysis-pipeline:
             tsvFileName: "amr.tsv"
             jsonFileName: "amr.json"
             summaryFileName: "amr.summary.json"
-        serotype:
+        snp:
+            annotation:
+                tsvFileName: "annotated.tsv"
 
         
         

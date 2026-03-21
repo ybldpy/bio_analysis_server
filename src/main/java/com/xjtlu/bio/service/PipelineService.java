@@ -63,6 +63,7 @@ import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineInpu
 
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 
 @Service
 public class PipelineService {
@@ -107,6 +108,9 @@ public class PipelineService {
 
     @Resource
     private StageOrchestrator stageOrchestrator;
+
+    @Value("${analysis-pipeline.covid2RefSeq.accession}")
+    private String originalCovid2Accession;
 
     public static final int PIPELINE_VIRUS = 0;
     public static final int PIPELINE_VIRUS_COVID = 1;
@@ -190,6 +194,21 @@ public class PipelineService {
     public Result<Long> createPipeline(BioSample bioSample,
             PipelineStageParameters pipelineStageParams) {
 
+        boolean noRefseq = pipelineStageParams.getTaxId() == null;
+
+        List<BioRefseq> candiates = null;
+
+        if (!noRefseq) {
+            BioRefseqExample bioRefseqExample = new BioRefseqExample();
+            bioRefseqExample.createCriteria().andTaxIdEqualTo(pipelineStageParams.getTaxId());
+            candiates = bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqExample);
+            if (candiates.isEmpty()) {
+                return new Result<Long>(Result.BUSINESS_FAIL, -1l, "未能找到参考基因组");
+            }
+        }
+
+
+
         BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
         bioAnalysisPipeline.setPipelineType(mapSampleTypeToPipelineType(bioSample.getSampleType()));
         bioAnalysisPipeline.setSampleId(bioSample.getSid());
@@ -199,7 +218,7 @@ public class PipelineService {
             return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
         }
 
-        List<BioPipelineStage> stages = this.buildPipelineStages(bioSample, bioAnalysisPipeline, pipelineStageParams);
+        List<BioPipelineStage> stages = this.buildPipelineStages(bioSample, bioAnalysisPipeline, candiates);
         if (stages == null || stages.isEmpty()) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
@@ -216,6 +235,10 @@ public class PipelineService {
         }
 
         return new Result<Long>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(), null);
+    }
+
+    private BioRefseq getOriginalCovid2Refseqs(List<BioRefseq> covid2Refseqs){
+        return covid2Refseqs.stream().filter(refseq->{return refseq.getAccessions().contains(originalCovid2Accession);}).findFirst().orElse(null);
     }
 
     private BioRefseq getBestCandicateRefSeqs(List<BioRefseq> candiatesRefseqs)
@@ -249,8 +272,6 @@ public class PipelineService {
         HashMap<Long, Integer> candiatesAccessionsListLengthMap = new HashMap<>();
         HashMap<Long, Integer> candiateAccessionLengthMap = new HashMap<>();
 
-        int accessionSourceWeight = 5;
-
 
         for (BioRefseq bioRefseq : candidates) {
             List<String> accessions = JsonUtil.toObject(bioRefseq.getAccessions(), List.class);
@@ -263,12 +284,15 @@ public class PipelineService {
             }
             candiatesNCPrefixNumMap.put(bioRefseq.getRefId(), num);
 
-            if(!hasSegment){
-                Map<String,Object> meta = JsonUtil.toMap(bioRefseq.getMeta());
+            if (!hasSegment) {
+                Map<String, Object> meta = JsonUtil.toMap(bioRefseq.getMeta());
                 int len = (Integer) meta.getOrDefault("length", 1000);
                 candiateAccessionLengthMap.put(bioRefseq.getRefId(), len);
             }
         }
+
+
+        int accessionSourceWeight = 10;
 
         if (hasSegment) {
             candidates.sort((refseq1, refseq2) -> {
@@ -283,9 +307,11 @@ public class PipelineService {
             return candidates.get(0);
         }
 
-        candidates.sort((refseq1, refseq2)->{
-            int refseq1Score = candiatesNCPrefixNumMap.get(refseq1.getRefId()) * accessionSourceWeight + candiateAccessionLengthMap.get(refseq1.getRefId());
-            int refseq2Score = candiatesNCPrefixNumMap.get(refseq2.getRefId()) * accessionSourceWeight + candiateAccessionLengthMap.get(refseq2.getRefId());
+        candidates.sort((refseq1, refseq2) -> {
+            int refseq1Score = candiatesNCPrefixNumMap.get(refseq1.getRefId()) * accessionSourceWeight
+                    + candiateAccessionLengthMap.get(refseq1.getRefId());
+            int refseq2Score = candiatesNCPrefixNumMap.get(refseq2.getRefId()) * accessionSourceWeight
+                    + candiateAccessionLengthMap.get(refseq2.getRefId());
             return Integer.compare(refseq2Score, refseq1Score);
         });
         return candidates.get(0);
@@ -294,20 +320,34 @@ public class PipelineService {
     private List<BioPipelineStage> buildPipelineStages(BioSample bioSample, BioAnalysisPipeline bioAnalysisPipeline,
             List<BioRefseq> candicateRefSeqs) {
 
-        if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS
-                || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {
+        if (bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS || bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID) {
             try {
 
                 // prefer NC prefix
-                BioRefseq bioRefseq = getBestCandicateRefSeqs(candicateRefSeqs);
-
                 PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
-                pipelineConfigurations.setRefId(bioRefseq.getRefId());
+                if(bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID){
+                    BioRefseq bioRefseq = getOriginalCovid2Refseqs(candicateRefSeqs);
+                    if(bioRefseq == null){
+                        return null;
+                    }
+                    pipelineConfigurations.setRefId(bioRefseq.getRefId());
+                    List<String> accession = JsonUtil.toObject(bioRefseq.getAccessions(), List.class);
+                    pipelineConfigurations.setRefseqAccessions(accession);
+                }
+                else if(candicateRefSeqs != null && !candicateRefSeqs.isEmpty()){
+                    BioRefseq bioRefseq = getBestCandicateRefSeqs(candicateRefSeqs);
+                    pipelineConfigurations.setRefId(bioRefseq.getRefId());
+                    List<String> accessions = JsonUtil.toObject(bioRefseq.getAccessions(), List.class);
+                    pipelineConfigurations.setRefseqAccessions(accessions);
+                }
+
+
+                boolean isCovid2Pipeline = bioAnalysisPipeline.getPipelineType() == PIPELINE_VIRUS_COVID;
 
                 List<BioPipelineStage> stages = AnalysisPipelineStagesBuilder.buildVirusStages(
                         bioAnalysisPipeline.getPipelineId(),
-                        false,
-                        false,
+                        isCovid2Pipeline,
+                        isCovid2Pipeline,
                         new PipelineInput(bioSample.getRead1Url(), bioSample.getRead2Url()),
                         pipelineConfigurations);
                 return stages;

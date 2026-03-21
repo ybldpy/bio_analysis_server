@@ -16,13 +16,14 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.taskrunner.AbstractPipelineStageExector.StageExecutionInput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
 
 @Component
-public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusStageOutput> implements PipelineStageExecutor<ConsensusStageOutput>{
+public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusStageOutput, ConsensusStageInputUrls, ConsensusStageParameters> implements PipelineStageExecutor<ConsensusStageOutput>{
 
 
 
@@ -36,15 +37,24 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
     @Value("${analysis-pipeline.stage.varient.vcfIndexFileName}")
     private String vcfTbiFileName;
 
+    @Override
+    protected Class<ConsensusStageInputUrls> stageInputType() {
+        return ConsensusStageInputUrls.class;
+    }
 
     @Override
-    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
+    protected Class<ConsensusStageParameters> stageParameterType() {
+        return ConsensusStageParameters.class;
+    }
+
+
+    @Override
+    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
-        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
-        String inputUrls = bioPipelineStage.getInputUrl();
-        ConsensusStageInputUrls consensusStageInputUrls = JsonUtil.toObject(inputUrls, ConsensusStageInputUrls.class);
-        ConsensusStageParameters consensusStageParameters = JsonUtil.toObject(bioPipelineStage.getParameters(), ConsensusStageParameters.class);
+        long bioPipelineStage = stageExecutionInput.stageId;
+        ConsensusStageInputUrls consensusStageInputUrls = stageExecutionInput.input;
+        ConsensusStageParameters consensusStageParameters = stageExecutionInput.stageParameters;
 
         RefSeqConfig refSeqConfig = consensusStageParameters.getRefSeqConfig();
 
@@ -81,10 +91,8 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         Path vcfTbiTmpPath = inputTmpDir.resolve(vcfTbiFileName);
 
         
-       boolean loadRes = loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
-        if(!loadRes){
-            return this.runFail(bioPipelineStage, "load failed");
-        }
+        loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
+        
 
         
         

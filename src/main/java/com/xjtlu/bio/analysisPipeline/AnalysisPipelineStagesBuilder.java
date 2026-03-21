@@ -11,7 +11,6 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.requestParameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.utils.JsonUtil;
 
 public class AnalysisPipelineStagesBuilder {
@@ -22,6 +21,7 @@ public class AnalysisPipelineStagesBuilder {
 
     public static class PipelineConfigurations{
         private long refId;
+        private List<String> refseqAccessions;
 
         public long getRefId() {
             return refId;
@@ -31,9 +31,15 @@ public class AnalysisPipelineStagesBuilder {
             this.refId = refId;
         }
 
-        
+        public List<String> getRefseqAccessions() {
+            return refseqAccessions;
+        }
 
-        
+        public void setRefseqAccessions(List<String> refseqAccessions) {
+            this.refseqAccessions = refseqAccessions;
+        }
+
+
 
     }
 
@@ -148,11 +154,11 @@ public class AnalysisPipelineStagesBuilder {
 
         long refseqId = pipelineConfigurations.getRefId();
         RefSeqConfig refSeqConfig = new RefSeqConfig();
+        refSeqConfig.setAccessions(pipelineConfigurations.getRefseqAccessions());
         refSeqConfig.setRefseqId(refseqId);
         refSeqConfig.setInnerRefSeq(refseqId >= 0);
         BaseStageParams baseStageParams = new BaseStageParams(refSeqConfig, null);
         
-
         BioPipelineStage qc = new BioPipelineStage();
         QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
         qcStageInputUrls.setRead1(qcInputRead1);
@@ -184,7 +190,7 @@ public class AnalysisPipelineStagesBuilder {
 
         if(requireSNP){
             BioPipelineStage snp = new BioPipelineStage();
-            snp.setStageType(PIPELINE_STAGE_SNP_CORE);
+            snp.setStageType(PIPELINE_STAGE_SNP_ANNOTATION);
             stages.add(snp);
         }
 

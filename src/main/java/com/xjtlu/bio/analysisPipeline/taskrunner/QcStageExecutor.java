@@ -26,8 +26,18 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
-public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput> implements PipelineStageExecutor<QCStageOutput> {
+public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput, QcStageInputUrls, QcParameters> implements PipelineStageExecutor<QCStageOutput> {
 
+
+    @Override
+    protected Class<QcStageInputUrls> stageInputType() {
+        return QcStageInputUrls.class;
+    }
+
+    @Override
+    protected Class<QcParameters> stageParameterType() {
+        return QcParameters.class;
+    }
 
     private static final Logger logger = LoggerFactory.getLogger(QcStageExecutor.class);
 
@@ -35,9 +45,8 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
     public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
-        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
-        String inputUrlsJson = bioPipelineStage.getInputUrl();
-        QcStageInputUrls qcStageInputUrls = JsonUtil.toObject(inputUrlsJson, QcStageInputUrls.class);
+        long bioPipelineStage = stageExecutionInput.stageId;
+        QcStageInputUrls qcStageInputUrls = stageExecutionInput.input;
 
         
 
@@ -49,8 +58,8 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput>
         Path outputDir = stageExecutionInput.workDir;
         Path inputDir = stageExecutionInput.inputDir;
 
-        String params = bioPipelineStage.getParameters();
-        QcParameters qcParams = JsonUtil.toObject(params, QcParameters.class);
+        
+        QcParameters qcParams = stageExecutionInput.stageParameters;
 
 
         boolean isGz = input1FileName.endsWith(".gz");

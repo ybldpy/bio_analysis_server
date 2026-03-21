@@ -37,6 +37,7 @@ public class Constants {
         // SNP & 溯源
         public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP
         public static final int PIPELINE_STAGE_SNP_CORE = 71; // 多样本核心SNP/建树
+        public static final int PIPELINE_STAGE_SNP_ANNOTATION = 72; //SNP注释
 
         // 病原学特征（细菌模块）
         public static final int PIPELINE_STAGE_AMR = 60; // 耐药基因 AMRFinder/ResFinder

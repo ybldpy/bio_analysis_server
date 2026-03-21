@@ -3,6 +3,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MLSTStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -18,27 +19,35 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class MLSTStageExecutor extends AbstractPipelineStageExector<MLSTStageOutput> implements PipelineStageExecutor<MLSTStageOutput>{
+public class MLSTStageExecutor extends AbstractPipelineStageExector<MLSTStageOutput, MLSTStageInputUrls, BaseStageParams> implements PipelineStageExecutor<MLSTStageOutput>{
 
 
 
+
+
+    @Override
+    protected Class<MLSTStageInputUrls> stageInputType() {
+        return MLSTStageInputUrls.class;
+    }
+
+    @Override
+    protected Class<BaseStageParams> stageParameterType() {
+        return BaseStageParams.class;
+    }
 
     @Value("${analysis-pipeline.stage.mlst.tsvFileName}")
     private String mlstFileName;
 
     @Override
-    protected StageRunResult<MLSTStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
-        BioPipelineStage stage = stageExecutionInput.bioPipelineStage;
+    protected StageRunResult<MLSTStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
+        long stage = stageExecutionInput.stageId;
 
-        MLSTStageInputUrls mlstStageInputUrls = JsonUtil.toObject(stage.getInputUrl(), MLSTStageInputUrls.class);
-
+        MLSTStageInputUrls mlstStageInputUrls = stageExecutionInput.input;
         String contigUrl = mlstStageInputUrls.getContigUrl();
         Path contigPath = stageExecutionInput.inputDir.resolve("in.contig");
         Path resultPath = stageExecutionInput.workDir.resolve("mlstResult.tsv");
-        boolean loadSuccess = this.loadInput(Map.of(contigUrl,contigPath));
-        if(!loadSuccess){
-            return this.runFail(stage, "load input failed");
-        }
+        this.loadInput(Map.of(contigUrl,contigPath));
+        
 
         List<String> runCmd = new ArrayList<>();
         runCmd.addAll(this.analysisPipelineToolsConfig.getMlst());

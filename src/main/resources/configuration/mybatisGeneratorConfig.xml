@@ -58,12 +58,23 @@
     </table> -->
 
 
-    <table tableName="bio_refseq" schema="bio" 
+    <!-- <table tableName="bio_refseq" schema="bio" 
     enableCountByExample="true"
     enableUpdateByExample="true"
     enableSelectByExample="true"
     enableDeleteByExample="true">
       <generatedKey column="ref_id" sqlStatement="JDBC" identity="true"/>
+    </table> -->
+
+    <table tableName="bio_tax_host" schema="bio"
+    enableCountByExample="true"
+    enableDeleteByExample="true"
+    enableSelectByExample="true"
+    enableUpdateByExample="true"
+    >
+
+    <generatedKey column="tax_host_id" sqlStatement="JDBC" identity="true"/>
+
     </table>
 
 
