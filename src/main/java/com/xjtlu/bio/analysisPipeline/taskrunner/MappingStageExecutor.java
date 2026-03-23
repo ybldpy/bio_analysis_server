@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
@@ -53,7 +54,7 @@ public class MappingStageExecutor
             throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
-        long bioPipelineStage = stageExecutionInput.stageId;
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
         
         MappingInputUrls mappingInputUrls = stageExecutionInput.input;
         MappingParameters parameters = stageExecutionInput.stageParameters;

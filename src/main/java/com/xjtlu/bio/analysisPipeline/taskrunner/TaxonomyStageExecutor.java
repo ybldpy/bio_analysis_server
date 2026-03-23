@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput;
@@ -37,7 +38,7 @@ public class TaxonomyStageExecutor
     protected StageRunResult<TaxonomyStageOutput> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException {
 
-        long bioPipelineStage = stageExecutionInput.stageId;
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
         Path inputDirPath = stageExecutionInput.inputDir;
         Path workDirPath = stageExecutionInput.workDir;
 

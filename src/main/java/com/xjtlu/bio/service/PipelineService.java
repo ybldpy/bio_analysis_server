@@ -34,9 +34,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder;
+import com.xjtlu.bio.analysisPipeline.BioStageUtil;
 import com.xjtlu.bio.analysisPipeline.StageOrchestrator;
 import com.xjtlu.bio.analysisPipeline.StageOrchestrator.MissingUpstreamException;
 import com.xjtlu.bio.analysisPipeline.StageOrchestrator.OrchestratePlan;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.common.Result;
@@ -53,7 +55,6 @@ import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.requestParameters.CreateSampleRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
-import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
@@ -440,7 +441,7 @@ public class PipelineService {
 
     @Async
     public void pipelineStageDone(StageRunResult stageRunResult) {
-        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+        StageContext bioPipelineStage = stageRunResult.getStage();
         int stageType = bioPipelineStage.getStageType();
         StageDoneHandler stageDoneHandler = stageDoneHandlerMap.get(stageType);
 
@@ -448,7 +449,7 @@ public class PipelineService {
             BioPipelineStage updateStage = new BioPipelineStage();
             updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
             int res = this.updateStageFromVersion(
-                    new UpdateStageCommand(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion()));
+                    new UpdateStageCommand(updateStage, bioPipelineStage.getRunStageId(), bioPipelineStage.getVersion()));
             logger.info("{} execute failed {}", stageRunResult.getStage(), stageRunResult.getErrorLog());
             return;
         }
@@ -458,7 +459,7 @@ public class PipelineService {
             return;
         }
 
-        this.scheduleDownstreamStages(bioPipelineStage.getStageId());
+        this.scheduleDownstreamStages(bioPipelineStage.getRunStageId());
 
     }
 

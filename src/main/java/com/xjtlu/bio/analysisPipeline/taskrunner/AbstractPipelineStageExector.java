@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.BioStageUtil;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
@@ -31,7 +33,6 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.RefSeqService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
-import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import jakarta.annotation.Resource;
@@ -73,8 +74,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     }
 
     protected class StageExecutionInput {
-        // BioPipelineStage bioPipelineStage;
-        long stageId;
+        StageContext stageContext;
         Input input;
         StageParameters stageParameters;
         Path workDir;
@@ -114,7 +114,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         return true;
     }
 
-    protected void preExecute(BioPipelineStage bioPipelineStage) throws IOException {
+    protected void preExecute(StageContext bioPipelineStage) throws IOException {
         resetDirectory(this.workDirPath(bioPipelineStage));
         resetDirectory(this.stageInputPath(bioPipelineStage));
     }
@@ -169,10 +169,10 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     }
 
     protected void postExecute(StageRunResult stageRunResult) {
-        Path inputDir = this.stageInputPath(stageRunResult.getStage());
+        Path inputDir = this.stageInputPath(stageRunResult.getStageContext());
         FileUtils.deleteQuietly(inputDir.toFile());
         if (!stageRunResult.isSuccess()) {
-            FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStage()).toFile());
+            FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStageContext()).toFile());
         }
     }
 
@@ -183,13 +183,13 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
                 : _execute(runCmd, stageExecutionInput.workDir, redirectOutputStream, null);
 
         if (!executeResult.success()) {
-            logExecutionFailed(executeResult, stageExecutionInput.stageId);
+            logExecutionFailed(executeResult, stageExecutionInput.stageContext.getRunStageId());
             return false;
         }
 
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(toValidateFiles);
         if (!stageOutputValidationResults.isEmpty()) {
-            logNoOutput(stageOutputValidationResults, stageExecutionInput.stageId);
+            logNoOutput(stageOutputValidationResults, stageExecutionInput.stageContext.getRunStageId());
             return false;
         }
         return true;
@@ -197,20 +197,26 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     @Override
     public StageRunResult<T> execute(BioPipelineStage bioPipelineStage) {
+
+        StageContext stageContext = new StageContext();
+        stageContext.setRunStageId(bioPipelineStage.getStageId());
+        stageContext.setVersion(bioPipelineStage.getVersion());
+        stageContext.setStageType(bioPipelineStage.getStageType());
+
         try {
-            preExecute(bioPipelineStage);
+            preExecute(stageContext);
         } catch (Exception e) {
             logger.error("{} exception happens at preExecute", bioPipelineStage, e);
-            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", bioPipelineStage.getStageId(), e);
+            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", stageContext, e);
             postExecute(stageRunResult);
             return stageRunResult;
         }
 
-        Path workDir = this.workDirPath(bioPipelineStage);
-        Path inputDir = this.stageInputPath(bioPipelineStage);
+        Path workDir = this.workDirPath(stageContext);
+        Path inputDir = this.stageInputPath(stageContext);
 
         StageExecutionInput stageExecutionInput = new StageExecutionInput();
-        stageExecutionInput.stageId = bioPipelineStage.getStageId();
+        stageExecutionInput.stageContext = stageContext;
         stageExecutionInput.inputDir = inputDir;
         stageExecutionInput.workDir = workDir;
 
@@ -224,14 +230,14 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         } catch (JsonMappingException e) {
             // TODO Auto-generated catch block
             logger.error("JSON mapping exception while executing stage. input={}", stageExecutionInput, e);
-            stageRunResult = this.runException(bioPipelineStage.getStageId(), e);
+            stageRunResult = this.runException(stageContext, e);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("JSON processing exception while executing stage. input={}", stageExecutionInput, e);
-            stageRunResult = this.runException(bioPipelineStage.getStageId(), e);
+            stageRunResult = this.runException(stageContext, e);
         } catch (LoadFailException e) {
             logger.error("stage = {} load failed. ", bioPipelineStage.getStageId(), e.causeException);
-            stageRunResult = this.runException(bioPipelineStage.getStageId(), e);
+            stageRunResult = this.runException(stageContext, e);
         }
         postExecute(stageRunResult);
         return stageRunResult;
@@ -245,19 +251,19 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException;
 
-    protected StageRunResult<T> runException(long bioPipelineStage, Exception e) {
+    protected StageRunResult<T> runException(StageContext bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());
     }
 
-    protected StageRunResult<T> runFail(long stageId, String errorMsg, Exception e) {
-        return StageRunResult.fail(errorMsg, stageId, e);
+    protected StageRunResult<T> runFail(StageContext stageContext, String errorMsg, Exception e) {
+        return StageRunResult.fail(errorMsg, stageContext, e);
     }
 
-    protected StageRunResult<T> runFail(long bioPipelineStage, String msg) {
+    protected StageRunResult<T> runFail(StageContext bioPipelineStage, String msg) {
         return runFail(bioPipelineStage, msg, null);
     }
 
-    public Path stageInputPath(BioPipelineStage bioPipelineStage) {
+    public Path stageInputPath(StageContext bioPipelineStage) {
         return bioStageUtil.stageExecutorInputDir(bioPipelineStage);
     }
 
@@ -363,11 +369,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     }
 
-    protected StageRunResult<T> runFail(long stageId, String errorMessge, Exception e,
+    protected StageRunResult<T> runFail(StageContext stageContext, String errorMessge, Exception e,
             Path inputDir,
             Path workDir) {
         this.deleteTmpFiles(List.of(inputDir.toFile(), workDir.toFile()));
-        return this.runFail(stageId, errorMessge, e);
+        return this.runFail(stageContext, errorMessge, e);
     }
 
     protected static String appendSuffixBeforeExtensions(String fileName, String suffix) {
@@ -421,7 +427,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     public abstract int id();
 
-    protected StageRunResult parseError(long bioPipelineStage) {
+    protected StageRunResult parseError(StageContext bioPipelineStage) {
         return runFail(bioPipelineStage, PARSE_JSON_ERROR);
     }
 
@@ -559,7 +565,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         return code;
     }
 
-    public Path workDirPath(BioPipelineStage bioPipelineStage) {
+    public Path workDirPath(StageContext bioPipelineStage) {
         return bioStageUtil.stageExecutorWorkDir(bioPipelineStage);
     }
 

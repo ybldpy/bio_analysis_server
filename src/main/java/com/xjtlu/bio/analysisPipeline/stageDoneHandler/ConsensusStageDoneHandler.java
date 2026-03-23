@@ -33,7 +33,7 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
     @Override
     protected Pair<Map<String, String>, ConsensusStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<ConsensusStageOutput> stageRunResult) {
-        String consensusUrl = this.createStoreObjectName(stageRunResult.getStage(), consensusOutputFileName);
+        String consensusUrl = this.createStoreObjectName(stageRunResult.getStageContext(), consensusOutputFileName);
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getConsensusFa(), consensusUrl),
             new ConsensusStageResult(consensusUrl)

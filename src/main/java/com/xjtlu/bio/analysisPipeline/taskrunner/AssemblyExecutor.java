@@ -18,7 +18,9 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AssemblyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
@@ -26,7 +28,7 @@ import com.xjtlu.bio.service.StorageService.GetObjectResult;
 import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
-public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput> {
+public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput, AssemblyInputUrls, BaseStageParams> {
 
 
     @Value("${analysis-pipeline.stage.assembly.contigsFileName}")
@@ -37,13 +39,26 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
 
     
 
+
+
     @Override
-    public StageRunResult<AssemblyStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
+    protected Class<AssemblyInputUrls> stageInputType() {
+        return AssemblyInputUrls.class;
+    }
+
+    @Override
+    protected Class<BaseStageParams> stageParameterType() {
+        return BaseStageParams.class;
+    }
+
+    @Override
+    public StageRunResult<AssemblyStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
-        BioPipelineStage bioPipelineStage = stageExecutionInput.bioPipelineStage;
-        String inputUrl = bioPipelineStage.getInputUrl();
-        AssemblyInputUrls assemblyInputUrls = JsonUtil.toObject(inputUrl, AssemblyInputUrls.class);
+
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
+        
+        AssemblyInputUrls assemblyInputUrls = stageExecutionInput.input;
 
         String r1 = assemblyInputUrls.getRead1Url();
         String r2 = assemblyInputUrls.getRead2Url();
@@ -60,11 +75,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
             r2Path = tempInputDir.resolve(r2.substring(r2.lastIndexOf("/")+1));
         }
 
-        boolean res = this.loadInput(r2!=null?Map.of(r1, r1Path, r2, r2Path):Map.of(r1,r1Path));
-
-        if(!res){
-            return this.runFail(bioPipelineStage, "load fail");
-        }
+        this.loadInput(r2!=null?Map.of(r1, r1Path, r2, r2Path):Map.of(r1,r1Path));
 
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getSpades());

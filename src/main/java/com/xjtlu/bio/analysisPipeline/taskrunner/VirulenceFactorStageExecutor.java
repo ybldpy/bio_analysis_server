@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VirulenceFactorStageOutput;
@@ -36,7 +37,7 @@ public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<V
     }
     @Override
     protected StageRunResult<VirulenceFactorStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
-        long stage = stageExecutionInput.stageId;
+        StageContext stage = stageExecutionInput.stageContext;
 
         // Map<String,String> inputUrlMap = this.loadInputUrlMap(stage);
         // if (inputUrlMap == null){

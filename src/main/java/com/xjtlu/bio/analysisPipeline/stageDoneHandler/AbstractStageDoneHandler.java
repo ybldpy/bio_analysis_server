@@ -6,10 +6,11 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
+import com.xjtlu.bio.analysisPipeline.BioStageUtil;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
-import com.xjtlu.bio.utils.BioStageUtil;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import jakarta.annotation.Resource;
@@ -65,11 +66,11 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
         Pair<Map<String,String>, ? extends StageResult> uploadConfigAndOutputUrlMap = this.buildUploadConfigAndOutputUrlMap(stageRunResult);
 
         Map<String,String> uploadConfig = uploadConfigAndOutputUrlMap.getLeft();
-        
+        StageContext stageContext = stageRunResult.getStageContext();
 
         if(uploadConfig!=null && !uploadConfig.isEmpty()){
             if(!this.batchUploadObjectsFromLocal(uploadConfig)){
-                this.handleFail(stageRunResult.getStage(), stageRunResult.getStageOutput().getParentPath().toString());
+                this.handleFail(stageContext, stageRunResult.getStageOutput().getParentPath().toString());
                 return false;
             }
         }
@@ -80,25 +81,21 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
             serializedOutputMap = JsonUtil.toJson(outputMap);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
-            this.logger.error("{} parsing {} json exception", stageRunResult.getStage(), outputMap,e);
+            this.logger.error("stage id = {} parsing {} json exception", stageContext.getRunStageId(), outputMap,e);
             return false;
         }
 
         deleteStageResultDir(stageRunResult.getStageOutput().getParentPath());
 
-        BioPipelineStage runStage = stageRunResult.getStage();
+
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setOutputUrl(serializedOutputMap);
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         Date endDate = new Date();
         updateStage.setEndTime(endDate);
-        updateStage.setVersion(runStage.getVersion()+1);
+        updateStage.setVersion(stageContext.getVersion()+1);
 
-        int updateRes = this.pipelineService.updateStageFromVersion(new UpdateStageCommand(updateStage, runStage.getStageId(), runStage.getVersion()));
-        runStage.setOutputUrl(serializedOutputMap);
-        runStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
-        runStage.setEndTime(endDate);
-        runStage.setVersion(runStage.getVersion()+1);
+        int updateRes = this.pipelineService.updateStageFromVersion(new UpdateStageCommand(updateStage, stageContext.getRunStageId(), stageContext.getVersion()));
 
         return updateRes > 0;
 
@@ -127,7 +124,7 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
 
     // protected abstract boolean batchUploadObjectsFromLocal(StageRunResult<T> stageRunResult);
 
-    protected String createStoreObjectName(BioPipelineStage pipelineStage, String name){
+    protected String createStoreObjectName(StageContext pipelineStage, String name){
         return bioStageUtil.createStoreObjectName(pipelineStage, name);
     }
 
@@ -175,15 +172,15 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
         }
     }
 
-    protected void handleFail(BioPipelineStage bioPipelineStage, String deleteDir){
+    protected void handleFail(StageContext bioPipelineStage, String deleteDir){
         this.deleteStageResultDir(deleteDir);
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setVersion(bioPipelineStage.getVersion()+1);
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FAIL);
-        pipelineService.updateStageFromVersion(new UpdateStageCommand(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion()));
+        pipelineService.updateStageFromVersion(new UpdateStageCommand(updateStage, bioPipelineStage.getRunStageId(), bioPipelineStage.getVersion()));
     }
 
-    protected void handleUnsuccessUpload(BioPipelineStage bioPipelineStage, String deleteDir) {
+    protected void handleUnsuccessUpload(StageContext bioPipelineStage, String deleteDir) {
         handleFail(bioPipelineStage, deleteDir);
     }
 

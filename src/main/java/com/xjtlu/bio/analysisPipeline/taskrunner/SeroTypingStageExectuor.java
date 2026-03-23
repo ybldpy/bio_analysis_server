@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SeroTypeStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SeroTypingStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.TaxonomyContext;
@@ -109,9 +110,9 @@ public class SeroTypingStageExectuor
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
 
         if (!res) {
-            return this.runFail(stageExecutionInput.stageId, "未成功执行");
+            return this.runFail(stageExecutionInput.stageContext, "未成功执行");
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageId);
+        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageContext);
     }
 
     private StageRunResult<SeroTypingStageOutput> executeECoilType(StageExecutionInput stageExecutionInput,
@@ -128,9 +129,9 @@ public class SeroTypingStageExectuor
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
 
         if (!res) {
-            return this.runFail(stageExecutionInput.stageId, "未成功执行");
+            return this.runFail(stageExecutionInput.stageContext, "未成功执行");
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageId);
+        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageContext);
 
     }
 
@@ -149,9 +150,9 @@ public class SeroTypingStageExectuor
 
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
         if (!res) {
-            return this.runFail(stageExecutionInput.stageId, "未成功执行");
+            return this.runFail(stageExecutionInput.stageContext, "未成功执行");
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageId);
+        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageContext);
     }
 
     private StageRunResult<SeroTypingStageOutput> executeStreptococcusType(StageExecutionInput stageExecutionInput,
@@ -168,8 +169,8 @@ public class SeroTypingStageExectuor
         Path resultFile = stageExecutionInput.workDir.resolve("pred.tsv");
 
         return _execute(cmd, null, stageExecutionInput, resultFile)
-                ? this.runFail(stageExecutionInput.stageId, "未执行成功")
-                : StageRunResult.OK(new SeroTypingStageOutput(resultFile), stageExecutionInput.stageId);
+                ? this.runFail(stageExecutionInput.stageContext, "未执行成功")
+                : StageRunResult.OK(new SeroTypingStageOutput(resultFile), stageExecutionInput.stageContext);
 
     }
 
@@ -177,7 +178,7 @@ public class SeroTypingStageExectuor
     protected StageRunResult<SeroTypingStageOutput> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
-        long stage = stageExecutionInput.stageId;
+        StageContext stage = stageExecutionInput.stageContext;
         Path inputDir = stageExecutionInput.inputDir;
         Path outputDir = stageExecutionInput.workDir;
 

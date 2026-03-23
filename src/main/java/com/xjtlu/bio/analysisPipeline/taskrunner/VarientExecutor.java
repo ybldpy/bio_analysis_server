@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VarientCallInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
@@ -41,7 +42,7 @@ protected Class<VarientCallParameters> stageParameterType() {
     public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
-        long bioPipelineStage = stageExecutionInput.stageId;
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
         VarientCallInputUrls varientCallInputUrls = stageExecutionInput.input;
         VarientCallParameters varientCallParameters = stageExecutionInput.stageParameters;
 

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
@@ -52,7 +53,7 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
     public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
-        long bioPipelineStage = stageExecutionInput.stageId;
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
         ConsensusStageInputUrls consensusStageInputUrls = stageExecutionInput.input;
         ConsensusStageParameters consensusStageParameters = stageExecutionInput.stageParameters;
 

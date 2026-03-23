@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
@@ -45,7 +46,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
     public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
-        long bioPipelineStage = stageExecutionInput.stageId;
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
         QcStageInputUrls qcStageInputUrls = stageExecutionInput.input;
 
         

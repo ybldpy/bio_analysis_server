@@ -4,6 +4,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Map;
 
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 
@@ -39,16 +40,27 @@ public class StageRunResult<T extends StageOutput> {
         this.stageOutput = stageOutput;
     }
     private BioPipelineStage stage;
-    private long runStageId;
+
+    private StageContext stageContext;
 
 
 
-    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, long runStageId, Exception e) {
+    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, StageContext stageContext,Exception e) {
         this.success = success;
         this.failReason = failReason;
         this.outputPath = outputPath;
-        this.runStageId = runStageId;
         this.e = e;
+        this.stageContext = stageContext;
+    }
+
+    
+
+    public StageContext getStageContext() {
+        return stageContext;
+    }
+
+    public void setStageContext(StageContext stageContext) {
+        this.stageContext = stageContext;
     }
 
     public Map<String,String> getOutputPath(){
@@ -60,24 +72,24 @@ public class StageRunResult<T extends StageOutput> {
         this.outputPath = outputPath;
     }
 
-    public BioPipelineStage getStage() {
-        return stage;
+    public StageContext getStage() {
+        return stageContext;
     }
 
     public void setStage(BioPipelineStage stage) {
         this.stage = stage;
     }
 
-    public static StageRunResult OK(Map<String,String> outputPath, long stage){
-        return new StageRunResult(true, null,outputPath, stage,null);
+    public static StageRunResult OK(Map<String,String> outputPath, StageContext stageContext){
+        return new StageRunResult(true, null, outputPath, stageContext, null);
     }
 
-    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, long stageId){
-        StageRunResult<T> stageRunResult = new StageRunResult<>(true, null, null, stageId, null);
+    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, StageContext stageContext){
+        StageRunResult<T> stageRunResult = new StageRunResult<>(true, null, null, stageContext, null);
         stageRunResult.setStageOutput(stageOutput);
         return stageRunResult;
     }
-    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, long stage,Exception e){
+    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, StageContext stage,Exception e){
         return new StageRunResult<>(false, failReason, null, stage, e);
     }
 

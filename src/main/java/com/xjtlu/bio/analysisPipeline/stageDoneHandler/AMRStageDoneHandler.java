@@ -10,6 +10,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.AMRStageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
@@ -42,7 +43,7 @@ public class AMRStageDoneHandler extends AbstractStageDoneHandler<AmrStageOutput
             StageRunResult<AmrStageOutput> stageRunResult) {
         // TODO Auto-generated method stub
 
-        BioPipelineStage bioPipelineStage = stageRunResult.getStage();
+        StageContext bioPipelineStage = stageRunResult.getStageContext();
         AmrStageOutput amrStageOutput = stageRunResult.getStageOutput();
 
 

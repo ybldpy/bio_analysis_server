@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.AMRParamters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AmrStageOutput;
@@ -35,7 +36,10 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
     @Override
     protected StageRunResult<AmrStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
 
-        long stage = stageExecutionInput.stageId;
+
+
+        StageContext stageContext = stageExecutionInput.stageContext;
+        long stage = stageContext.getRunStageId();
         AMRInputUrls amrInputUrls = stageExecutionInput.input;
 
         String inputUrl = amrInputUrls.getContigsUrl();
@@ -63,15 +67,15 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
 
         ExecuteResult executeResult = this._execute(runCmd, stageExecutionInput.workDir);
         if (!executeResult.success()){
-            logger.error("{} amr run failed. run code = {}. ", stageExecutionInput.stageId, executeResult.runCode, executeResult.ex);
-            return this.runFail(stage, "amr run failed");
+            logger.error("{} amr run failed. run code = {}. ", stageContext.getRunStageId(), executeResult.runCode, executeResult.ex);
+            return this.runFail(stageContext, "amr run failed");
         }
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(resultPath);
         if(!stageOutputValidationResults.isEmpty()){
             logger.error("{} amr run failed. {} Amr result not generated", stage, stageOutputValidationResults.get(0).path, stageOutputValidationResults.get(0).ioException);
-            return this.runFail(stage, "Amr result not generated");
+            return this.runFail(stageContext, "Amr result not generated");
         }
-        return StageRunResult.OK(new AmrStageOutput(resultPath), stage);
+        return StageRunResult.OK(new AmrStageOutput(resultPath), stageContext);
     }
 
     @Override

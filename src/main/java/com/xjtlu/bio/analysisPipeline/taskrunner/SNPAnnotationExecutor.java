@@ -10,6 +10,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SNPAnnotationInputs;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SNPAnnotationStageParameters;
@@ -36,7 +37,7 @@ public class SNPAnnotationExecutor extends AbstractPipelineStageExector<SNPAnnot
     protected StageRunResult<SNPAnnotationStageOutput> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
-        long bioPipelineStage = stageExecutionInput.stageId;
+        StageContext bioPipelineStage = stageExecutionInput.stageContext;
 
         SNPAnnotationInputs snpAnnotationInputs = stageExecutionInput.input;
         SNPAnnotationStageParameters snpAnnotationStageParameters = stageExecutionInput.stageParameters;
@@ -59,7 +60,6 @@ public class SNPAnnotationExecutor extends AbstractPipelineStageExector<SNPAnnot
         }
 
         
-
 
 
     }

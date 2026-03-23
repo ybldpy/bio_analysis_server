@@ -68,8 +68,10 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
     protected Pair<Map<String, String>, AssemblyResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<AssemblyStageOutput> stageRunResult) {
 
-        String contigUrl = this.createStoreObjectName(stageRunResult.getStage(), contigsFileName);
-        String scaffoldUrl = this.createStoreObjectName(stageRunResult.getStage(), scaffoldFileName);
+
+
+        String contigUrl = this.createStoreObjectName(stageRunResult.getStageContext(), contigsFileName);
+        String scaffoldUrl = this.createStoreObjectName(stageRunResult.getStageContext(), scaffoldFileName);
 
         return Pair.of(
             Map.of(stageRunResult.getStageOutput().getContigPath(), contigUrl, stageRunResult.getStageOutput().getScaffoldPath(), scaffoldUrl),
