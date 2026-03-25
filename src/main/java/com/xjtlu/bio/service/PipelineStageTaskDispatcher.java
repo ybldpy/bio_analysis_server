@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.taskrunner.PipelineStageExecutor;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -103,7 +104,7 @@ public class PipelineStageTaskDispatcher implements Runnable {
             stageRunResult = executor.execute(bPipelineStage);
         } catch (Exception e) {
             logger.error("{} 运行时异常", bPipelineStage, e);
-            stageRunResult = StageRunResult.fail("运行时异常", bPipelineStage, e);
+            stageRunResult = StageRunResult.fail("运行时异常", new StageContext(bPipelineStage.getStageId(), bPipelineStage.getVersion(), bPipelineStage.getStageType()), e);
         }finally{
             this.inStageIdSet.remove(bPipelineStage.getStageId());
         }

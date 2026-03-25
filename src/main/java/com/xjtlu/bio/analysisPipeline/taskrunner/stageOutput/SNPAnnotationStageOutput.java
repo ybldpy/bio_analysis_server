@@ -18,4 +18,14 @@ public class SNPAnnotationStageOutput implements StageOutput{
         return annotatedFilePath.getParent();
     }
 
+
+    public Path getAnnotatedFilePath() {
+        return annotatedFilePath;
+    }
+
+
+    public void setAnnotatedFilePath(Path annotatedFilePath) {
+        this.annotatedFilePath = annotatedFilePath;
+    }
+
 }

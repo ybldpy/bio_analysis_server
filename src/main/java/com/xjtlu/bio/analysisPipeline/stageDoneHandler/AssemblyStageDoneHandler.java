@@ -1,22 +1,15 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
+
 import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AssemblyStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.entity.BioPipelineStageExample;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.utils.JsonUtil;
 
-import jakarta.validation.Valid;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Path;
 import java.util.*;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_ASSEMBLY;

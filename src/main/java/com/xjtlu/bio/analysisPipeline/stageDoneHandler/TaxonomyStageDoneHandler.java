@@ -16,6 +16,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.Taxon;
@@ -128,7 +129,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
 
     @Override
     public boolean handleStageDone(StageRunResult<TaxonomyStageOutput> stageRunResult) {
-        BioPipelineStage taxonomyStage = stageRunResult.getStage();
+        StageContext taxonomyStage = stageRunResult.getStageContext();
         TaxonomyStageOutput taxonomyStageOutput = stageRunResult.getStageOutput();
 
         TaxonomyResult taxonomySortedResults = null;
@@ -159,7 +160,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         patch.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         patch.setEndTime(new Date());
         patch.setOutputUrl(serializedResult);
-        int updateRes = updateStageFromVersion(patch, taxonomyStage.getStageId(), taxonomyStage.getVersion());
+        int updateRes = updateStageFromVersion(patch, taxonomyStage.getRunStageId(), taxonomyStage.getVersion());
         this.deleteStageResultDir(taxonomyStageOutput.getParentPath().toString());
         return updateRes > 0;
     }

@@ -17,9 +17,6 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SeroTypeStageInputUr
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SeroTypingStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SeroTypingStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
 public class SeroTypingStageExectuor

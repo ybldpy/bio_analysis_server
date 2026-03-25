@@ -7,6 +7,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.MLSTStageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
@@ -38,7 +39,7 @@ public class MLSTStageDoneHandler extends AbstractStageDoneHandler<MLSTStageOutp
     protected Pair<Map<String, String>, MLSTStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<MLSTStageOutput> stageRunResult) {
         // TODO Auto-generated method stub
-        BioPipelineStage stage = stageRunResult.getStage();
+        StageContext stage = stageRunResult.getStage();
         MLSTStageOutput mlstStageOutput = stageRunResult.getStageOutput();
 
         String url = this.createStoreObjectName(stage, mlstOutputFileName);

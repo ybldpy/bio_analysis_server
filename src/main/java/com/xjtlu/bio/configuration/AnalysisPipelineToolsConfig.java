@@ -4,6 +4,7 @@ package com.xjtlu.bio.configuration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -16,10 +17,19 @@ public class AnalysisPipelineToolsConfig {
 
     private List<String> amrfinder;
     private List<String> virulenceFactor;
+    public List<String> getVep() {
+        return new ArrayList(vep);
+    }
+
+    public void setVep(List<String> vep) {
+        this.vep = vep;
+    }
+
     private List<String> mlst;
     private List<String> kraken2;
 
     private List<String> seqsero2;
+    private List<String> vep;
 
     public List<String> getEctyper() {
         return ectyper;
@@ -30,7 +40,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getKaptive() {
-        return kaptive;
+        return new ArrayList(kaptive);
     }
 
     public void setKaptive(List<String> kaptive) {
@@ -38,7 +48,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getSeroBA() {
-        return seroBA;
+        return new ArrayList(seroBA);
     }
 
     public void setSeroBA(List<String> seroBA) {
@@ -54,7 +64,7 @@ public class AnalysisPipelineToolsConfig {
      
 
     public List<String> getSeqsero2() {
-        return seqsero2;
+        return new ArrayList(seqsero2);
     }
 
     public void setSeqsero2(List<String> seqsero2) {
@@ -62,11 +72,11 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getMlst() {
-        return mlst;
+        return new ArrayList(mlst);
     }
 
     public List<String> getKraken2() {
-        return kraken2;
+        return new ArrayList(kraken2);
     }
 
     public void setKraken2(List<String> kraken2) {
@@ -78,7 +88,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getVirulenceFactor() {
-        return virulenceFactor;
+        return new ArrayList(virulenceFactor);
     }
 
     public void setVirulenceFactor(List<String> virulenceFactor) {
@@ -86,7 +96,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getAmrfinder() {
-        return amrfinder;
+        return new ArrayList(amrfinder);
     }
 
     public void setAmrfinder(List<String> amrfinder) {
@@ -94,7 +104,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getFastp() {
-        return fastp;
+        return new ArrayList(fastp);
     }
 
     public void setFastp(List<String> fastp) {
@@ -102,7 +112,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getSpades() {
-        return spades;
+        return new ArrayList(spades);
     }
 
     public void setSpades(List<String> spades) {
@@ -110,7 +120,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getMinimap2() {
-        return minimap2;
+        return new ArrayList(minimap2);
     }
 
     public void setMinimap2(List<String> minimap2) {
@@ -118,7 +128,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getBcftools() {
-        return bcftools;
+        return new ArrayList(bcftools);
     }
 
     public void setBcftools(List<String> bcftools) {
@@ -126,7 +136,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getSamtools() {
-        return samtools;
+        return new ArrayList(samtools);
     }
 
     public void setSamtools(List<String> samtools) {

@@ -105,6 +105,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     protected String stageInputTmpBasePath;
 
     protected static final String ERROR_LOAD_REFSEQ = "加载参考基因组失败";
+    protected static final String ERROR_EXECUTE_FAIL = "运行失败";
 
     protected static boolean requireNonEmpty(Path p) throws IOException {
 
@@ -135,6 +136,29 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         public LoadFailException() {
 
         }
+    }
+
+    protected static class NotGetRefSeqException extends Exception {
+
+        private static final long serialVersionUID = 1L;
+
+        private String refSeqId;
+        private String reason;
+
+        public NotGetRefSeqException(String refSeqId, String reason) {
+            super("Failed to get RefSeq: " + refSeqId + ", reason: " + reason);
+            this.refSeqId = refSeqId;
+            this.reason = reason;
+        }
+
+        public String getRefSeqId() {
+            return refSeqId;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
     }
 
     protected abstract Class<Input> stageInputType();
@@ -238,6 +262,9 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         } catch (LoadFailException e) {
             logger.error("stage = {} load failed. ", bioPipelineStage.getStageId(), e.causeException);
             stageRunResult = this.runException(stageContext, e);
+        }catch(NotGetRefSeqException e){
+            logger.error("stage = {}. Not get Refseq. reason = {}", bioPipelineStage.getStageId(), e.getReason());
+            stageRunResult = this.runException(stageContext, e);
         }
         postExecute(stageRunResult);
         return stageRunResult;
@@ -249,7 +276,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
      * {@link StageRunResult#fail(...)}.
      */
     protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput)
-            throws JsonMappingException, JsonProcessingException, LoadFailException;
+            throws JsonMappingException, JsonProcessingException, LoadFailException, NotGetRefSeqException;
 
     protected StageRunResult<T> runException(StageContext bioPipelineStage, Exception e) {
         return runFail(bioPipelineStage, "异常\n" + e.getMessage());
@@ -283,7 +310,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     }
 
-    protected void logNoOutput(List<StageOutputValidationResult> results,long stage) {
+    protected void logNoOutput(List<StageOutputValidationResult> results, long stage) {
         if (results == null || results.isEmpty()) {
             logger.error(
                     "Stage output validation failed (no details). stageId={}",
@@ -314,7 +341,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         for (StageOutputValidationResult r : ioErrors) {
             logger.error(
                     "Stage output validation IO error. stageId={}, path={}",
-                    stage, 
+                    stage,
                     r.path,
                     r.ioException);
         }
@@ -438,7 +465,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     protected void logExecutionFailed(ExecuteResult failResult, long stage) {
         logger.error(
                 "Stage execution failed. stageId={}, runCode={}, error={}",
-                stage, 
+                stage,
                 failResult.runCode,
                 failResult.ex == null ? "unknown" : failResult.ex.getMessage(),
                 failResult.ex);
