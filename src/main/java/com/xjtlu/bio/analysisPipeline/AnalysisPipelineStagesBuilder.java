@@ -23,8 +23,27 @@ public class AnalysisPipelineStagesBuilder {
         private long refId;
         private List<String> refseqAccessions;
 
+        private boolean requireSNPAnnotation;
+        private boolean requireCoverageDepth;
+
         public long getRefId() {
             return refId;
+        }
+
+        public boolean isRequireSNPAnnotation() {
+            return requireSNPAnnotation;
+        }
+
+        public void setRequireSNPAnnotation(boolean requireSNPAnnotation) {
+            this.requireSNPAnnotation = requireSNPAnnotation;
+        }
+
+        public boolean isRequireCoverageDepth() {
+            return requireCoverageDepth;
+        }
+
+        public void setRequireCoverageDepth(boolean requireCoverageDepth) {
+            this.requireCoverageDepth = requireCoverageDepth;
         }
 
         public void setRefId(long refId) {
@@ -143,7 +162,7 @@ public class AnalysisPipelineStagesBuilder {
         
     }
 
-    public static List<BioPipelineStage> buildVirusStages(long pid, boolean requireSNP, boolean requiredDepth, PipelineInput pipelineInput, 
+    public static List<BioPipelineStage> buildVirusStages(long pid, PipelineInput pipelineInput, 
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
@@ -188,13 +207,13 @@ public class AnalysisPipelineStagesBuilder {
 
 
 
-        if(requireSNP){
+        if(pipelineConfigurations.isRequireSNPAnnotation()){
             BioPipelineStage snp = new BioPipelineStage();
             snp.setStageType(PIPELINE_STAGE_SNP_ANNOTATION);
             stages.add(snp);
         }
 
-        if(requiredDepth){
+        if(pipelineConfigurations.isRequireCoverageDepth()){
             BioPipelineStage depth = new BioPipelineStage();
             depth.setStageType(PIPELINE_STAGE_DEPTH_COVERAGE);
             stages.add(depth);

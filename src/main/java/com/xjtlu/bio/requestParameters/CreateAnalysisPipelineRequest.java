@@ -6,7 +6,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class CreateSampleRequest {
+public class CreateAnalysisPipelineRequest {
 
     public static class PipelineStageParameters {
         private Integer taxId;
@@ -50,8 +50,6 @@ public class CreateSampleRequest {
 
 
 
-    @NotBlank(message = "sampleName不能为空")
-    private String sampleName;
 
     // 用 Boolean 才能判断“没传 vs 传了false”
     @NotNull(message = "isPair不能为空")
@@ -59,10 +57,10 @@ public class CreateSampleRequest {
     private Boolean isPair;
 
     @NotNull(message = "projectId不能为空")
-    private Integer projectId;
+    private Long projectId;
 
     @NotNull(message = "sampleType不能为空")
-    private Integer sampleType;
+    private Integer pipelineType;
 
     @NotBlank(message = "read1OriginName不能为空")
     private String read1OriginName;
@@ -70,15 +68,25 @@ public class CreateSampleRequest {
     // pair=true 时建议必填（后续用自定义校验实现）
     private String read2OriginName;
 
+    @NotNull(message = "分析名称不能为空")
+    private String analysisName;
+
+
     
     private PipelineStageParameters pipelineStageParameters;
 
-    public String getSampleName() {
-        return sampleName;
+    
+
+    public void setPipelineType(Integer pipelineType) {
+        this.pipelineType = pipelineType;
     }
 
-    public void setSampleName(String sampleName) {
-        this.sampleName = sampleName;
+    public String getAnalysisName() {
+        return analysisName;
+    }
+
+    public void setAnalysisName(String analysisName) {
+        this.analysisName = analysisName;
     }
 
     public boolean isPair() {
@@ -89,21 +97,23 @@ public class CreateSampleRequest {
         this.isPair = isPair;
     }
 
-    public Integer getProjectId() {
+    public Long getProjectId() {
         return projectId;
     }
 
-    public void setProjectId(Integer projectId) {
+    public void setProjectId(Long projectId) {
         this.projectId = projectId;
     }
 
-    public Integer getSampleType() {
-        return sampleType;
+    public void setPipelineType(int pipelineType){
+        this.pipelineType = pipelineType;
     }
 
-    public void setSampleType(Integer sampleType) {
-        this.sampleType = sampleType;
+    public int getPipelineType(){
+        return this.pipelineType;
     }
+
+    
 
     public String getRead1OriginName() {
         return read1OriginName;

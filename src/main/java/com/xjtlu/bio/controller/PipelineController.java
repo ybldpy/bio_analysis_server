@@ -2,12 +2,17 @@ package com.xjtlu.bio.controller;
 
 
 import com.xjtlu.bio.common.Result;
+import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
 import com.xjtlu.bio.service.PipelineService;
 import jakarta.annotation.Resource;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.annotations.Param;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
@@ -38,6 +43,24 @@ public class PipelineController {
 
         
         return ResponseEntity.ok(result);
+    }
+
+
+    @PostMapping("/create")
+    public ResponseEntity create(@RequestBody CreateAnalysisPipelineRequest createAnalysisPipelineRequest){
+
+            if (createAnalysisPipelineRequest.isPair() && StringUtils.isBlank(createAnalysisPipelineRequest.getRead2OriginName())) {
+            return ResponseEntity.badRequest().body(
+                    "输入为双端时read2不能为空");
+        }
+
+
+        this.pipelineService.createPipeline(createAnalysisPipelineRequest);
         
+        
+        Result<Long> returnResult = new Result<Long>(result.getStatus(), result.getData()!=null?result.getData().getSid():-1, result.getFailMsg());
+        return ResponseEntity.ok().body(returnResult);
+
+
     }
 }

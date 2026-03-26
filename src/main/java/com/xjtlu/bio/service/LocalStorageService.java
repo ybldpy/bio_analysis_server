@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -18,9 +19,6 @@ public class LocalStorageService implements StorageService {
 
     @Value("${localstorageService.baseDir}")
     private String base;
-
-
-
 
     private static final Logger logger = LoggerFactory.getLogger(LocalStorageService.class);
 
@@ -71,9 +69,6 @@ public class LocalStorageService implements StorageService {
         return resolvedTarget.equals(expected);
     }
 
-
-    
-
     @Override
     public GetObjectResult getObject(String key, String writeToPath) {
         Path objectPath = Paths.get(this.base, key);
@@ -85,8 +80,7 @@ public class LocalStorageService implements StorageService {
 
         Path parentDir = writeToFilePath.getParent();
 
-
-        //if no parent dir
+        // if no parent dir
         if (parentDir != null) {
             try {
                 Files.createDirectories(parentDir);
@@ -95,7 +89,7 @@ public class LocalStorageService implements StorageService {
                     return new GetObjectResult(false, null, new NotDirectoryException(parentDir.toString()));
                 }
             } catch (IOException e) {
-                logger.error("object key: {}, writeToPath: {} get object error: \n", key, writeToPath,e);
+                logger.error("object key: {}, writeToPath: {} get object error: \n", key, writeToPath, e);
                 return new GetObjectResult(false, null, e);
             }
         }
@@ -107,7 +101,7 @@ public class LocalStorageService implements StorageService {
             locked = true;
             // check existence
             if (Files.exists(writeToFilePath)) {
-                if(isSymlinkTo(writeToFilePath, objectPath)){
+                if (isSymlinkTo(writeToFilePath, objectPath)) {
                     return new GetObjectResult(true, writeToFilePath.toFile(), null);
                 }
 
@@ -117,18 +111,18 @@ public class LocalStorageService implements StorageService {
             Path writeObjectPath = createSymbolicLink(writeToFilePath, objectPath);
             return new GetObjectResult(true, writeObjectPath.toFile(), null);
         } catch (IOException e) {
-            logger.error("{}: {} get object error", key, writeToPath,e);
+            logger.error("{}: {} get object error", key, writeToPath, e);
             try {
                 Files.deleteIfExists(writeToFilePath);
             } catch (IOException e1) {
-                logger.error("{}: {} get object error", key, writeToPath,e1);
-                
+                logger.error("{}: {} get object error", key, writeToPath, e1);
+
             }
             return new GetObjectResult(false, null, e);
         } catch (Exception e) {
-            logger.error("{}: {} get object error", key, writeToPath,e);
+            logger.error("{}: {} get object error", key, writeToPath, e);
             return new GetObjectResult(false, null, e);
-            
+
         } finally {
             if (locked) {
                 unlockFile(writeToFilePath);
@@ -146,7 +140,9 @@ public class LocalStorageService implements StorageService {
     @Override
     public boolean exists(String key) {
         // TODO Auto-generated method stub
-        return Files.exists(Paths.get(String.format("%s/%s", base, key)));
+        Path path = Paths.get(base, key);
+        boolean exists = Files.exists(path, LinkOption.NOFOLLOW_LINKS);
+        return exists;
     }
 
     @Override

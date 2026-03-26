@@ -12,10 +12,8 @@ import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.AMRStageResult;
-import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AmrStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
 
 
 @Component
