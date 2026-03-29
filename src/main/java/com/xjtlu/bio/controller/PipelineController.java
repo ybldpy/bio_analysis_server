@@ -3,6 +3,7 @@ package com.xjtlu.bio.controller;
 
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
+import com.xjtlu.bio.response.CreatePipelineResponse;
 import com.xjtlu.bio.service.PipelineService;
 import jakarta.annotation.Resource;
 
@@ -50,17 +51,15 @@ public class PipelineController {
     public ResponseEntity create(@RequestBody CreateAnalysisPipelineRequest createAnalysisPipelineRequest){
 
             if (createAnalysisPipelineRequest.isPair() && StringUtils.isBlank(createAnalysisPipelineRequest.getRead2OriginName())) {
-            return ResponseEntity.badRequest().body(
-                    "输入为双端时read2不能为空");
+            return ResponseEntity.badRequest().body(null);
         }
 
-
-        this.pipelineService.createPipeline(createAnalysisPipelineRequest);
         
-        
-        Result<Long> returnResult = new Result<Long>(result.getStatus(), result.getData()!=null?result.getData().getSid():-1, result.getFailMsg());
-        return ResponseEntity.ok().body(returnResult);
-
+        Result<CreatePipelineResponse> result = this.pipelineService.createPipeline(createAnalysisPipelineRequest);
+        if(result.getStatus()!=Result.INTERNAL_FAIL){
+            return ResponseEntity.internalServerError().body(result.getFailMsg());
+        }
+        return ResponseEntity.ok(result);
 
     }
 }

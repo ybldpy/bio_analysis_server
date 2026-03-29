@@ -12,16 +12,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.xjtlu.bio.common.Result;
-import com.xjtlu.bio.entity.BioSample;
-import com.xjtlu.bio.requestParameters.CreateSampleRequest;
 import com.xjtlu.bio.service.PipelineInputService;
-import com.xjtlu.bio.service.SampleService;
 
 import jakarta.annotation.Resource;
-import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @Controller
 @RequestMapping("/pipelineInput")

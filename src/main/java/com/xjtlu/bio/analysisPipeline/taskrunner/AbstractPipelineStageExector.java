@@ -73,13 +73,15 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         }
     }
 
-    protected class StageExecutionInput {
-        StageContext stageContext;
-        Input input;
-        StageParameters stageParameters;
-        Path workDir;
-        Path inputDir;
-    }
+    // protected class StageExecutionInput {
+    //     StageContext stageContext;
+    //     Input input;
+    //     StageParameters stageParameters;
+    //     Path workDir;
+    //     Path inputDir;
+    // }
+
+    
 
     protected Logger logger = LoggerFactory.getLogger(getClass());
 

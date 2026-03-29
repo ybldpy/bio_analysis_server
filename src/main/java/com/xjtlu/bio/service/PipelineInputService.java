@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.logging.Log;
 import org.apache.ibatis.executor.BatchResult;
 import org.apache.ibatis.transaction.TransactionException;
-import org.hibernate.validator.internal.util.logging.Log_.logger;
+import org.hibernate.validator.internal.util.stereotypes.Lazy;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +76,13 @@ public class PipelineInputService {
 
     private Set<Long> uploadingLockSet = ConcurrentHashMap.newKeySet();
 
+
+    public List<BioPipelineInputFile> queryInputs(BioPipelineInputFileExample example){
+
+        return this.bioPipelineInputFileMapper.selectByExample(example);
+
+    }
+
     private static String substractPostfixFromFileName(String filename) {
         int index = filename.indexOf(".");
         if (index == -1) {
@@ -86,7 +93,7 @@ public class PipelineInputService {
 
     private boolean checkInputFileExist(String filePath) {
 
-        storageService.exists(filePath);
+        return storageService.exists(filePath);
     }
 
     private Result<Void> checkStatus(BioPipelineInputFile bioPipelineInputFile) {
@@ -301,116 +308,116 @@ public class PipelineInputService {
         return isLongRead;
     }
 
-    public Result<Boolean> receiveSampleData(long sid, int index, InputStream datastream) {
+    // public Result<Boolean> receiveSampleData(long sid, int index, InputStream datastream) {
 
-        String lockKey = sid + ":" + index;
+    //     String lockKey = sid + ":" + index;
 
-        final BioSample bioSample = new BioSample();
-        try {
-            int statusCode = transactionTemplate.execute(status -> {
-                BioSample selectedBioSample = this.bioSampleExtensionMapper.selectByIdForUpdate(sid);
-                if (selectedBioSample == null) {
-                    return -1;
-                }
+    //     final BioSample bioSample = new BioSample();
+    //     try {
+    //         int statusCode = transactionTemplate.execute(status -> {
+    //             BioSample selectedBioSample = this.bioSampleExtensionMapper.selectByIdForUpdate(sid);
+    //             if (selectedBioSample == null) {
+    //                 return -1;
+    //             }
 
-                // 这里是防止重复操作的
-                if ((index == 0 && (selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING
-                        || selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))
-                        || (index == 1 && (selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING
-                                || selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))) {
-                    return 1;
-                }
+    //             // 这里是防止重复操作的
+    //             if ((index == 0 && (selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING
+    //                     || selectedBioSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))
+    //                     || (index == 1 && (selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_UPLOADING
+    //                             || selectedBioSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY))) {
+    //                 return 1;
+    //             }
 
-                BioSample updateSample = new BioSample();
-                updateSample.setSid(sid);
+    //             BioSample updateSample = new BioSample();
+    //             updateSample.setSid(sid);
 
-                if (index == 0) {
-                    updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                    selectedBioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                } else {
-                    updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                    selectedBioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                }
-                int updateResult = 0;
+    //             if (index == 0) {
+    //                 updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+    //                 selectedBioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+    //             } else {
+    //                 updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+    //                 selectedBioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+    //             }
+    //             int updateResult = 0;
 
-                try {
-                    updateResult = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
-                } catch (Exception e) {
-                    status.setRollbackOnly();
-                    return 2;
-                }
-                if (updateResult < 1) {
-                    status.setRollbackOnly();
-                    return 2;
-                }
+    //             try {
+    //                 updateResult = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
+    //             } catch (Exception e) {
+    //                 status.setRollbackOnly();
+    //                 return 2;
+    //             }
+    //             if (updateResult < 1) {
+    //                 status.setRollbackOnly();
+    //                 return 2;
+    //             }
 
-                copyTo(selectedBioSample, bioSample);
-                return 0;
-            });
+    //             copyTo(selectedBioSample, bioSample);
+    //             return 0;
+    //         });
 
-            if (statusCode == -1) {
-                return new Result<>(Result.BUSINESS_FAIL, false, "未找到对应样本");
-            }
-            if (statusCode == 1) {
-                return new Result<>(Result.DUPLICATE_OPERATION, false, "样本不能被重复上传");
-            }
-            if (statusCode == 2) {
-                return new Result<>(Result.INTERNAL_FAIL, false, "上传样本失败");
-            }
-        } catch (TransactionException transactionException) {
-            return new Result<Boolean>(Result.INTERNAL_FAIL, false, "上传失败");
-        }
+    //         if (statusCode == -1) {
+    //             return new Result<>(Result.BUSINESS_FAIL, false, "未找到对应样本");
+    //         }
+    //         if (statusCode == 1) {
+    //             return new Result<>(Result.DUPLICATE_OPERATION, false, "样本不能被重复上传");
+    //         }
+    //         if (statusCode == 2) {
+    //             return new Result<>(Result.INTERNAL_FAIL, false, "上传样本失败");
+    //         }
+    //     } catch (TransactionException transactionException) {
+    //         return new Result<Boolean>(Result.INTERNAL_FAIL, false, "上传失败");
+    //     }
 
-        String uploadToUrl = index == 0 ? bioSample.getRead1Url() : bioSample.getRead2Url();
-        PutResult putResult = this.storageService.putObject(uploadToUrl, datastream);
+    //     String uploadToUrl = index == 0 ? bioSample.getRead1Url() : bioSample.getRead2Url();
+    //     PutResult putResult = this.storageService.putObject(uploadToUrl, datastream);
 
-        if (!putResult.success()) {
+    //     if (!putResult.success()) {
 
-            if (index == 0) {
-                bioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_ERROR);
-            } else {
-                bioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_ERROR);
-            }
+    //         if (index == 0) {
+    //             bioSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_ERROR);
+    //         } else {
+    //             bioSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_ERROR);
+    //         }
 
-            int updateResult = this.sampleMapper.updateByPrimaryKey(bioSample);
-            return new Result<>(Result.INTERNAL_FAIL, false, "上传失败");
-        }
+    //         int updateResult = this.sampleMapper.updateByPrimaryKey(bioSample);
+    //         return new Result<>(Result.INTERNAL_FAIL, false, "上传失败");
+    //     }
 
-        BioSample updatedSample = transactionTemplate.execute(status -> {
-            BioSample curSample = this.bioSampleExtensionMapper.selectByIdForUpdate(sid);
-            BioSample updateSample = new BioSample();
-            updateSample.setSid(sid);
-            if (index == 0) {
-                updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
-                curSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
-            } else {
-                updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
-                curSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
-            }
-            int updateRes = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
+    //     BioSample updatedSample = transactionTemplate.execute(status -> {
+    //         BioSample curSample = this.bioSampleExtensionMapper.selectByIdForUpdate(sid);
+    //         BioSample updateSample = new BioSample();
+    //         updateSample.setSid(sid);
+    //         if (index == 0) {
+    //             updateSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+    //             curSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+    //         } else {
+    //             updateSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+    //             curSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_READY);
+    //         }
+    //         int updateRes = this.sampleMapper.updateByPrimaryKeySelective(updateSample);
 
-            if (updateRes < 1) {
-                // 代表更新失败, 依赖定时任务来更新状态吧
-                if (index == 0) {
-                    curSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                } else {
-                    curSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
-                }
-            }
-            return curSample;
-        });
+    //         if (updateRes < 1) {
+    //             // 代表更新失败, 依赖定时任务来更新状态吧
+    //             if (index == 0) {
+    //                 curSample.setRead1UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+    //             } else {
+    //                 curSample.setRead2UploadStatus(SAMPLE_UPLOAD_STATUS_UPLOADING);
+    //             }
+    //         }
+    //         return curSample;
+    //     });
 
-        boolean canStartPipeline = updatedSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY
-                && (!updatedSample.getIsPair() || updatedSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY);
+    //     boolean canStartPipeline = updatedSample.getRead1UploadStatus() == SAMPLE_UPLOAD_STATUS_READY
+    //             && (!updatedSample.getIsPair() || updatedSample.getRead2UploadStatus() == SAMPLE_UPLOAD_STATUS_READY);
 
-        if (canStartPipeline) {
-            this.pipelineService.pipelineStart(sid);
-        }
-        return new Result<Boolean>(Result.SUCCESS, true, null);
-    }
+    //     if (canStartPipeline) {
+    //         this.pipelineService.pipelineStart(sid);
+    //     }
+    //     return new Result<Boolean>(Result.SUCCESS, true, null);
+    // }
 
-    private int tryInsertion(BioSample bioSample) {
-        return sampleMapper.insertSelective(bioSample);
+    // private int tryInsertion(BioSample bioSample) {
+    //     return sampleMapper.insertSelective(bioSample);
 
-    }
+    // }
 }

@@ -77,7 +77,7 @@
 
     </table> -->
 
-    <table tableName="bio_pipeline_input_file" schema="bio"
+    <!-- <table tableName="bio_pipeline_input_file" schema="bio"
     enableCountByExample="true"
     enableDeleteByExample="true"
     enableSelectByExample="true"
@@ -85,17 +85,17 @@
     
     <generatedKey column="input_file_id" sqlStatement="JDBC" identity="true" />
     
-    </table>
+    </table> -->
 
 
-    <!-- <table tableName="bio_analysis_pipeline" schema="bio"
+    <table tableName="bio_analysis_pipeline" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
       <generatedKey column="pipeline_id" sqlStatement="JDBC" identity="true" />
-    </table> -->
+    </table>
 
     <!-- <table tableName="bio_refseq_meta"
       schema="bio"
