@@ -17,25 +17,23 @@ public class CreateAnalysisPipelineRequest {
             return extraParams;
         }
 
-        
+
+        public PipelineStageParameters() {
+        }
+
 
         public PipelineStageParameters(Integer taxId, Map<String, Object> extraParams) {
             this.taxId = taxId;
             this.extraParams = extraParams;
         }
 
-
-
         public void setExtraParams(Map<String, Object> extraParams) {
             this.extraParams = extraParams;
         }
 
-
-
         public Integer getTaxId() {
             return taxId;
         }
-
 
 
         public void setTaxId(Integer taxId) {
@@ -59,7 +57,7 @@ public class CreateAnalysisPipelineRequest {
     @NotNull(message = "projectId不能为空")
     private Long projectId;
 
-    @NotNull(message = "sampleType不能为空")
+    @NotNull(message = "Pipeline不能为空")
     private Integer pipelineType;
 
     @NotBlank(message = "read1OriginName不能为空")
@@ -109,7 +107,7 @@ public class CreateAnalysisPipelineRequest {
         this.pipelineType = pipelineType;
     }
 
-    public int getPipelineType(){
+    public Integer getPipelineType(){
         return this.pipelineType;
     }
 

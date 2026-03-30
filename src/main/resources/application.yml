@@ -7,6 +7,8 @@ spring:
         multipart:
             max-request-size: 1200MB
             max-file-size: 1024MB
+    main:
+        allow-circular-references: true
 
 logging:
     level:

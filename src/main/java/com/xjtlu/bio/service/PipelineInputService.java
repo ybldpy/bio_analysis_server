@@ -23,17 +23,10 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.xjtlu.bio.common.Result;
-import com.xjtlu.bio.entity.BioAnalysisPipeline;
-import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
 import com.xjtlu.bio.entity.BioPipelineInputFile;
 import com.xjtlu.bio.entity.BioPipelineInputFileExample;
-import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioSample;
-import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioPipelineInputFileMapper;
-import com.xjtlu.bio.mapper.BioSampleExtensionMapper;
-import com.xjtlu.bio.mapper.BioSampleMapper;
-import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.StorageService.PutResult;
 import com.xjtlu.bio.utils.SampleReadLengthDetector;
 
@@ -124,7 +117,7 @@ public class PipelineInputService {
         update.setStatus(status);
         BioPipelineInputFileExample bioPipelineInputFileExample = new BioPipelineInputFileExample();
         bioPipelineInputFileExample.createCriteria().andInputFileIdEqualTo(bioPipelineInputFile.getInputFileId());
-        int res = this.bioPipelineInputFileMapper.updateByExample(update, bioPipelineInputFileExample);
+        int res = this.bioPipelineInputFileMapper.updateByExampleSelective(update, bioPipelineInputFileExample);
         return res;
     }
 
@@ -134,6 +127,8 @@ public class PipelineInputService {
         if (updateRes <= 0) {
             return uploadFail();
         }
+
+        this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
 
         return new Result<Void>(Result.SUCCESS, null, null);
 
@@ -156,17 +151,18 @@ public class PipelineInputService {
             if (bioPipelineInputFile == null) {
                 return new Result<Void>(Result.BUSINESS_FAIL, null, "未找到目标文件，不存在的分析任务");
             }
-            if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_NOT_UPLOAD) {
+            else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_NOT_UPLOAD) {
                 String path = bioPipelineInputFile.getFilePath();
                 if (this.storageService.exists(path)) {
                     return this.handleUploaded(bioPipelineInputFile);
                 }
-                return null;
             }
-            if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_UPLOADED) {
+            else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_UPLOADED) {
+
+                this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
                 return new Result<Void>(Result.SUCCESS, null, null);
             }
-            if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_CANCELLED) {
+            else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_CANCELLED) {
                 return new Result<Void>(Result.BUSINESS_FAIL, null, "分析任务已取消");
             }
 
@@ -188,10 +184,17 @@ public class PipelineInputService {
 
     }
 
+
+    private String pipelineInputFilePath(String fileName, long pipelineId){
+        return "pipelineInput/"+pipelineId+"/"+fileName;
+    }
+
     @Transactional
     public Result createInputs(List<Integer> inputRoles, List<String> fileOriginalName, long associatedPipelineId) {
 
         List<BioPipelineInputFile> bioPipelineInputFiles = new ArrayList<>();
+
+
 
         for (int i = 0; i < inputRoles.size(); i++) {
             BioPipelineInputFile bioPipelineInputFile = new BioPipelineInputFile();
@@ -201,39 +204,27 @@ public class PipelineInputService {
             bioPipelineInputFile.setStatus(PIPELINE_INPUT_FILE_STATUS_NOT_UPLOAD);
             bioPipelineInputFile.setFileRole(inputRoles.get(i));
             bioPipelineInputFiles.add(bioPipelineInputFile);
+            String filePath = pipelineInputFilePath(fileOriginalName.get(i), associatedPipelineId);
+            bioPipelineInputFile.setFilePath(filePath);
         }
 
         try {
-            BioPipelineInputFileMapper batchMapper = batchSqlSessionTemplate
-                    .getMapper(BioPipelineInputFileMapper.class);
+            
 
             for (BioPipelineInputFile bioPipelineInputFile : bioPipelineInputFiles) {
-                batchMapper.insertSelective(bioPipelineInputFile);
-            }
-
-            List<BatchResult> batchResults = batchSqlSessionTemplate.flushStatements();
-
-            boolean allSuccess = true;
-
-            for (BatchResult result : batchResults) {
-                int[] counts = result.getUpdateCounts();
-                for (int c : counts) {
-                    if (c <= 0) {
-                        allSuccess = false;
-                        break;
-                    }
+                int res = this.bioPipelineInputFileMapper.insertSelective(bioPipelineInputFile);
+                if(res <= 0 ){
+                    TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+                    return new Result(Result.INTERNAL_FAIL, null, "创建输入失败");
                 }
             }
 
-            if(!allSuccess){
-                TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();;
-                return new Result(Result.INTERNAL_FAIL, null, "创建输入失败");
-            }
             return new Result(Result.SUCCESS, null, null);
             
 
         } catch (Exception e) {
             logger.error("Pipeline id = {} Inserting input file exception", associatedPipelineId, e);
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return new Result(Result.INTERNAL_FAIL, null, "创建输入失败");
         }
 

@@ -6,9 +6,11 @@ import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
 import com.xjtlu.bio.response.CreatePipelineResponse;
 import com.xjtlu.bio.service.PipelineService;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.annotations.Param;
+import org.simpleframework.xml.core.Validate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,9 +26,9 @@ public class PipelineController {
     private PipelineService pipelineService;
 
     @GetMapping("/start")
-    public ResponseEntity start(@Param("sampleId") long sampleId){
+    public ResponseEntity start(@Param("pipelineId")long pipelineId){
 
-        Result<Boolean> startResult = this.pipelineService.pipelineStart(sampleId);
+        Result<Boolean> startResult = this.pipelineService.startPipeline(pipelineId);
 
         if(startResult.getStatus()==Result.INTERNAL_FAIL){
             return ResponseEntity.internalServerError().body(startResult.getFailMsg());
@@ -48,7 +50,7 @@ public class PipelineController {
 
 
     @PostMapping("/create")
-    public ResponseEntity create(@RequestBody CreateAnalysisPipelineRequest createAnalysisPipelineRequest){
+    public ResponseEntity create(@RequestBody @Valid CreateAnalysisPipelineRequest createAnalysisPipelineRequest){
 
             if (createAnalysisPipelineRequest.isPair() && StringUtils.isBlank(createAnalysisPipelineRequest.getRead2OriginName())) {
             return ResponseEntity.badRequest().body(null);
@@ -56,7 +58,7 @@ public class PipelineController {
 
         
         Result<CreatePipelineResponse> result = this.pipelineService.createPipeline(createAnalysisPipelineRequest);
-        if(result.getStatus()!=Result.INTERNAL_FAIL){
+        if(result.getStatus()==Result.INTERNAL_FAIL){
             return ResponseEntity.internalServerError().body(result.getFailMsg());
         }
         return ResponseEntity.ok(result);

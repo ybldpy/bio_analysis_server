@@ -1,12 +1,8 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.stageResult.ConsensusStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.utils.JsonUtil;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;

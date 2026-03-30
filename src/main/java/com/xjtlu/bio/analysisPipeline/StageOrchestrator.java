@@ -33,12 +33,9 @@ import com.xjtlu.bio.utils.JsonUtil;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
 
-import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
-import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;

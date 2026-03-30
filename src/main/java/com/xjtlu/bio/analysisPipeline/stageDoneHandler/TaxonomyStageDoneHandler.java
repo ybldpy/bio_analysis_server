@@ -23,7 +23,6 @@ import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.Taxon;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.utils.JsonUtil;
 
 class TaxonomyParser {
@@ -128,7 +127,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
     }
 
     @Override
-    public boolean handleStageDone(StageRunResult<TaxonomyStageOutput> stageRunResult) {
+    public void handleStageDone(StageRunResult<TaxonomyStageOutput> stageRunResult) {
         StageContext taxonomyStage = stageRunResult.getStageContext();
         TaxonomyStageOutput taxonomyStageOutput = stageRunResult.getStageOutput();
 
@@ -144,7 +143,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
                     e);
 
             this.handleFail(taxonomyStage, taxonomyStageOutput.getParentPath().toString());
-            return false;
+            return;
         }
 
         String serializedResult = null;
@@ -162,7 +161,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         patch.setOutputUrl(serializedResult);
         int updateRes = updateStageFromVersion(patch, taxonomyStage.getRunStageId(), taxonomyStage.getVersion());
         this.deleteStageResultDir(taxonomyStageOutput.getParentPath().toString());
-        return updateRes > 0;
+        return;
     }
 
     @Override

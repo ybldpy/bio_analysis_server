@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.taskrunner.PipelineStageExecutor;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -33,11 +34,14 @@ public class PipelineStageTaskDispatcher implements Runnable {
     @Resource
     private Map<Integer, PipelineStageExecutor> stageExecutorMap;
 
-    private Set<Long> stageInQueueIdSet = ConcurrentHashMap.newKeySet();
+    // private Set<Long> stageInQueueIdSet = ConcurrentHashMap.newKeySet();
 
-    private Set<Long> stageInRunningIdSet = ConcurrentHashMap.newKeySet();
+    // private Set<Long> stageInRunningIdSet = ConcurrentHashMap.newKeySet();
 
     private Set<Long> inStageIdSet = ConcurrentHashMap.newKeySet();
+
+    @Resource
+    private Map<Integer, StageDoneHandler> stageDoneHandlerMap;
 
     @Override
     public void run() {
@@ -58,7 +62,7 @@ public class PipelineStageTaskDispatcher implements Runnable {
                 }
                 logger.info("stage " + bioPipelineStage.toString() + " start running");
                 runStage(bioPipelineStage);
-                
+
             } catch (InterruptedException e) {
                 // TODO Auto-generated catch block
                 logger.debug("Worker Thread interruption", e);
@@ -79,42 +83,52 @@ public class PipelineStageTaskDispatcher implements Runnable {
         logger.debug("create " + Math.max(4, this.concurrentNum) + " worker threads");
     }
 
-    private void notifyPipelineService(StageRunResult stageRunResult) {
-        this.pipelineService.pipelineStageDone(stageRunResult);
+    private void releaseStageRunTaskResource(StageContext stageContext) {
+
     }
 
-    public boolean isStageInWaittingQueue(long stageId) {
-        return this.stageInQueueIdSet.contains(stageId);
+    public void stageComplete(StageRunResult stageRunResult) {
+        releaseStageRunTaskResource(stageRunResult.getStageContext());
+        // this.notifyPipelineService(stageRunResult);
     }
 
-    public boolean isStageInRunning(long stageId) {
-        return this.stageInRunningIdSet.contains(stageId);
-    }
+    // private void notifyPipelineService(StageRunResult stageRunResult) {
+    //     this.pipelineService.pipelineStageDone(stageRunResult);
+    // }
 
-    public boolean isStageIn(long stageId){
+    // public boolean isStageInWaittingQueue(long stageId) {
+    //     return this.stageInQueueIdSet.contains(stageId);
+    // }
+
+    // public boolean isStageInRunning(long stageId) {
+    //     return this.stageInRunningIdSet.contains(stageId);
+    // }
+
+    public boolean isStageIn(long stageId) {
         return this.inStageIdSet.contains(stageId);
     }
 
-    
-
     private void runStage(BioPipelineStage bPipelineStage) {
-        PipelineStageExecutor executor = stageExecutorMap.get(bPipelineStage.getStageType());
+
         StageRunResult stageRunResult = null;
-        try {
-            stageRunResult = executor.execute(bPipelineStage);
-        } catch (Exception e) {
-            logger.error("{} 运行时异常", bPipelineStage, e);
-            stageRunResult = StageRunResult.fail("运行时异常", new StageContext(bPipelineStage.getStageId(), bPipelineStage.getVersion(), bPipelineStage.getStageType()), e);
-        }finally{
-            this.inStageIdSet.remove(bPipelineStage.getStageId());
+
+        PipelineStageExecutor executor = stageExecutorMap.get(bPipelineStage.getStageType());
+
+        stageRunResult = executor.execute(bPipelineStage);
+
+        if (stageRunResult.isSuccess()) {
+            this.stageDoneHandlerMap.get(stageRunResult.getStageContext().getStageType())
+                    .handleStageDone(stageRunResult);
+        } else {
+            this.stageDoneHandlerMap.get(-1).handleStageDone(stageRunResult);
         }
-        
-        notifyPipelineService(stageRunResult);
+
+        inStageIdSet.remove(bPipelineStage.getStageId());
+
     }
 
     public boolean addTask(BioPipelineStage bioPipelineStage) {
 
-    
         if (!this.inStageIdSet.add(bioPipelineStage.getStageId())) {
             return true; // 已经在队列里：幂等成功
         }

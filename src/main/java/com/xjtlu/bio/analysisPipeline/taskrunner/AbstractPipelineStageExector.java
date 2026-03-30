@@ -2,34 +2,30 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
-import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
-import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SeroTypingStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.apache.commons.io.FileUtils;
+import org.hibernate.validator.internal.util.stereotypes.Lazy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.service.PipelineStageTaskDispatcher;
 import com.xjtlu.bio.service.RefSeqService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
@@ -73,20 +69,20 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         }
     }
 
-    // protected class StageExecutionInput {
-    //     StageContext stageContext;
-    //     Input input;
-    //     StageParameters stageParameters;
-    //     Path workDir;
-    //     Path inputDir;
-    // }
+    protected class StageExecutionInput {
+        StageContext stageContext;
+        Input input;
+        StageParameters stageParameters;
+        Path workDir;
+        Path inputDir;
+    }
 
     
 
     protected Logger logger = LoggerFactory.getLogger(getClass());
 
-    @Resource
-    protected PipelineService pipelineService;
+    // @Resource
+    // protected PipelineService pipelineService;
     @Resource
     protected ObjectMapper objectMapper;
     @Resource
@@ -100,6 +96,9 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     @Resource
     protected AnalysisPipelineToolsConfig analysisPipelineToolsConfig;
+
+    @Resource
+    protected PipelineStageTaskDispatcher taskDispatcher;
 
     protected static final String PARSE_JSON_ERROR = "解析参数错误";
 
@@ -138,6 +137,16 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         public LoadFailException() {
 
         }
+    }
+
+
+    protected void asyncRunFinished(StageRunResult<T> stageRunResult){
+
+        postExecute(stageRunResult);
+
+
+
+
     }
 
     protected static class NotGetRefSeqException extends Exception {
@@ -267,6 +276,8 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         }catch(NotGetRefSeqException e){
             logger.error("stage = {}. Not get Refseq. reason = {}", bioPipelineStage.getStageId(), e.getReason());
             stageRunResult = this.runException(stageContext, e);
+        }catch(Exception e){
+            logger.error("[Stage running exception] Stage = {}, ", bioPipelineStage.getStageId(), e);
         }
         postExecute(stageRunResult);
         return stageRunResult;
@@ -548,6 +559,35 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
             r2Result = storageService.getObject(r2Url, r2TmpPath.toString());
         }
         return new File[] { r1Result.objectFile(), r2Url != null ? r2Result.objectFile() : null };
+
+    }
+
+    private void runSubProcessAync(List<String> cmd, Path workDir, Path stdout,Path stdErr, boolean append, Consumer<Process> onFinish) throws IOException{
+
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(workDir.toFile());
+
+        // stdout
+        if (stdout != null) {
+            Files.createDirectories(stdout.toAbsolutePath().getParent());
+            pb.redirectOutput(append
+                    ? ProcessBuilder.Redirect.appendTo(stdout.toFile())
+                    : ProcessBuilder.Redirect.to(stdout.toFile()));
+        } else {
+            pb.redirectOutput(ProcessBuilder.Redirect.INHERIT); // 或 DISCARD，看你默认想要啥
+        }
+
+        if (stdErr != null) {
+            pb.redirectError(append
+                    ? ProcessBuilder.Redirect.appendTo(stdErr.toFile())
+                    : ProcessBuilder.Redirect.to(stdErr.toFile()));
+        } else {
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT); // 或 DISCARD
+        }
+
+
+        Process p = pb.start();
+        p.onExit().thenAccept(onFinish);
 
     }
 
