@@ -38,6 +38,7 @@ import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
+import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
 import com.xjtlu.bio.entity.BioPipelineInputFile;
 import com.xjtlu.bio.entity.BioPipelineInputFileExample;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -116,7 +117,7 @@ public class PipelineService {
 
     public static final int PIPELINE_VIRUS = 0;
     public static final int PIPELINE_VIRUS_COVID = 1;
-    public static final int PIPELINE_VIRUS_BACKTERIA = 2;
+    public static final int PIPELINE_REGULAR_BACTERIA = 2;
 
     // for genetic
     private static final int OK = 0;
@@ -323,9 +324,17 @@ public class PipelineService {
     }
 
     @Async
-    public void handleInputRecevied(long pipelineId) {
+    public void handleInputRecevied(long pipelineId, ) {
         BioPipelineInputFileExample bioPipelineInputFileExample = new BioPipelineInputFileExample();
-        bioPipelineInputFileExample.createCriteria().andPipelineIdEqualTo(pipelineId);
+
+
+        if(receviedInputRole == PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1 || receviedInputRole == PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2){
+            bioPipelineInputFileExample.createCriteria().andPipelineIdEqualTo(pipelineId).andFileRoleIn(List.of(PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1, PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2));
+        }
+
+
+
+        
 
         List<BioPipelineInputFile> pipelineInputs = this.pipelineInputService.queryInputs(bioPipelineInputFileExample);
         List<BioPipelineInputFile> notFinishedUpload = pipelineInputs.stream()
@@ -338,7 +347,7 @@ public class PipelineService {
 
     private boolean isLegalPipelineType(int pipelineType) {
         return pipelineType == PIPELINE_VIRUS || pipelineType == PIPELINE_VIRUS_COVID
-                || pipelineType == PIPELINE_VIRUS_BACKTERIA;
+                || pipelineType == PIPELINE_REGULAR_BACTERIA;
     }
 
     public int startStageExecute(BioPipelineStage pipelineStage) {
@@ -435,6 +444,22 @@ public class PipelineService {
     // return new Result<Long>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(),
     // null);
     // }
+
+
+
+
+    public Result<List<BioAnalysisPipeline>> queryPipelines(BioAnalysisPipelineExample condition) {
+
+        try{
+            List<BioAnalysisPipeline> pipelines = this.analysisPipelineMapper.selectByExample(condition);
+            return new Result<List<BioAnalysisPipeline>>(Result.SUCCESS, pipelines, null);
+        }catch(Exception e){
+            logger.warn("[query pipeline]exception", e);
+            return new Result<List<BioAnalysisPipeline>>(Result.INTERNAL_FAIL, null, "内部错误");
+        }
+        
+
+    }
 
     private BioRefseq getOriginalCovid2Refseqs(List<BioRefseq> covid2Refseqs) {
         return covid2Refseqs.stream().filter(refseq -> {
@@ -562,13 +587,13 @@ public class PipelineService {
                         new PipelineInput(read1.getFilePath(), read2 == null ? null : read2.getFilePath()),
                         pipelineConfigurations);
 
-            } else {
+            } else if(bioAnalysisPipeline.getPipelineType() == PIPELINE_REGULAR_BACTERIA){
 
                 PipelineInput pipelineInput = new PipelineInput(read1.getFilePath(),
                         read2 == null ? null : read2.getFilePath());
                 PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
 
-                stages = AnalysisPipelineStagesBuilder.buildBacteriaPipeline(bioAnalysisPipeline.getPipelineId(),
+                stages = AnalysisPipelineStagesBuilder.buildRegularBacteriaPipeline(bioAnalysisPipeline.getPipelineId(),
                         pipelineInput, pipelineConfigurations);
 
             }
