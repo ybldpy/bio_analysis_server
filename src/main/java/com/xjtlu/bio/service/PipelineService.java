@@ -115,9 +115,19 @@ public class PipelineService {
     @Value("${analysis-pipeline.covid2RefSeq.accession}")
     private String originalCovid2Accession;
 
+
+
+    public static final int PIPELINE_STATUS_PENDING_UPLOADING = 0;
+    public static final int PIPELINE_STATUS_RUNNING = 1;
+    public static final int PIPELINE_STATUS_COMPELETE = 2;
+
+
+    
+
     public static final int PIPELINE_VIRUS = 0;
     public static final int PIPELINE_VIRUS_COVID = 1;
     public static final int PIPELINE_REGULAR_BACTERIA = 2;
+    public static final int PIPELINE_SNP_ANALYSIS = 3;
 
     // for genetic
     private static final int OK = 0;
@@ -236,22 +246,16 @@ public class PipelineService {
         List<BioPipelineInputFile> bioPipelineInputFiles = this.pipelineInputService.queryInputs(queryCondition);
 
         if (bioPipelineInputFiles.isEmpty()) {
-            return new Result(Result.BUSINESS_FAIL, null, "未找到分析任务");
+            return new Result(Result.BUSINESS_FAIL, null, "未上传文件");
         }
-
-        if (bioPipelineInputFiles.stream()
-                .filter(f -> f.getStatus() != PipelineInputService.PIPELINE_INPUT_FILE_STATUS_UPLOADED).toList()
-                .size() > 0) {
-            return new Result(Result.BUSINESS_FAIL, null, "输入文件未全部上传");
-        }
-
-        return startPipeline(pipelineId, bioPipelineInputFiles);
 
     }
 
     private Result startPipeline(long pipelineId, List<BioPipelineInputFile> inputFiles) {
 
         try {
+
+
             boolean lockSuccess = pipelineLock.add(pipelineId);
             if (!lockSuccess) {
                 // another is processing
@@ -323,27 +327,27 @@ public class PipelineService {
 
     }
 
-    @Async
-    public void handleInputRecevied(long pipelineId, ) {
-        BioPipelineInputFileExample bioPipelineInputFileExample = new BioPipelineInputFileExample();
+    // @Async
+    // public void handleInputRecevied(long pipelineId, ) {
+    //     BioPipelineInputFileExample bioPipelineInputFileExample = new BioPipelineInputFileExample();
 
 
-        if(receviedInputRole == PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1 || receviedInputRole == PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2){
-            bioPipelineInputFileExample.createCriteria().andPipelineIdEqualTo(pipelineId).andFileRoleIn(List.of(PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1, PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2));
-        }
+    //     if(receviedInputRole == PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1 || receviedInputRole == PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2){
+    //         bioPipelineInputFileExample.createCriteria().andPipelineIdEqualTo(pipelineId).andFileRoleIn(List.of(PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1, PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2));
+    //     }
 
 
 
         
 
-        List<BioPipelineInputFile> pipelineInputs = this.pipelineInputService.queryInputs(bioPipelineInputFileExample);
-        List<BioPipelineInputFile> notFinishedUpload = pipelineInputs.stream()
-                .filter((in) -> in.getStatus() != PipelineInputService.PIPELINE_INPUT_FILE_STATUS_UPLOADED).toList();
-        if (notFinishedUpload.size() > 0) {
-            return;
-        }
-        startPipeline(pipelineId, pipelineInputs);
-    }
+    //     List<BioPipelineInputFile> pipelineInputs = this.pipelineInputService.queryInputs(bioPipelineInputFileExample);
+    //     List<BioPipelineInputFile> notFinishedUpload = pipelineInputs.stream()
+    //             .filter((in) -> in.getStatus() != PipelineInputService.PIPELINE_INPUT_FILE_STATUS_UPLOADED).toList();
+    //     if (notFinishedUpload.size() > 0) {
+    //         return;
+    //     }
+    //     startPipeline(pipelineId, pipelineInputs);
+    // }
 
     private boolean isLegalPipelineType(int pipelineType) {
         return pipelineType == PIPELINE_VIRUS || pipelineType == PIPELINE_VIRUS_COVID
