@@ -50,9 +50,9 @@ public class CreateAnalysisPipelineRequest {
 
 
     // 用 Boolean 才能判断“没传 vs 传了false”
-    @NotNull(message = "isPair不能为空")
-    @JsonProperty("isPair")
-    private Boolean isPair;
+    // @NotNull(message = "isPair不能为空")
+    // @JsonProperty("isPair")
+    // private Boolean isPair;
 
     @NotNull(message = "projectId不能为空")
     private Long projectId;
@@ -60,11 +60,11 @@ public class CreateAnalysisPipelineRequest {
     @NotNull(message = "Pipeline不能为空")
     private Integer pipelineType;
 
-    @NotBlank(message = "read1OriginName不能为空")
-    private String read1OriginName;
+    // @NotBlank(message = "read1OriginName不能为空")
+    // private String read1OriginName;
 
-    // pair=true 时建议必填（后续用自定义校验实现）
-    private String read2OriginName;
+    // // pair=true 时建议必填（后续用自定义校验实现）
+    // private String read2OriginName;
 
     @NotNull(message = "分析名称不能为空")
     private String analysisName;
@@ -87,13 +87,13 @@ public class CreateAnalysisPipelineRequest {
         this.analysisName = analysisName;
     }
 
-    public boolean isPair() {
-        return isPair;
-    }
+    // public boolean isPair() {
+    //     return isPair;
+    // }
 
-    public void setPair(boolean isPair) {
-        this.isPair = isPair;
-    }
+    // public void setPair(boolean isPair) {
+    //     this.isPair = isPair;
+    // }
 
     public Long getProjectId() {
         return projectId;
@@ -113,21 +113,21 @@ public class CreateAnalysisPipelineRequest {
 
     
 
-    public String getRead1OriginName() {
-        return read1OriginName;
-    }
+    // public String getRead1OriginName() {
+    //     return read1OriginName;
+    // }
 
-    public void setRead1OriginName(String read1OriginName) {
-        this.read1OriginName = read1OriginName;
-    }
+    // public void setRead1OriginName(String read1OriginName) {
+    //     this.read1OriginName = read1OriginName;
+    // }
 
-    public String getRead2OriginName() {
-        return read2OriginName;
-    }
+    // public String getRead2OriginName() {
+    //     return read2OriginName;
+    // }
 
-    public void setRead2OriginName(String read2OriginName) {
-        this.read2OriginName = read2OriginName;
-    }
+    // public void setRead2OriginName(String read2OriginName) {
+    //     this.read2OriginName = read2OriginName;
+    // }
 
     public PipelineStageParameters getPipelineStageParameters() {
         return pipelineStageParameters;

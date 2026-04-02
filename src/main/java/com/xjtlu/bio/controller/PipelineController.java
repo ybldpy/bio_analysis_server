@@ -51,9 +51,7 @@ public class PipelineController {
     @PostMapping("/create")
     public ResponseEntity create(@RequestBody @Valid CreateAnalysisPipelineRequest createAnalysisPipelineRequest){
 
-            if (createAnalysisPipelineRequest.isPair() && StringUtils.isBlank(createAnalysisPipelineRequest.getRead2OriginName())) {
-            return ResponseEntity.badRequest().body(null);
-        }
+        
 
         
         Result<CreatePipelineResponse> result = this.pipelineService.createPipeline(createAnalysisPipelineRequest);

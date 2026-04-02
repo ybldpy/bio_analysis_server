@@ -86,12 +86,12 @@ public class AnalysisPipelineStagesBuilder {
 
     }
 
-    public static class PipelineInput {
+    public static class PipelineSampleInput {
 
         private String r1;
         private String r2;
 
-        public PipelineInput(String r1, String r2) {
+        public PipelineSampleInput(String r1, String r2) {
             this.r1 = r1;
             this.r2 = r2;
         }
@@ -118,7 +118,7 @@ public class AnalysisPipelineStagesBuilder {
         return null;
     }
 
-    public static List<BioPipelineStage> buildRegularBacteriaPipeline(long pid, PipelineInput pipelineInput,
+    public static List<BioPipelineStage> buildRegularBacteriaPipeline(long pid, PipelineSampleInput pipelineInput,
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>();
@@ -187,7 +187,7 @@ public class AnalysisPipelineStagesBuilder {
 
     }
 
-    public static List<BioPipelineStage> buildVirusStages(long pid, PipelineInput pipelineInput,
+    public static List<BioPipelineStage> buildVirusStages(long pid, PipelineSampleInput pipelineInput,
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
