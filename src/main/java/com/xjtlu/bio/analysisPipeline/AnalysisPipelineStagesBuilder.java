@@ -33,7 +33,7 @@ public class AnalysisPipelineStagesBuilder {
         public static final int READ_TYPE_FASTA = 1;
 
         public PipelineConfigurations() {
-
+            this.refId = -1;
         }
 
         public String getCustomReferenceSequenceObjectName() {
