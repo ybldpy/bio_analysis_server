@@ -7,10 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
@@ -27,10 +31,6 @@ public class AnalysisPipelineStagesBuilder {
         // usually used for bacteria part
         private String customReferenceSequenceObjectName;
 
-        private int readsType;
-
-        public static final int READ_TYPE_FASTQ = 0;
-        public static final int READ_TYPE_FASTA = 1;
 
         public PipelineConfigurations() {
             this.refId = -1;
@@ -44,13 +44,6 @@ public class AnalysisPipelineStagesBuilder {
             this.customReferenceSequenceObjectName = customReferenceSequenceObjectName;
         }
 
-        public int getReadsType() {
-            return readsType;
-        }
-
-        public void setReadsType(int readsType) {
-            this.readsType = readsType;
-        }
 
         public long getRefId() {
             return refId;
@@ -91,6 +84,16 @@ public class AnalysisPipelineStagesBuilder {
         private String r1;
         private String r2;
 
+        private int readType;
+
+        public PipelineSampleInput() {
+        }
+
+        public static int READ_TYPE_FASTA = 0;
+        public static int READ_TYPE_FASTQ = 1;
+
+        
+
         public PipelineSampleInput(String r1, String r2) {
             this.r1 = r1;
             this.r2 = r2;
@@ -111,6 +114,14 @@ public class AnalysisPipelineStagesBuilder {
         public void setR2(String r2) {
             this.r2 = r2;
         }
+
+        public int getReadType() {
+            return readType;
+        }
+
+        public void setReadType(int readType) {
+            this.readType = readType;
+        }
     }
 
     public static List<BioPipelineStage> buildBacteriaStages() {
@@ -118,7 +129,7 @@ public class AnalysisPipelineStagesBuilder {
         return null;
     }
 
-    public static List<BioPipelineStage> buildRegularBacteriaPipeline(long pid, PipelineSampleInput pipelineInput,
+    public static List<BioPipelineStage> buildRegularBacteriaPipeline(PipelineSampleInput pipelineInput,
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>();
@@ -136,13 +147,11 @@ public class AnalysisPipelineStagesBuilder {
             stages.add(qc);
         }
 
-
-
         BioPipelineStage taxonomy = new BioPipelineStage();
         taxonomy.setStageType(PIPELINE_STAGE_TAXONOMY);
         stages.add(taxonomy);
 
-        if(readType == PipelineConfigurations.READ_TYPE_FASTA){
+        if (readType == PipelineConfigurations.READ_TYPE_FASTA) {
             TaxonomyStageInputUrls taxonomyStageInputUrls = new TaxonomyStageInputUrls();
             taxonomyStageInputUrls.setR1(pipelineInput.getR1());
             taxonomyStageInputUrls.setR2(pipelineInput.getR2());
@@ -168,26 +177,97 @@ public class AnalysisPipelineStagesBuilder {
         BaseStageParams baseStageParams = new BaseStageParams();
         String serializedPamras = JsonUtil.toJson(baseStageParams);
         stages.forEach(s -> {
-            if(readType == PipelineConfigurations.READ_TYPE_FASTQ && s.getStageType() == PIPELINE_STAGE_QC){
-                    s.setStageIndex(0);
-            }
-            else if(readType == PipelineConfigurations.READ_TYPE_FASTA && s.getStageType() == PIPELINE_STAGE_TAXONOMY){
+            if (readType == PipelineConfigurations.READ_TYPE_FASTQ && s.getStageType() == PIPELINE_STAGE_QC) {
                 s.setStageIndex(0);
-            }else {
+            } else if (readType == PipelineConfigurations.READ_TYPE_FASTA
+                    && s.getStageType() == PIPELINE_STAGE_TAXONOMY) {
+                s.setStageIndex(0);
+            } else {
                 s.setStageIndex(-1);
             }
             s.setStatus(PIPELINE_STAGE_STATUS_PENDING);
             // TODO: now all use base params here. To be improved later
             s.setParameters(serializedPamras);
             s.setStageName(STAGE_NAME_MAP.get(s.getStageType()));
-            s.setPipelineId(pid);
         });
 
         return stages;
 
     }
 
-    public static List<BioPipelineStage> buildVirusStages(long pid, PipelineSampleInput pipelineInput,
+    public static BioPipelineStage buildSNPAnalysisMergeStage() {
+        BioPipelineStage pipelineStage = new BioPipelineStage();
+        pipelineStage.setStageType(PIPELINE_STAGE_SNP_MERGE_RESULT);
+        return pipelineStage;
+    }
+
+    public static List<BioPipelineStage> buildSNPAnalysisStages(PipelineSampleInput pipelineInput,
+            PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
+
+        List<BioPipelineStage> stages = new ArrayList<>();
+        String refseqObject = pipelineConfigurations.getCustomReferenceSequenceObjectName();
+
+        RefSeqConfig refSeqConfig = new RefSeqConfig();
+        refSeqConfig.setInnerRefSeq(false);
+        refSeqConfig.setRefseqObjectName(refseqObject);
+
+        BioPipelineStage firstStage = null;
+
+        if (pipelineConfigurations.readsType == PipelineConfigurations.READ_TYPE_FASTQ) {
+            BioPipelineStage qc = new BioPipelineStage();
+            qc.setStageType(PIPELINE_STAGE_QC);
+            QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
+            qcStageInputUrls.setRead1(pipelineInput.getR1());
+            qcStageInputUrls.setRead2(pipelineInput.getR2());
+            qc.setInputUrl(JsonUtil.toJson(qcStageInputUrls));
+            QcParameters qcParameters = new QcParameters();
+            qcParameters.setRefSeqConfig(refSeqConfig);
+            qc.setParameters(JsonUtil.toJson(qcParameters));
+            qc.setStageName(STAGE_NAME_MAP.get(PIPELINE_STAGE_QC));
+            firstStage = qc;
+        } else {
+            BioPipelineStage mapping = new BioPipelineStage();
+            mapping.setStageType(PIPELINE_STAGE_MAPPING);
+            mapping.setStageName(STAGE_NAME_MAP.get(PIPELINE_STAGE_MAPPING));
+
+            MappingInputUrls mappingInputUrls = new MappingInputUrls();
+            mappingInputUrls.setR1Url(pipelineInput.getR1());
+            mappingInputUrls.setR2Url(pipelineInput.getR2());
+
+            MappingParameters mappingParameters = new MappingParameters();
+            mappingParameters.setRefSeqConfig(refSeqConfig);
+
+            mapping.setInputUrl(JsonUtil.toJson(mappingInputUrls));
+            mapping.setParameters(JsonUtil.toJson(mappingParameters));
+
+            firstStage = mapping;
+
+        }
+
+
+        firstStage.setStageIndex(0);
+        firstStage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+
+        stages.add(firstStage);
+
+        BioPipelineStage varientCall = new BioPipelineStage();
+        varientCall.setStageType(PIPELINE_STAGE_VARIANT_CALL);
+        varientCall.setStageName(STAGE_NAME_MAP.get(PIPELINE_STAGE_VARIANT_CALL));
+        VarientCallParameters varientCallParameters = new VarientCallParameters();
+        varientCallParameters.setRefSeqConfig(refSeqConfig);
+
+        varientCall.setParameters(JsonUtil.toJson(varientCallParameters));
+        varientCall.setStageIndex(-1);
+        varientCall.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+
+        stages.add(varientCall);
+
+
+        return stages;
+
+    }
+
+    public static List<BioPipelineStage> buildVirusStages(PipelineSampleInput pipelineInput,
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
@@ -247,7 +327,6 @@ public class AnalysisPipelineStagesBuilder {
             } else {
                 stage.setStageIndex(-1);
             }
-            stage.setPipelineId(pid);
             stage.setStageName(STAGE_NAME_MAP.get(stage.getStageType()));
             stage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
             stage.setParameters(serializedParams);

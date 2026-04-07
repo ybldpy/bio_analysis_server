@@ -245,6 +245,14 @@ public class StageOrchestrator {
             BioPipelineStage varientCallStage) throws JsonMappingException, JsonProcessingException, MissingUpstreamException {
 
         BioPipelineStage consensusStage = findStageFromStages(allStages, PIPELINE_STAGE_CONSENSUS);
+
+
+        if(consensusStage == null){
+            return noDownstreamPlan();
+        }
+
+
+
         return makePlan(allStages, consensusStage.getStageId());
 
     }
@@ -735,6 +743,27 @@ public class StageOrchestrator {
 
 
 
+        BioPipelineStage runStage = null;
+        for(BioPipelineStage stage:stages){
+            if(stage.getStageId() == runStageId){
+                runStage = stage;
+                break;
+            }
+        }
+
+
+        //start flag
+        if(runStage.getStageIndex() == 0){
+
+            OrchestratePlan plan = new OrchestratePlan();
+            BioPipelineStage patch = new BioPipelineStage();
+            int currentVersion = runStage.getVersion();
+            this.applyUpdatesToUpdateStage(patch, runStage, (String) null, (String) null, PIPELINE_STAGE_STATUS_QUEUING, currentVersion);
+            plan.updateStageCommands.add(new UpdateStageCommand(patch, runStageId, currentVersion));
+            plan.runStages.add(runStage);
+            return plan;
+        }
+        
         this.validateUpstreamStages(stages, runStageId);
         // prerequisize: cannot be null
         BioPipelineStage startStage = stages.stream().filter(s -> s.getStageId() == runStageId).findFirst()

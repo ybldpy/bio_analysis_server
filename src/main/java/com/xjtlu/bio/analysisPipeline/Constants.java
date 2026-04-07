@@ -38,6 +38,7 @@ public class Constants {
         public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP
         public static final int PIPELINE_STAGE_SNP_CORE = 71; // 多样本核心SNP/建树
         public static final int PIPELINE_STAGE_SNP_ANNOTATION = 72; //SNP注释
+        public static final int PIPELINE_STAGE_SNP_MERGE_RESULT = 73;
 
         // 病原学特征（细菌模块）
         public static final int PIPELINE_STAGE_AMR = 60; // 耐药基因 AMRFinder/ResFinder
@@ -74,6 +75,9 @@ public class Constants {
         public static final String PIPELINE_STAGE_NAME_ASSEMBLY = "组装 (Assembly)";
         public static final String PIPELINE_STAGE_NAME_MAPPING = "有参比对 (Mapping)";
         public static final String PIPELINE_STAGE_NAME_VARIANT = "变异检测 (Variant calling)";
+
+
+        
         
 
         public static final Map<Integer, String> STAGE_NAME_MAP = Map.ofEntries(
