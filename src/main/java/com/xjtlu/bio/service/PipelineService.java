@@ -1,6 +1,7 @@
 package com.xjtlu.bio.service;
 
 import java.lang.reflect.InvocationTargetException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -125,11 +126,10 @@ public class PipelineService {
 
     public static final int PIPELINE_SNP_ANALYSIS = 300;
     public static final int PIPELINE_SNP_SUB_ANALYSIS = 301;
-    public static final int PIPELINE_SNP_SUB_ANALYSIS_MERGE = 302;
+    public static final int PIPELINE_SNP_ANALYSIS_MERGE = 302;
 
     public static final int PIPELINE_METAGENOME_AMPLicon16s = 400;
     public static final int PIPELINE_METAGENOME_SHOTGUN = 401;
-
 
     // for genetic
     private static final int OK = 0;
@@ -317,37 +317,269 @@ public class PipelineService {
 
     }
 
-    private List<PipelineSampleInput> paritionSubPipelineSampleInputFiles(List<BioPipelineInputFile> pipelineInputFiles){
+    private List<PipelineSampleInput> paritionSubPipelineSampleInputFiles(
+            List<BioPipelineInputFile> pipelineInputFiles) {
 
-        List<BioPipelineInputFile> sampleInputs = pipelineInputFiles.stream().filter(f->f.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_READ).toList();
+        List<BioPipelineInputFile> sampleInputs = pipelineInputFiles.stream()
+                .filter(f -> f.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_READ).toList();
 
         HashMap<String, PipelineSampleInput> subPipelineSampleInputsMap = new HashMap<>();
 
-        for(BioPipelineInputFile sample:sampleInputs){
+        for (BioPipelineInputFile sample : sampleInputs) {
             String key = sample.getInputKey();
 
             int lastSplit = key.lastIndexOf("/");
             String groupKey = key.substring(0, lastSplit);
 
-            if(!subPipelineSampleInputsMap.containsKey(groupKey)){
+            if (!subPipelineSampleInputsMap.containsKey(groupKey)) {
                 PipelineSampleInput pipelineSampleInput = new PipelineSampleInput();
                 int sampleReadTypeCode = sampleReadTypeCode(sample.getFileName());
                 pipelineSampleInput.setReadType(sampleReadTypeCode);
                 subPipelineSampleInputsMap.put(groupKey, pipelineSampleInput);
             }
-            int slot = Integer.parseInt(key.substring(lastSplit+1));
-            if(slot == 0){
+            int slot = Integer.parseInt(key.substring(lastSplit + 1));
+            if (slot == 0) {
                 subPipelineSampleInputsMap.get(groupKey).setR1(sample.getFilePath());
-            }else {
+            } else {
                 subPipelineSampleInputsMap.get(groupKey).setR2(sample.getFilePath());
-            }    
+            }
         }
 
         return new ArrayList<>(subPipelineSampleInputsMap.values());
     }
 
 
-    
+    private Result startRegularPipeline(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineInputFile> inputs){
+
+        
+
+
+    }
+
+    private Result startSNPAnalysisPipeline(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineInputFile> inputs)
+            throws JsonProcessingException {
+
+        List<PipelineSampleInput> pipelineSampleInputs = paritionSubPipelineSampleInputFiles(inputs);
+        BioPipelineInputFile refseqFile = inputs.stream().filter(in -> {
+            return in.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_REFSEQ;
+        }).findAny().orElse(null);
+
+        PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
+        pipelineConfigurations.setCustomReferenceSequenceObjectName(refseqFile.getFilePath());
+
+        List<List<BioPipelineStage>> subPipelineStagesList = new ArrayList<>();
+
+        for (int i = 0; i < pipelineSampleInputs.size(); i++) {
+            List<BioPipelineStage> subPipelineStages = AnalysisPipelineStagesBuilder
+                    .buildSNPAnalysisStages(pipelineSampleInputs.get(i), pipelineConfigurations);
+            if (subPipelineStages == null || subPipelineStages.isEmpty()) {
+                return new Result(Result.INTERNAL_FAIL, null, "创建分析任务失败");
+            }
+            subPipelineStagesList.add(subPipelineStages);
+        }
+
+        BioPipelineStage mergeResultPipelineStage = AnalysisPipelineStagesBuilder.buildSNPAnalysisMergeStage();
+
+        List<BioAnalysisPipeline> subPipelines = new ArrayList<>(subPipelineStagesList.size() + 1);
+        for (int i = 0; i < subPipelineStagesList.size() + 1; i++) {
+
+            BioAnalysisPipeline subPipeline = new BioAnalysisPipeline();
+            subPipeline.setParentPipelineId(bioAnalysisPipeline.getPipelineId());
+            subPipeline.setPipelineParameters(bioAnalysisPipeline.getPipelineParameters());
+
+
+            subPipeline.setPipelineType(PIPELINE_SNP_ANALYSIS);
+            subPipeline.setStatus(PIPELINE_STATUS_PENDING);
+            subPipeline.setAnalysisPipelineName(bioAnalysisPipeline.getAnalysisPipelineName() + "- 样本分析" + (i + 1));
+
+            subPipeline.setProjectId(bioAnalysisPipeline.getProjectId());
+            subPipelines.add(subPipeline);
+        }
+
+        BioAnalysisPipeline mergeResultSubPipeline = new BioAnalysisPipeline();
+        mergeResultSubPipeline.setParentPipelineId(bioAnalysisPipeline.getPipelineId());
+        mergeResultSubPipeline.setStatus(PIPELINE_STATUS_PENDING);
+        mergeResultSubPipeline.setProjectId(bioAnalysisPipeline.getProjectId());
+        mergeResultSubPipeline.setPipelineType(PIPELINE_SNP_ANALYSIS_MERGE);
+        mergeResultSubPipeline.setAnalysisPipelineName(bioAnalysisPipeline.getAnalysisPipelineName() + "SNP结果汇总");
+
+        List<BioPipelineStage> allSubPipelineStages = rcTransactionTemplate.execute((status) -> {
+
+            BioAnalysisPipeline patch = new BioAnalysisPipeline();
+            patch.setStatus(PIPELINE_STATUS_RUNNING);
+
+            BioAnalysisPipelineExample queryCondition = new BioAnalysisPipelineExample();
+            queryCondition.createCriteria().andParentPipelineIdEqualTo(bioAnalysisPipeline.getPipelineId());
+
+            BioAnalysisPipelineMapper batchMapper = batchSqlSessionTemplate.getMapper(BioAnalysisPipelineMapper.class);
+
+            batchMapper.updateByExampleSelective(patch, queryCondition);
+
+            List<BatchResult> batchResults = batchSqlSessionTemplate.flushStatements();
+
+            boolean updateSuccess = false;
+            for (BatchResult batchResult : batchResults) {
+                for (int i : batchResult.getUpdateCounts()) {
+                    if (i > 0) {
+                        updateSuccess = true;
+                        break;
+                    }
+                }
+            }
+            if (!updateSuccess) {
+                return null;
+            }
+
+            for (BioAnalysisPipeline subPipeline : subPipelines) {
+                batchMapper.insertSelective(subPipeline);
+            }
+            batchMapper.insertSelective(mergeResultSubPipeline);
+
+            batchResults = batchSqlSessionTemplate.flushStatements();
+
+            for (BatchResult batchResult : batchResults) {
+                for (int i : batchResult.getUpdateCounts()) {
+                    if (i == Statement.EXECUTE_FAILED) {
+                        status.setRollbackOnly();
+                        return null;
+                    }
+                }
+            }
+
+            queryCondition.clear();
+            queryCondition.createCriteria().andParentPipelineIdEqualTo(bioAnalysisPipeline.getPipelineId());
+
+            List<BioAnalysisPipeline> insertedSubPipelines = batchMapper.selectByExample(queryCondition);
+            if (insertedSubPipelines.size() != subPipelines.size()+1) {
+                status.setRollbackOnly();
+                return null;
+            }
+
+            BioPipelineStageMapper stageBatchMapper = batchSqlSessionTemplate.getMapper(BioPipelineStageMapper.class);
+
+            List<BioAnalysisPipeline> nonMergeSubPipeline = insertedSubPipelines.stream().filter(s->s.getPipelineType()!=PIPELINE_SNP_ANALYSIS_MERGE).toList();
+            for (int i = 0; i < subPipelineStagesList.size(); i++) {
+                List<BioPipelineStage> subPipelineStages = subPipelineStagesList.get(i);
+                BioAnalysisPipeline subPipeline = nonMergeSubPipeline.get(i);
+                for(BioPipelineStage subPipelineStage: subPipelineStages){
+                    subPipelineStage.setPipelineId(subPipeline.getPipelineId());
+                    stageBatchMapper.insertSelective(subPipelineStage);
+                }
+            }
+
+            batchResults = batchSqlSessionTemplate.flushStatements();
+
+            boolean allInserted = true;
+            for(BatchResult batchResult:batchResults){
+                for(int i:batchResult.getUpdateCounts()){
+                    if(i == Statement.EXECUTE_FAILED){
+                        allInserted = false;
+                        break;
+                    }
+                }
+            }
+
+            if(!allInserted){
+                status.setRollbackOnly();
+                return null;
+            }
+
+            List<Long> subPipelineIds = new ArrayList<>(nonMergeSubPipeline.size()); 
+            for(BioAnalysisPipeline subPipeline: nonMergeSubPipeline){
+                subPipelineIds.add(subPipeline.getPipelineId());
+            }
+
+            BioPipelineStageExample stageQueryCondition = new BioPipelineStageExample();
+            stageQueryCondition.createCriteria().andPipelineIdIn(subPipelineIds);
+
+            return stageBatchMapper.selectByExampleWithBLOBs(stageQueryCondition);
+        });
+
+        if(allSubPipelineStages == null){
+            return new Result(Result.INTERNAL_FAIL, null, "创建失败");
+        }
+
+        HashMap<Long, List<BioPipelineStage>> pipelineStageMap = new HashMap<>();
+        for(BioPipelineStage stage:allSubPipelineStages){
+            if(!pipelineStageMap.containsKey(stage.getPipelineId())){
+                pipelineStageMap.put(stage.getPipelineId(), new ArrayList<>());
+            }
+            pipelineStageMap.get(stage.getPipelineId()).add(stage);
+        }
+        
+        for(List<BioPipelineStage> pipelineStages: pipelineStageMap.values()){
+            BioPipelineStage entry = pipelineStages.stream().filter(s->s.getStageIndex() == 0).findAny().orElse(null);
+            this.scheduleStage(entry, pipelineStages);
+        }
+
+        return new Result(Result.SUCCESS, null, null);
+
+
+        
+
+    }
+
+    private int startSinglePipeline(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineStage> stages) {
+
+        List<BioPipelineStage> pipelineInsertedStages = rcTransactionTemplate.execute((status) -> {
+
+            BioAnalysisPipeline patch = new BioAnalysisPipeline();
+            patch.setStatus(PIPELINE_STATUS_RUNNING);
+            BioAnalysisPipelineExample updateCondition = new BioAnalysisPipelineExample();
+            updateCondition.createCriteria().andPipelineIdEqualTo(bioAnalysisPipeline.getPipelineId());
+
+            BioAnalysisPipelineMapper batchOperationMapper = this.batchSqlSessionTemplate
+                    .getMapper(BioAnalysisPipelineMapper.class);
+
+            batchOperationMapper.updateByExample(patch, updateCondition);
+
+            List<BatchResult> batchResults = batchSqlSessionTemplate.flushStatements();
+            boolean updatedSuccess = false;
+
+            for (BatchResult batchResult : batchResults) {
+                for (int update : batchResult.getUpdateCounts()) {
+                    if (update > 0) {
+                        updatedSuccess = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!updatedSuccess) {
+                return null;
+            }
+
+            BioPipelineStageMapper batchStageMapper = this.batchSqlSessionTemplate
+                    .getMapper(BioPipelineStageMapper.class);
+
+            for (BioPipelineStage stage : stages) {
+                batchStageMapper.insertSelective(stage);
+            }
+
+            batchResults = batchSqlSessionTemplate.flushStatements();
+
+            BioPipelineStageExample stageExample = new BioPipelineStageExample();
+            stageExample.createCriteria().andPipelineIdEqualTo(bioAnalysisPipeline.getPipelineId());
+            List<BioPipelineStage> pipelineStages = batchStageMapper.selectByExample(stageExample);
+
+            if (stages.size() != pipelineStages.size()) {
+                status.setRollbackOnly();
+                return null;
+            }
+
+            return pipelineStages;
+        });
+
+        if (pipelineInsertedStages == null || pipelineInsertedStages.isEmpty()) {
+            return -1;
+        }
+
+        BioPipelineStage entry = pipelineInsertedStages.stream().filter(stage -> stage.getStageIndex() == 0).findAny()
+                .orElse(null);
+
+        return this.scheduleStage(entry, pipelineInsertedStages);
+
+    }
 
     public Result startPipeline(long pipelineId) {
 
@@ -394,36 +626,38 @@ public class PipelineService {
 
                 selectedRefSeqs = this.getBestCandicateRefSeqs(refseqs);
             }
-            List<PipelineSampleInput> subPipelineSampleInputs = paritionSubPipelineSampleInputFiles(bioPipelineInputFiles);
+            List<PipelineSampleInput> subPipelineSampleInputs = paritionSubPipelineSampleInputFiles(
+                    bioPipelineInputFiles);
 
             List<List<BioPipelineStage>> subPipelineStages = new ArrayList<>();
 
-            for(PipelineSampleInput sampleInput: subPipelineSampleInputs){
-                List<BioPipelineStage> stages = this.buildPipelineStages(pipelineId, bioAnalysisPipeline.getPipelineType(), pipelineStageParameters, selectedRefSeqs, sampleInput);
-                if(stages == null || stages.isEmpty()){
+            for (PipelineSampleInput sampleInput : subPipelineSampleInputs) {
+                List<BioPipelineStage> stages = this.buildPipelineStages(pipelineId,
+                        bioAnalysisPipeline.getPipelineType(), pipelineStageParameters, selectedRefSeqs, sampleInput);
+                if (stages == null || stages.isEmpty()) {
                     return new Result(Result.INTERNAL_FAIL, null, "启动失败");
                 }
                 subPipelineStages.add(stages);
             }
 
-
-
             List<BioAnalysisPipeline> subPipelines = new ArrayList<>();
 
-            if(subPipelineStages.size() >= 2){
-                for(int i = 0;i<subPipelineStages.size();i++){
+            if (subPipelineStages.size() >= 2) {
+                for (int i = 0; i < subPipelineStages.size(); i++) {
                     BioAnalysisPipeline subPipeline = new BioAnalysisPipeline();
                     subPipeline.setProjectId(bioAnalysisPipeline.getProjectId());
                     subPipeline.setParentPipelineId(bioAnalysisPipeline.getPipelineId());
                     subPipeline.setCreateTime(bioAnalysisPipeline.getCreateTime());
-                    subPipeline.setAnalysisPipelineName(bioAnalysisPipeline.getAnalysisPipelineName() + "-样本-" + (i + 1));
+                    subPipeline
+                            .setAnalysisPipelineName(bioAnalysisPipeline.getAnalysisPipelineName() + "-样本-" + (i + 1));
                     subPipeline.setStatus(PIPELINE_STATUS_RUNNING);
                 }
             }
 
-            rcTransactionTemplate.execute((status)->{
+            List<List<BioPipelineStage>> allSubPipelineStages = rcTransactionTemplate.execute((status) -> {
 
-                BioAnalysisPipelineMapper analysisPipelineMapper = batchSqlSessionTemplate.getMapper(BioAnalysisPipelineMapper.class);
+                BioAnalysisPipelineMapper analysisPipelineMapper = batchSqlSessionTemplate
+                        .getMapper(BioAnalysisPipelineMapper.class);
 
                 BioAnalysisPipeline pipelineUpdate = new BioAnalysisPipeline();
                 pipelineUpdate.setStatus(PIPELINE_STATUS_RUNNING);
@@ -435,17 +669,27 @@ public class PipelineService {
 
                 List<BatchResult> batchResults = batchSqlSessionTemplate.flushStatements();
 
-                
+                boolean updated = false;
 
-
-                //single, just run normally
-                if(subPipelineStages.size() < 2){
-
-
+                for (BatchResult batchResult : batchResults) {
+                    int[] counts = batchResult.getUpdateCounts();
+                    if (counts != null) {
+                        for (int count : counts) {
+                            if (count > 0) {
+                                updated = true;
+                            }
+                        }
+                    }
                 }
 
+                if (!updated) {
+                    return null;
+                }
 
+                // single, just run normally
+                if (subPipelineStages.size() < 2) {
 
+                }
 
             });
 
@@ -788,15 +1032,13 @@ public class PipelineService {
         return PipelineSampleInput.READ_TYPE_FASTA;
     }
 
-
-
-    private List<BioPipelineStage> buildPipelineStages(long pipelineId, int pipelineType, PipelineStageParameters pipelineStageParameters, BioRefseq refseq, PipelineSampleInput pipelineSampleInput)
+    private List<BioPipelineStage> buildPipelineStages(long pipelineId, int pipelineType,
+            PipelineStageParameters pipelineStageParameters, BioRefseq refseq, PipelineSampleInput pipelineSampleInput)
             throws JsonMappingException, JsonProcessingException {
-
 
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
         List<BioPipelineStage> stages = Collections.emptyList();
-         
+
         if (refseq != null) {
             pipelineConfigurations.setRefId(refseq.getRefId());
             List<String> accessions = JsonUtil.toObject(refseq.getAccessions(), List.class);
@@ -807,20 +1049,19 @@ public class PipelineService {
             if (pipelineType == PIPELINE_VIRUS
                     || pipelineType == PIPELINE_VIRUS_COVID) {
 
-                
                 stages = AnalysisPipelineStagesBuilder.buildVirusStages(
                         pipelineSampleInput, pipelineConfigurations);
             } else {
-                stages = AnalysisPipelineStagesBuilder.buildRegularBacteriaPipeline(pipelineSampleInput, pipelineConfigurations);
+                stages = AnalysisPipelineStagesBuilder.buildRegularBacteriaPipeline(pipelineSampleInput,
+                        pipelineConfigurations);
             }
-        } else if(pipelineType == PIPELINE_SNP_ANALYSIS){
+        } else if (pipelineType == PIPELINE_SNP_ANALYSIS) {
             stages = AnalysisPipelineStagesBuilder.buildSNPAnalysisStages(pipelineSampleInput, pipelineConfigurations);
         }
 
-        for(BioPipelineStage stage: stages){
+        for (BioPipelineStage stage : stages) {
             stage.setPipelineId(pipelineId);
         }
-
 
         return stages;
 

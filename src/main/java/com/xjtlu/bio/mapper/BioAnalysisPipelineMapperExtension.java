@@ -10,10 +10,7 @@ import com.xjtlu.bio.entity.BioAnalysisPipeline;
 
 public interface BioAnalysisPipelineMapperExtension {
 
-
-
     
-    public int batchInsertSelective(@Param("pipelines") List<BioAnalysisPipeline> pipelines);
 
 
 }
