@@ -134,9 +134,9 @@ public class AnalysisPipelineStagesBuilder {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>();
 
-        int readType = pipelineConfigurations.getReadsType();
+        int readType = pipelineInput.getReadType();
 
-        if (readType == PipelineConfigurations.READ_TYPE_FASTQ) {
+        if (readType == PipelineSampleInput.READ_TYPE_FASTQ) {
 
             BioPipelineStage qc = new BioPipelineStage();
             QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
@@ -151,11 +151,20 @@ public class AnalysisPipelineStagesBuilder {
         taxonomy.setStageType(PIPELINE_STAGE_TAXONOMY);
         stages.add(taxonomy);
 
-        if (readType == PipelineConfigurations.READ_TYPE_FASTA) {
+
+        BioPipelineStage assembly = new BioPipelineStage();
+        assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
+        stages.add(assembly);
+
+
+
+        if (readType == PipelineSampleInput.READ_TYPE_FASTA) {
             TaxonomyStageInputUrls taxonomyStageInputUrls = new TaxonomyStageInputUrls();
             taxonomyStageInputUrls.setR1(pipelineInput.getR1());
             taxonomyStageInputUrls.setR2(pipelineInput.getR2());
             taxonomy.setInputUrl(JsonUtil.toJson(taxonomyStageInputUrls));
+
+            
         }
 
         BioPipelineStage amr = new BioPipelineStage();
@@ -177,9 +186,9 @@ public class AnalysisPipelineStagesBuilder {
         BaseStageParams baseStageParams = new BaseStageParams();
         String serializedPamras = JsonUtil.toJson(baseStageParams);
         stages.forEach(s -> {
-            if (readType == PipelineConfigurations.READ_TYPE_FASTQ && s.getStageType() == PIPELINE_STAGE_QC) {
+            if (readType == PipelineSampleInput.READ_TYPE_FASTQ && s.getStageType() == PIPELINE_STAGE_QC) {
                 s.setStageIndex(0);
-            } else if (readType == PipelineConfigurations.READ_TYPE_FASTA
+            } else if (readType == PipelineSampleInput.READ_TYPE_FASTA
                     && s.getStageType() == PIPELINE_STAGE_TAXONOMY) {
                 s.setStageIndex(0);
             } else {
@@ -213,7 +222,7 @@ public class AnalysisPipelineStagesBuilder {
 
         BioPipelineStage firstStage = null;
 
-        if (pipelineConfigurations.readsType == PipelineConfigurations.READ_TYPE_FASTQ) {
+        if (pipelineInput.getReadType() == PipelineSampleInput.READ_TYPE_FASTQ) {
             BioPipelineStage qc = new BioPipelineStage();
             qc.setStageType(PIPELINE_STAGE_QC);
             QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();

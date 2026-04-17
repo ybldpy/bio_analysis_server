@@ -58,7 +58,7 @@ public class PipelineInputController {
     private PipelineInputService pipelineInputService;
 
     @PostMapping("/upload")
-    public ResponseEntity sampleUpload(@RequestParam("inputId")long inputId, @RequestParam("sampleFile") MultipartFile sampleFile) {
+    public ResponseEntity sampleUpload(@RequestParam("pipelineId")long pipelineId,@RequestParam("inputKey")String inputKey, @RequestParam("fileName")String fileName, @RequestParam("fileType")int type, @RequestParam("inputFile") MultipartFile sampleFile) {
         // TODO: process POST request
 
         InputStream inputStream = null;
@@ -67,16 +67,21 @@ public class PipelineInputController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("文件上传失败：文件内容为空");
         }
 
+        if(type!=PipelineInputService.PIPELINE_INPUT_TYPE_READ && type!=PipelineInputService.PIPELINE_INPUT_TYPE_REFSEQ){
+            Result result = new Result(Result.BUSINESS_FAIL, null, "不正确的输入文件类型");
+            return ResponseEntity.ok(result);
+        }
+
 
         try {
             inputStream = sampleFile.getInputStream();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
+            // TODO replace with logger later
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("连接错误");
         }
 
-        Result<Void> uploadRes = this.pipelineInputService.recevieInput(inputId, inputStream);
+        Result uploadRes = this.pipelineInputService.createInputs(pipelineId, fileName, type, inputKey, inputStream);
 
         if(uploadRes.getStatus()==Result.INTERNAL_FAIL){
             return ResponseEntity.internalServerError().body(uploadRes.getFailMsg());

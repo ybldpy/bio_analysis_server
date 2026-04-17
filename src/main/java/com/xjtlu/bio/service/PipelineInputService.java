@@ -145,7 +145,7 @@ public class PipelineInputService {
             return uploadFail();
         }
 
-        this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
+        // this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
 
         return new Result<Void>(Result.SUCCESS, null, null);
     }
@@ -154,48 +154,52 @@ public class PipelineInputService {
         return new Result<Void>(Result.INTERNAL_FAIL, null, "上传失败");
     }
 
-    public Result<Void> recevieInput(long inputFileId, InputStream in) {
+    // public Result<Void> recevieInput(long inputFileId, InputStream in) {
 
-        try {
-            boolean getLockSuccess = this.uploadingLockSet.add(inputFileId);
-            if (!getLockSuccess) {
-                return new Result(Result.DUPLICATE_OPERATION, null, "文件正在上传");
-            }
+    //     try {
 
-            BioPipelineInputFile bioPipelineInputFile = this.bioPipelineInputFileMapper.selectByPrimaryKey(inputFileId);
 
-            if (bioPipelineInputFile == null) {
-                return new Result<Void>(Result.BUSINESS_FAIL, null, "未找到目标文件，不存在的分析任务");
-            } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_NOT_UPLOAD) {
-                String path = bioPipelineInputFile.getFilePath();
-                if (this.storageService.exists(path)) {
-                    return this.handleUploaded(bioPipelineInputFile);
-                }
-            } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_UPLOADED) {
 
-                this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
-                return new Result<Void>(Result.SUCCESS, null, null);
-            } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_CANCELLED) {
-                return new Result<Void>(Result.BUSINESS_FAIL, null, "分析任务已取消");
-            }
+            
+    //         boolean getLockSuccess = this.uploadingLockSet.add(inputFileId);
+    //         if (!getLockSuccess) {
+    //             return new Result(Result.DUPLICATE_OPERATION, null, "文件正在上传");
+    //         }
 
-            PutResult putResult = this.storageService.putObject(bioPipelineInputFile.getFilePath(), in);
-            if (putResult.success()) {
-                return this.handleUploaded(bioPipelineInputFile);
-            }
+    //         BioPipelineInputFile bioPipelineInputFile = this.bioPipelineInputFileMapper.selectByPrimaryKey(inputFileId);
 
-            if (putResult.e() != null) {
-                throw putResult.e();
-            }
-            return uploadFail();
-        } catch (Exception e) {
-            logger.error("input file id = {}. Expcetion happen when receving file", inputFileId, e);
-            return uploadFail();
-        } finally {
-            this.uploadingLockSet.remove(inputFileId);
-        }
+    //         if (bioPipelineInputFile == null) {
+    //             return new Result<Void>(Result.BUSINESS_FAIL, null, "未找到目标文件，不存在的分析任务");
+    //         } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_NOT_UPLOAD) {
+    //             String path = bioPipelineInputFile.getFilePath();
+    //             if (this.storageService.exists(path)) {
+    //                 return this.handleUploaded(bioPipelineInputFile);
+    //             }
+    //         } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_UPLOADED) {
 
-    }
+    //             this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
+    //             return new Result<Void>(Result.SUCCESS, null, null);
+    //         } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_CANCELLED) {
+    //             return new Result<Void>(Result.BUSINESS_FAIL, null, "分析任务已取消");
+    //         }
+
+    //         PutResult putResult = this.storageService.putObject(bioPipelineInputFile.getFilePath(), in);
+    //         if (putResult.success()) {
+    //             return this.handleUploaded(bioPipelineInputFile);
+    //         }
+
+    //         if (putResult.e() != null) {
+    //             throw putResult.e();
+    //         }
+    //         return uploadFail();
+    //     } catch (Exception e) {
+    //         logger.error("input file id = {}. Expcetion happen when receving file", inputFileId, e);
+    //         return uploadFail();
+    //     } finally {
+    //         this.uploadingLockSet.remove(inputFileId);
+    //     }
+
+    // }
 
     private int isInputAllowed(BioAnalysisPipeline pipeline, int inputType, String inputKey,
             List<BioPipelineInputFile> inputFiles) {
@@ -271,23 +275,6 @@ public class PipelineInputService {
         }
 
         try {
-            BioAnalysisPipelineExample bioAnalysisPipelineExample = new BioAnalysisPipelineExample();
-            bioAnalysisPipelineExample.createCriteria().andPipelineIdEqualTo(pipelineId);
-            Result<List<BioAnalysisPipeline>> pipelinesResult = this.pipelineService
-                    .queryPipelines(bioAnalysisPipelineExample);
-            if (pipelinesResult.getStatus() != Result.SUCCESS) {
-                return new Result<Long>(pipelinesResult.getStatus(), -1l, pipelinesResult.getFailMsg());
-            }
-
-            List<BioAnalysisPipeline> pipelines = pipelinesResult.getData();
-            if (pipelines == null || pipelines.isEmpty()) {
-                return new Result(Result.BUSINESS_FAIL, -1l, "分析任务不存在");
-            }
-
-            BioAnalysisPipeline pipeline = pipelines.get(0);
-            if (pipeline.getStatus() != PipelineService.PIPELINE_STATUS_PENDING_UPLOADING) {
-                return new Result(Result.BUSINESS_FAIL, -1l, "分析任务已经启动");
-            }
 
             int pipelineUploadingCnt = this.pipelineUploadingLocks.compute(pipelineId, (id, cnt) -> {
 
@@ -304,6 +291,26 @@ public class PipelineInputService {
             if (pipelineUploadingCnt == -1) {
                 return new Result<Long>(Result.BUSINESS_FAIL, -1l, "分析任务正在启动");
             }
+
+            BioAnalysisPipelineExample bioAnalysisPipelineExample = new BioAnalysisPipelineExample();
+            bioAnalysisPipelineExample.createCriteria().andPipelineIdEqualTo(pipelineId);
+            Result<List<BioAnalysisPipeline>> pipelinesResult = this.pipelineService
+                    .queryPipelines(bioAnalysisPipelineExample);
+            if (pipelinesResult.getStatus() != Result.SUCCESS) {
+                return new Result<Long>(pipelinesResult.getStatus(), -1l, pipelinesResult.getFailMsg());
+            }
+
+            List<BioAnalysisPipeline> pipelines = pipelinesResult.getData();
+            if (pipelines == null || pipelines.isEmpty()) {
+                return new Result(Result.BUSINESS_FAIL, -1l, "分析任务不存在");
+            }
+
+            BioAnalysisPipeline pipeline = pipelines.get(0);
+            if (pipeline.getStatus() != PipelineService.PIPELINE_STATUS_PENDING) {
+                return new Result(Result.BUSINESS_FAIL, -1l, "分析任务已经启动");
+            }
+
+            
 
             BioPipelineInputFileExample query = new BioPipelineInputFileExample();
             query.createCriteria().andPipelineIdEqualTo(pipelineId).andFileRoleEqualTo(inputType);
@@ -368,6 +375,7 @@ public class PipelineInputService {
         } finally {
             this.uploadingLockSet.remove(lockKey);
             this.pipelineUploadingLocks.compute(pipelineId, (id, cnt) -> {
+
                 if (cnt <= 1) {
                     return null;
                 }

@@ -54,7 +54,7 @@ public class PipelineController {
         
 
         
-        Result<CreatePipelineResponse> result = this.pipelineService.createPipeline(createAnalysisPipelineRequest);
+        Result<Long> result = this.pipelineService.createPipeline(createAnalysisPipelineRequest);
         if(result.getStatus()==Result.INTERNAL_FAIL){
             return ResponseEntity.internalServerError().body(result.getFailMsg());
         }

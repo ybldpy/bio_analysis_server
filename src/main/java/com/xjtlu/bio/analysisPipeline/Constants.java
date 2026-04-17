@@ -13,6 +13,17 @@ public class Constants {
         public static final int PIPELINE_STAGE_STATUS_FINISHED = 4;
         public static final int PIPELINE_STAGE_STATUS_ACTION_REQUIRED = 5;
         public static final int PIPELINE_STAGE_STATUS_NOT_APPLICABLE = 6;
+    }
+
+    public static class PipelineType {
+
+        public static final int PIPELINE_VIRUS = 100;
+        public static final int PIPELINE_VIRUS_COVID = 101;
+        public static final int PIPELINE_REGULAR_BACTERIA = 200;
+
+        public static final int PIPELINE_SNP_ANALYSIS = 300;
+        public static final int PIPELINE_SNP_SUB_ANALYSIS = 301;
+        public static final int PIPELINE_SNP_ANALYSIS_MERGE = 302;
 
     }
 
@@ -24,7 +35,6 @@ public class Constants {
         // 比对 / 组装
         public static final int PIPELINE_STAGE_MAPPING = 20; // 有参比对 minimap2/bwa
         public static final int PIPELINE_STAGE_MAPPING_NO_REFSEQ = 21;
-        
 
         public static final int PIPELINE_STAGE_ASSEMBLY = 30; // 无参拼装 SPAdes/Flye
         public static final int PIPELINE_STAGE_ASSEMBLY_POLISH = 31; // 抛光 Pilon/Racon/Medaka
@@ -37,7 +47,7 @@ public class Constants {
         // SNP & 溯源
         public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP
         public static final int PIPELINE_STAGE_SNP_CORE = 71; // 多样本核心SNP/建树
-        public static final int PIPELINE_STAGE_SNP_ANNOTATION = 72; //SNP注释
+        public static final int PIPELINE_STAGE_SNP_ANNOTATION = 72; // SNP注释
         public static final int PIPELINE_STAGE_SNP_MERGE_RESULT = 73;
 
         // 病原学特征（细菌模块）
@@ -76,10 +86,6 @@ public class Constants {
         public static final String PIPELINE_STAGE_NAME_MAPPING = "有参比对 (Mapping)";
         public static final String PIPELINE_STAGE_NAME_VARIANT = "变异检测 (Variant calling)";
 
-
-        
-        
-
         public static final Map<Integer, String> STAGE_NAME_MAP = Map.ofEntries(
                 Map.entry(PIPELINE_STAGE_QC, PIPELINE_STAGE_NAME_QC),
                 Map.entry(PIPELINE_STAGE_ASSEMBLY, PIPELINE_STAGE_NAME_ASSEMBLY),
@@ -90,12 +96,11 @@ public class Constants {
                 Map.entry(PIPELINE_STAGE_MLST, PIPELINE_STAGE_NAME_MLST),
                 Map.entry(PIPELINE_STAGE_AMR, PIPELINE_STAGE_NAME_AMR),
                 Map.entry(PIPELINE_STAGE_SEROTYPE, PIPELINE_STAGE_NAME_SEROTYPE),
-                Map.entry(PIPELINE_STAGE_VIRULENCE, PIPELINE_STAGE_NAME_VIRULENCE)
-            );
+                Map.entry(PIPELINE_STAGE_VIRULENCE, PIPELINE_STAGE_NAME_VIRULENCE));
 
     }
 
-    private Constants(){
+    private Constants() {
 
     }
 
