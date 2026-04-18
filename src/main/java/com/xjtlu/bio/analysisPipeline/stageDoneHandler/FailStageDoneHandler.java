@@ -28,7 +28,7 @@ public class FailStageDoneHandler extends AbstractStageDoneHandler implements St
     public void handleStageDone(StageRunResult stageRunResult) {
 
         StageContext stageContext = stageRunResult.getStageContext();
-        handleFail(stageContext, stageRunResult.getStageOutput().getParentPath().toString());
+        handleFail(stageContext, null);
         return;
 
 

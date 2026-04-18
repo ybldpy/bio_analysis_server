@@ -15,6 +15,12 @@ public class Constants {
         public static final int PIPELINE_STAGE_STATUS_NOT_APPLICABLE = 6;
     }
 
+
+    
+
+
+    
+
     public static class PipelineType {
 
         public static final int PIPELINE_VIRUS = 100;
@@ -57,7 +63,10 @@ public class Constants {
         public static final int PIPELINE_STAGE_CGMLST = 63; // cgMLST chewBBACA
         public static final int PIPELINE_STAGE_SEROTYPE = 64; // 血清型（ECTyper/SeqSero2/Kaptive等）
 
-        public static final int PIPELINE_STAGE_READ_LENGTH_DETECT = 80;
+        public static final int PIPELINE_STAGE_READ_INSPECT = 80;
+
+
+        
 
         // 物种鉴定
         public static final String PIPELINE_STAGE_NAME_TAXONOMY = "物种鉴定 (Taxonomy)";

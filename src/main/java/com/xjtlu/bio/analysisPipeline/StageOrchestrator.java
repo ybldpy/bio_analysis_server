@@ -132,15 +132,6 @@ public class StageOrchestrator {
 
     }
 
-    private void applyUpdatesToUpdateStage(BioPipelineStage updateStage, BioPipelineStage stageCache, Map inputUrlMap,
-            Map params, int status, int currentVersion) throws JsonProcessingException {
-
-        String serializedInputMap = inputUrlMap == null ? null : JsonUtil.toJson(inputUrlMap);
-        String serializedParams = params == null ? null : JsonUtil.toJson(params);
-
-        this.applyUpdatesToUpdateStage(updateStage, stageCache, serializedInputMap, serializedParams, status,
-                currentVersion);
-    }
 
     private OrchestratePlan planDownstreamQc(List<BioPipelineStage> allStages, BioPipelineStage qcStage,
             int pipelineType)
@@ -413,12 +404,6 @@ public class StageOrchestrator {
                 .filter(s -> s.getStageType() == PIPELINE_STAGE_QC).findFirst().orElse(null);
         BioPipelineStage assemblyStage = qcAndAssemblyAndReadLenStages.stream()
                 .filter(s -> s.getStageType() == PIPELINE_STAGE_ASSEMBLY).findFirst().orElse(null);
-        BioPipelineStage readLenStage = qcAndAssemblyAndReadLenStages.stream()
-                .filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).findFirst().orElse(null);
-        boolean isLongRead = this.getReadLenFromReadLenStage(readLenStage);
-
-        Map<String, Object> paramsMap = new HashMap<>();
-        Map<String, String> inputMap = new HashMap<>();
 
         MappingParameters mappingParameters = JsonUtil.toObject(mappingStage.getParameters(), MappingParameters.class);
         MappingInputUrls mappingInputUrls = new MappingInputUrls();
@@ -685,17 +670,16 @@ public class StageOrchestrator {
             throws JsonMappingException, JsonProcessingException {
 
         BioPipelineStage assembly = findStageFromStages(upstreamStages, PIPELINE_STAGE_ASSEMBLY);
-        BioPipelineStage taxonomy = findStageFromStages(upstreamStages, PIPELINE_STAGE_TAXONOMY);
 
         AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
-        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(), TaxonomyResult.class);
+        //TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(), TaxonomyResult.class);
 
         AMRInputUrls amrInputUrls = new AMRInputUrls();
         amrInputUrls.setContigsUrl(assemblyResult.getContigsUrl());
 
-        TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
+        //TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
         AMRParamters params = JsonUtil.toObject(amrStage.getParameters(), AMRParamters.class);
-        params.setTaxonomyContext(taxonomyContext);
+        //params.setTaxonomyContext(taxonomyContext);
 
         String serializedInput = JsonUtil.toJson(amrInputUrls);
         String serializedParams = JsonUtil.toJson(params);
@@ -826,6 +810,8 @@ public class StageOrchestrator {
             return this.planForAMR(upstreamStages, startStage);
         } else if (startStage.getStageType() == PIPELINE_STAGE_SEROTYPE) {
             return this.planForSeroType(upstreamStages, startStage);
+        }else if(startStage.getStageType() == PIPELINE_STAGE_VIRULENCE){
+            return this.planForVirulenFactorStage(upstreamStages, startStage);
         }
         return null;
 

@@ -35,7 +35,7 @@ public class PipelineController {
         return ResponseEntity.ok().body(startResult);
     }
 
-    @GetMapping("/restart")
+    @GetMapping("/stage/run")
     public ResponseEntity restart(@Param("stageId")long stageId){
         Result<Boolean> result = this.pipelineService.restartStage(stageId);
 

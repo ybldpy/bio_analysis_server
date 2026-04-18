@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
+import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
@@ -216,7 +217,7 @@ public class PipelineInputService {
             }
 
             String[] keys = inputKey.split("/");
-            if (pipeline.getPipelineType() == PipelineService.PIPELINE_SNP_ANALYSIS) {
+            if (pipeline.getPipelineType() == Constants.PipelineType.PIPELINE_SNP_ANALYSIS) {
                 return INPUT_ALLOWED;
 
             } else {

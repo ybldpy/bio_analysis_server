@@ -49,9 +49,12 @@ public class PipelineStageTaskDispatcher implements Runnable {
         logger.debug("Worker Thread " + Thread.currentThread().getName() + " start to run");
         while (true) {
             // todo
+            
+            long runStageId = -1;
             try {
 
                 BioPipelineStage bioPipelineStage = stageBuffer.take();
+                runStageId = bioPipelineStage.getStageId();
                 logger.debug("take {} to run", bioPipelineStage);
                 int updateRes = this.pipelineService.startStageExecute(bioPipelineStage);
                 if (updateRes != 1) {
@@ -66,8 +69,13 @@ public class PipelineStageTaskDispatcher implements Runnable {
             } catch (InterruptedException e) {
                 // TODO Auto-generated catch block
                 logger.debug("Worker Thread interruption", e);
+            }catch(Exception e){
+                logger.error("Worker exception", e);
+            }finally{
+                inStageIdSet.remove(runStageId);
             }
         }
+
 
     }
 
@@ -122,8 +130,6 @@ public class PipelineStageTaskDispatcher implements Runnable {
         } else {
             this.stageDoneHandlerMap.get(-1).handleStageDone(stageRunResult);
         }
-
-        inStageIdSet.remove(bPipelineStage.getStageId());
 
     }
 

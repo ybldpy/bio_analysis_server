@@ -31,7 +31,6 @@ public class AnalysisPipelineStagesBuilder {
         // usually used for bacteria part
         private String customReferenceSequenceObjectName;
 
-
         public PipelineConfigurations() {
             this.refId = -1;
         }
@@ -43,7 +42,6 @@ public class AnalysisPipelineStagesBuilder {
         public void setCustomReferenceSequenceObjectName(String customReferenceSequenceObjectName) {
             this.customReferenceSequenceObjectName = customReferenceSequenceObjectName;
         }
-
 
         public long getRefId() {
             return refId;
@@ -91,8 +89,6 @@ public class AnalysisPipelineStagesBuilder {
 
         public static int READ_TYPE_FASTA = 0;
         public static int READ_TYPE_FASTQ = 1;
-
-        
 
         public PipelineSampleInput(String r1, String r2) {
             this.r1 = r1;
@@ -145,18 +141,15 @@ public class AnalysisPipelineStagesBuilder {
             qc.setStageType(PIPELINE_STAGE_QC);
             qc.setInputUrl(JsonUtil.toJson(qcStageInputUrls));
             stages.add(qc);
+
+            BioPipelineStage assembly = new BioPipelineStage();
+            assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
+            stages.add(assembly);
         }
 
         BioPipelineStage taxonomy = new BioPipelineStage();
         taxonomy.setStageType(PIPELINE_STAGE_TAXONOMY);
         stages.add(taxonomy);
-
-
-        BioPipelineStage assembly = new BioPipelineStage();
-        assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
-        stages.add(assembly);
-
-
 
         if (readType == PipelineSampleInput.READ_TYPE_FASTA) {
             TaxonomyStageInputUrls taxonomyStageInputUrls = new TaxonomyStageInputUrls();
@@ -164,7 +157,6 @@ public class AnalysisPipelineStagesBuilder {
             taxonomyStageInputUrls.setR2(pipelineInput.getR2());
             taxonomy.setInputUrl(JsonUtil.toJson(taxonomyStageInputUrls));
 
-            
         }
 
         BioPipelineStage amr = new BioPipelineStage();
@@ -253,7 +245,6 @@ public class AnalysisPipelineStagesBuilder {
 
         }
 
-
         firstStage.setStageIndex(0);
         firstStage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
 
@@ -270,7 +261,6 @@ public class AnalysisPipelineStagesBuilder {
         varientCall.setStatus(PIPELINE_STAGE_STATUS_PENDING);
 
         stages.add(varientCall);
-
 
         return stages;
 
