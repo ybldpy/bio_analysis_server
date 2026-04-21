@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
@@ -17,7 +18,6 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParam
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SeroTypingStageParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VFParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
@@ -50,7 +50,7 @@ public class StageOrchestrator {
             Map.entry(PIPELINE_STAGE_CONSENSUS, Set.of(PIPELINE_STAGE_VARIANT_CALL)),
             Map.entry(PIPELINE_STAGE_TAXONOMY, Set.of(PIPELINE_STAGE_QC)),
             Map.entry(PIPELINE_STAGE_MLST, Set.of(PIPELINE_STAGE_TAXONOMY, PIPELINE_STAGE_ASSEMBLY)),
-            Map.entry(PIPELINE_STAGE_AMR, Set.of(PIPELINE_STAGE_TAXONOMY, PIPELINE_STAGE_ASSEMBLY)),
+            Map.entry(PIPELINE_STAGE_AMR, Set.of(PIPELINE_STAGE_ASSEMBLY)),
             Map.entry(PIPELINE_STAGE_VIRULENCE, Set.of(PIPELINE_STAGE_TAXONOMY, PIPELINE_STAGE_ASSEMBLY)),
             Map.entry(PIPELINE_STAGE_SEROTYPE, Set.of(PIPELINE_STAGE_ASSEMBLY, PIPELINE_STAGE_TAXONOMY)));
 
@@ -371,8 +371,8 @@ public class StageOrchestrator {
         String serializedParams = null;
         BioPipelineStage qcStage = upstreamStages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC)
                 .findFirst().orElse(null);
-        BioPipelineStage readDetectLengthStage = upstreamStages.stream()
-                .filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).findFirst().orElse(null);
+        // BioPipelineStage readDetectLengthStage = upstreamStages.stream()
+        //         .filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).findFirst().orElse(null);
 
         QcResult qcResult = JsonUtil.toObject(qcStage.getOutputUrl(), QcResult.class);
         AssemblyInputUrls assemblyInputUrls = new AssemblyInputUrls();
@@ -397,8 +397,7 @@ public class StageOrchestrator {
         BioPipelineStage patch = new BioPipelineStage();
 
         List<BioPipelineStage> qcAndAssemblyAndReadLenStages = upstreamStages.stream()
-                .filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT
-                        || s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
+                .filter(s->s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
                 .toList();
         BioPipelineStage qcStage = qcAndAssemblyAndReadLenStages.stream()
                 .filter(s -> s.getStageType() == PIPELINE_STAGE_QC).findFirst().orElse(null);
@@ -511,48 +510,46 @@ public class StageOrchestrator {
         return null;
     }
 
-    private List<BioPipelineStage> findUpstreamStages(List<BioPipelineStage> stages, BioPipelineStage stage) {
+    // private List<BioPipelineStage> findUpstreamStages(List<BioPipelineStage> stages, BioPipelineStage stage) {
 
-        int stageType = stage.getStageType();
-        switch (stageType) {
-            case PIPELINE_STAGE_READ_LENGTH_DETECT:
-                return Collections.emptyList();
-            case PIPELINE_STAGE_QC:
-                return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).toList();
-            case PIPELINE_STAGE_ASSEMBLY:
-                return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC).toList();
-            case PIPELINE_STAGE_MAPPING:
-                return stages.stream().filter(
-                        s -> s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
-                        .toList();
-            case PIPELINE_STAGE_VARIANT_CALL:
-                return stages.stream().filter(
-                        s -> s.getStageType() == PIPELINE_STAGE_MAPPING || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
-                        .toList();
-            case PIPELINE_STAGE_CONSENSUS:
-                return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_VARIANT_CALL
-                        || s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
-            case PIPELINE_STAGE_TAXONOMY:
-                return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC).toList();
-            case PIPELINE_STAGE_AMR:
-                return stages.stream().filter(
-                        s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
-                        .toList();
-            case PIPELINE_STAGE_MLST:
-                return stages.stream().filter(
-                        s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
-                        .toList();
-            case PIPELINE_STAGE_SEROTYPE:
-                return stages.stream()
-                        .filter(s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY
-                                || s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
-                        .toList();
-            default:
-                break;
-        }
+    //     int stageType = stage.getStageType();
+    //     switch (stageType) {
+    //         case PIPELINE_STAGE_QC:
+    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).toList();
+    //         case PIPELINE_STAGE_ASSEMBLY:
+    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC).toList();
+    //         case PIPELINE_STAGE_MAPPING:
+    //             return stages.stream().filter(
+    //                     s -> s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
+    //                     .toList();
+    //         case PIPELINE_STAGE_VARIANT_CALL:
+    //             return stages.stream().filter(
+    //                     s -> s.getStageType() == PIPELINE_STAGE_MAPPING || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
+    //                     .toList();
+    //         case PIPELINE_STAGE_CONSENSUS:
+    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_VARIANT_CALL
+    //                     || s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
+    //         case PIPELINE_STAGE_TAXONOMY:
+    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC).toList();
+    //         case PIPELINE_STAGE_AMR:
+    //             return stages.stream().filter(
+    //                     s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
+    //                     .toList();
+    //         case PIPELINE_STAGE_MLST:
+    //             return stages.stream().filter(
+    //                     s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
+    //                     .toList();
+    //         case PIPELINE_STAGE_SEROTYPE:
+    //             return stages.stream()
+    //                     .filter(s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY
+    //                             || s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
+    //                     .toList();
+    //         default:
+    //             break;
+    //     }
 
-        return null;
-    }
+    //     return null;
+    // }
 
     private OrchestratePlan planForTaxonomy(List<BioPipelineStage> upstreamStages, BioPipelineStage taxStage)
             throws JsonMappingException, JsonProcessingException {
@@ -584,7 +581,7 @@ public class StageOrchestrator {
         BioPipelineStage taxonomyStage = upstreamStages.stream()
                 .filter(s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY).findFirst().orElse(null);
 
-        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomyStage.getOutputUrl(), TaxonomyResult.class);
+        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomyStage.getOutputInline(), TaxonomyResult.class);
 
         TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
         AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
@@ -601,7 +598,7 @@ public class StageOrchestrator {
                 PIPELINE_STAGE_STATUS_QUEUING, mlstStage.getVersion());
         plan.runStages.add(mlstStage);
         plan.updateStageCommands
-                .add(new UpdateStageCommand(patch, taxonomyStage.getStageId(), taxonomyStage.getVersion() - 1));
+                .add(new UpdateStageCommand(patch, mlstStage.getStageId(), mlstStage.getVersion() - 1));
         return plan;
     }
 
@@ -619,7 +616,7 @@ public class StageOrchestrator {
             throws JsonMappingException, JsonProcessingException {
 
         BioPipelineStage taxonomy = findStageFromStages(stages, PIPELINE_STAGE_TAXONOMY);
-        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(), TaxonomyResult.class);
+        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputInline(), TaxonomyResult.class);
 
         TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
         boolean canDoSeroType = SeroTypingStageExectuor.canDoSeroType(taxonomyContext);
@@ -703,7 +700,7 @@ public class StageOrchestrator {
         BioPipelineStage assembly = findStageFromStages(upstreamStages, PIPELINE_STAGE_ASSEMBLY);
 
         AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
-        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(), TaxonomyResult.class);
+        TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputInline(), TaxonomyResult.class);
 
         TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
 
@@ -788,30 +785,28 @@ public class StageOrchestrator {
         // prerequisize: cannot be null
         BioPipelineStage startStage = stages.stream().filter(s -> s.getStageId() == runStageId).findFirst()
                 .orElse(null);
-        List<BioPipelineStage> upstreamStages = findUpstreamStages(stages, startStage);
+        // List<BioPipelineStage> upstreamStages = findUpstreamStages(stages, startStage);
 
         if (startStage.getStageType() == PIPELINE_STAGE_ASSEMBLY) {
-            return this.planForAssembly(startStage, upstreamStages);
+            return this.planForAssembly(startStage, stages);
         } else if (startStage.getStageType() == PIPELINE_STAGE_MAPPING) {
-            return this.planForMapping(startStage, upstreamStages);
+            return this.planForMapping(startStage, stages);
         } else if (startStage.getStageType() == PIPELINE_STAGE_VARIANT_CALL) {
-            return this.planForVarientCall(startStage, upstreamStages);
+            return this.planForVarientCall(startStage, stages);
         } else if (startStage.getStageType() == PIPELINE_STAGE_CONSENSUS) {
-            return this.planForConsensus(startStage, upstreamStages);
+            return this.planForConsensus(startStage, stages);
         } else if (startStage.getStageType() == PIPELINE_STAGE_QC) {
-            return this.planForQc(startStage, upstreamStages);
-        } else if (startStage.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT) {
-            return this.planForReadLengDetect(startStage);
+            return this.planForQc(startStage, stages);
         } else if (startStage.getStageType() == PIPELINE_STAGE_TAXONOMY) {
-            return this.planForTaxonomy(upstreamStages, startStage);
+            return this.planForTaxonomy(stages, startStage);
         } else if (startStage.getStageType() == PIPELINE_STAGE_MLST) {
-            return this.planForMLST(upstreamStages, startStage);
+            return this.planForMLST(stages, startStage);
         } else if (startStage.getStageType() == PIPELINE_STAGE_AMR) {
-            return this.planForAMR(upstreamStages, startStage);
+            return this.planForAMR(stages, startStage);
         } else if (startStage.getStageType() == PIPELINE_STAGE_SEROTYPE) {
-            return this.planForSeroType(upstreamStages, startStage);
+            return this.planForSeroType(stages, startStage);
         }else if(startStage.getStageType() == PIPELINE_STAGE_VIRULENCE){
-            return this.planForVirulenFactorStage(upstreamStages, startStage);
+            return this.planForVirulenFactorStage(stages, startStage);
         }
         return null;
 

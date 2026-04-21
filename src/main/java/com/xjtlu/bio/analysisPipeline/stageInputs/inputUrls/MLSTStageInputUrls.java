@@ -18,6 +18,9 @@ public class MLSTStageInputUrls implements StageInputUrls{
         this.contigUrl = contigUrl;
     }
 
+    public MLSTStageInputUrls() {
+    }
+
     
 
 

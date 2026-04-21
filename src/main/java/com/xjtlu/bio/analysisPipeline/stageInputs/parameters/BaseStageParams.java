@@ -1,7 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
 
+import com.xjtlu.bio.analysisPipeline.context.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.meta.ReadMeta;
-import com.xjtlu.bio.entity.RefSeqMeta;
 
 public class BaseStageParams {
 
@@ -24,8 +24,10 @@ public class BaseStageParams {
         this.readMeta = readMeta;
     }
 
+    public BaseStageParams(RefSeqConfig refSeqConfig, TaxonomyContext taxonomyContext){
+        this(refSeqConfig, taxonomyContext, null);
+    }
 
-    
 
     public BaseStageParams(){
     }

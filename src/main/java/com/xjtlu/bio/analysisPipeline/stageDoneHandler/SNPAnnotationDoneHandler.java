@@ -5,11 +5,14 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.SNPAnnotationResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SNPAnnotationStageOutput;
 
+
+@Component
 public class SNPAnnotationDoneHandler extends AbstractStageDoneHandler<SNPAnnotationStageOutput> implements StageDoneHandler<SNPAnnotationStageOutput>{
 
     @Override

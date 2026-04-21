@@ -55,15 +55,14 @@ public class PipelineStageTaskDispatcher implements Runnable {
 
                 BioPipelineStage bioPipelineStage = stageBuffer.take();
                 runStageId = bioPipelineStage.getStageId();
-                logger.debug("take {} to run", bioPipelineStage);
+                logger.debug("take {} to run", bioPipelineStage.getStageId());
                 int updateRes = this.pipelineService.startStageExecute(bioPipelineStage);
                 if (updateRes != 1) {
-                    logger.debug("stage " + bioPipelineStage.toString()
-                            + " unable to update status to running and cannot run");
+                    logger.debug("stage = {} unable to update status to running and cannot run", bioPipelineStage.getStageId());
                     inStageIdSet.remove(bioPipelineStage.getStageId());
                     continue;
                 }
-                logger.info("stage " + bioPipelineStage.toString() + " start running");
+                logger.info("stage = {} start running", bioPipelineStage.getStageId());
                 runStage(bioPipelineStage);
 
             } catch (InterruptedException e) {

@@ -57,7 +57,7 @@ public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<V
         List<String> runCmd = new ArrayList<>();
         runCmd.addAll(this.analysisPipelineToolsConfig.getVirulenceFactor());
         runCmd.add("--db");
-        runCmd.add("");
+        runCmd.add("vfdb");
         runCmd.add("--minid");
         runCmd.add("90");
         runCmd.add("--mincov");

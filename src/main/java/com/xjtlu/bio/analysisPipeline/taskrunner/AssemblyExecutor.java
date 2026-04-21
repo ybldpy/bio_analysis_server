@@ -90,6 +90,10 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
             cmd.add("-s");
             cmd.add(r1Path.toString());
         }
+        cmd.add("--phred-offset");
+        cmd.add("33");
+
+        
         cmd.add("-o");
         cmd.add(workDir.toString());
 

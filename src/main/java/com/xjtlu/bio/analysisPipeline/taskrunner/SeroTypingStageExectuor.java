@@ -13,9 +13,9 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SeroTypeStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SeroTypingStageParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SeroTypingStageOutput;
 
 @Component
@@ -31,6 +31,15 @@ public class SeroTypingStageExectuor
     public static final int INPUT_TYPE_READS = 0;
     public static final int INPUT_TYPE_CONTIGS = 1;
 
+    private static class SeqSero2TMode {
+
+        public static final String SINGLE = "3";
+        public static final String INTERLEAVED = "1";
+        public static final String ASSEMBLY = "4";
+        public static final String PAIRED = "2";
+
+    }
+
     public static final Set<Integer> SUPPORTED_SEROTYPE_TAXID = Set.of(
             TAX_ID_ESCHERICHIA_COLI, // Salmonella enterica
             TAX_ID_KLEBSIELLA_PNEUMONIAE, // E. coli
@@ -42,7 +51,7 @@ public class SeroTypingStageExectuor
         if (rank == null)
             return false;
         String r = rank.toLowerCase();
-        return r.contains("species") || r.contains("strain") || r.contains("sub");
+        return r.contains("species") || r.contains("strain") || r.contains("sub") || r.contains("s") || r.contains("S");
     }
 
     public static boolean canDoSeroType(TaxonomyContext ctx) {
@@ -95,11 +104,21 @@ public class SeroTypingStageExectuor
         cmd.addAll(this.analysisPipelineToolsConfig.getSeqsero2());
         cmd.add("-i");
         cmd.add(r1Path.toString());
+        String mode = SeqSero2TMode.SINGLE;
+
+
         if (r2Path != null) {
             cmd.add(r2Path.toString());
+            mode = SeqSero2TMode.PAIRED;
         }
+
+        String fname = r1Path.getFileName().toString();
+        if(fname.endsWith(".fa") || fname.endsWith(".fasta") || fname.endsWith(".fna")){
+            mode = SeqSero2TMode.ASSEMBLY;
+        }
+
         cmd.add("-t");
-        cmd.add(r2Path == null ? "1" : "2");
+        cmd.add(mode);
         cmd.add("-d");
         cmd.add(stageExecutionInput.workDir.toString());
 

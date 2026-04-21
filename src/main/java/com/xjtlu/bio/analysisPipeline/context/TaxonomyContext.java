@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
+package com.xjtlu.bio.analysisPipeline.context;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 
@@ -55,6 +55,10 @@ public class TaxonomyContext {
     }
 
     public static TaxonomyContext of(TaxonomyResult r) {
+        if(r == null){
+            return new TaxonomyContext();
+        }
+        
         TaxonomyContext ctx = new TaxonomyContext();
         ctx.status = r.getStatus();
         ctx.taxid = r.getBest().getTaxid();

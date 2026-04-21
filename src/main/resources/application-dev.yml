@@ -38,7 +38,7 @@ analysis-pipeline:
         amrfinder: ["${analysis-pipeline.conda}", "run", "-n", "amrfinder", "amrfinder"]
         virulenceFactor: ["${analysis-pipeline.conda}", "run", "-n", "virulence", "abricate"]
         mlst: ["${analysis-pipeline.conda}", "run", "-n", "mlst", "mlst"]
-        kraken2: ["${analysis-pipeline.conda}", "run", "-n", "bio-kraken", "kraken2", "--db", "~/refereceTmp/kraken_db"]
+        kraken2: ["${analysis-pipeline.conda}", "run", "-n", "bio-kraken", "kraken2", "--db", "/home/jcy/refereceTmp/kraken_db"]
         seqsero2: ["${analysis-pipeline.conda}", "run", "-n", "seqsero2", "SeqSero2_package.py"]
         ectyper: ["${analysis-pipeline.conda}", "run", "-n", "ectyper", "ectyper"]
         kaptive: ["${analysis-pipeline.conda}", "run", "-n", "kaptive", "kaptive", "-k", "/home/jcy/refereceTmp/kaptive_db"]

@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.MLSTStageResult;
@@ -14,6 +15,8 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MLSTStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 
+
+@Component
 public class MLSTStageDoneHandler extends AbstractStageDoneHandler<MLSTStageOutput> implements StageDoneHandler<MLSTStageOutput>{
 
 

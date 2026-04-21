@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
@@ -25,31 +26,73 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
+
 class TaxonomyParser {
 
-    public static TaxonomyResult parseKraken2Output(Path reportFile) throws IOException {
+    private static final int MAX_CANDIDATES = 50;
 
-        List<Taxon> taxa = new ArrayList<>();
+    // 第一名最低支持度
+    private static final double MIN_CONFIDENT_SCORE = 3.0;
+
+    // 第一名至少比第二名高 20%
+    private static final double MIN_CONFIDENT_RATIO = 1.2;
+
+    public static TaxonomyResult parseKraken2Output(Path reportFile) throws IOException {
+        TaxonomyResult result = new TaxonomyResult();
 
         if (reportFile == null || !Files.exists(reportFile)) {
-            TaxonomyResult empty = new TaxonomyResult();
-            empty.setStatus("NO_HIT");
-            empty.setCandidates(Collections.emptyList());
-            return empty;
+            result.setStatus("NO_HIT");
+            result.setCandidates(Collections.emptyList());
+            return result;
         }
 
-        List<String> lines = Files.readAllLines(reportFile);
+        List<TaxonomyResult.Taxon> taxa = parseSpeciesOnly(reportFile);
 
-        for (String line : lines) {
+        if (taxa.isEmpty()) {
+            result.setStatus("NO_HIT");
+            result.setCandidates(Collections.emptyList());
+            return result;
+        }
 
+        taxa.sort(Comparator.comparingDouble(TaxonomyResult.Taxon::getScore).reversed());
+
+        List<TaxonomyResult.Taxon> topTaxa =
+                new ArrayList<>(taxa.subList(0, Math.min(MAX_CANDIDATES, taxa.size())));
+
+        TaxonomyResult.Taxon best = topTaxa.get(0);
+        result.setBest(best);
+        result.setCandidates(topTaxa);
+
+        if (topTaxa.size() == 1) {
+            if (best.getScore() >= MIN_CONFIDENT_SCORE) {
+                result.setStatus("CONFIDENT");
+            } else {
+                result.setStatus("AMBIGUOUS");
+            }
+            return result;
+        }
+
+        TaxonomyResult.Taxon second = topTaxa.get(1);
+        double ratio = calcRatio(best.getScore(), second.getScore());
+
+        if (best.getScore() >= MIN_CONFIDENT_SCORE && ratio >= MIN_CONFIDENT_RATIO) {
+            result.setStatus("CONFIDENT");
+        } else {
+            result.setStatus("AMBIGUOUS");
+        }
+
+        return result;
+    }
+
+    private static List<TaxonomyResult.Taxon> parseSpeciesOnly(Path reportFile) throws IOException {
+        List<TaxonomyResult.Taxon> taxa = new ArrayList<>();
+
+        for (String line : Files.readAllLines(reportFile)) {
             if (line == null || line.isBlank()) {
                 continue;
             }
 
-            line = line.trim();
-
-            String[] parts = line.split("\\s+", 6);
-
+            String[] parts = line.trim().split("\\s+", 6);
             if (parts.length < 6) {
                 continue;
             }
@@ -61,63 +104,38 @@ class TaxonomyParser {
                 continue;
             }
 
-            Taxon taxon = new Taxon();
-
             try {
-                taxon.setScore(Double.parseDouble(parts[0]));
-                taxon.setTaxid(Integer.parseInt(parts[4]));
-            } catch (NumberFormatException e) {
-                continue;
-            }
+                double score = Double.parseDouble(parts[0]);
+                int taxid = Integer.parseInt(parts[4]);
+                String name = parts[5];
 
-            taxon.setRank(rank);
-            taxon.setName(parts[5]);
+                TaxonomyResult.Taxon taxon = new TaxonomyResult.Taxon();
+                taxon.setScore(score);
+                taxon.setTaxid(taxid);
+                taxon.setRank(rank);
+                taxon.setName(name);
 
-            taxa.add(taxon);
-        }
-
-        // 按 score 降序排序
-        taxa.sort(
-                Comparator.comparingDouble(Taxon::getScore)
-                        .reversed());
-
-        TaxonomyResult result = new TaxonomyResult();
-
-        if (taxa.isEmpty()) {
-            result.setStatus("NO_HIT");
-            result.setCandidates(Collections.emptyList());
-            return result;
-        }
-
-        // 取前 50
-        int limit = Math.min(50, taxa.size());
-        List<Taxon> topTaxa = new ArrayList<>(taxa.subList(0, limit));
-
-        Taxon best = topTaxa.get(0);
-
-        result.setBest(best);
-        result.setCandidates(topTaxa);
-
-        // 状态判断
-        if (topTaxa.size() == 1) {
-            result.setStatus("CONFIDENT");
-        } else {
-
-            Taxon second = topTaxa.get(1);
-
-            if (best.getScore() >= 60 &&
-                    best.getScore() - second.getScore() >= 20) {
-                result.setStatus("CONFIDENT");
-            } else {
-                result.setStatus("AMBIGUOUS");
+                taxa.add(taxon);
+            } catch (NumberFormatException ignored) {
             }
         }
 
-        return result;
+        return taxa;
     }
 
+    private static double calcRatio(double best, double second) {
+        if (second <= 0) {
+            return Double.MAX_VALUE;
+        }
+        return best / second;
+    }
 }
 
+
+
+
+
+@Component
 public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyStageOutput> {
 
     @Override
@@ -158,7 +176,9 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         BioPipelineStage patch = new BioPipelineStage();
         patch.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         patch.setEndTime(new Date());
-        patch.setOutputUrl(serializedResult);
+        patch.setOutputInline(serializedResult);
+
+        
         int updateRes = updateStageFromVersion(patch, taxonomyStage.getRunStageId(), taxonomyStage.getVersion());
         this.deleteStageResultDir(taxonomyStageOutput.getParentPath().toString());
         return;

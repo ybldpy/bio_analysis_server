@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.SeroTypeResult;
@@ -14,6 +15,8 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SeroTypingStageOutp
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.PipelineService;
 
+
+@Component
 public class SeroTypeStageDoneHandler extends AbstractStageDoneHandler<SeroTypingStageOutput> implements StageDoneHandler<SeroTypingStageOutput>{
 
 

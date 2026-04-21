@@ -5,12 +5,15 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.stereotype.Component;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.CoverageDepthStageResult;
 
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.CoverageDepthStageOutput;
 
+
+@Component
 public class CoverageDepthStageDoneHandler extends AbstractStageDoneHandler<CoverageDepthStageOutput> implements StageDoneHandler<CoverageDepthStageOutput>{
 
     @Override
