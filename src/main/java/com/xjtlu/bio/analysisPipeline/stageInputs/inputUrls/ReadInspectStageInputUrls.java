@@ -2,22 +2,37 @@ package com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls;
 
 public class ReadInspectStageInputUrls implements StageInputUrls{
 
-    private String readUrl;
+    private String read1Url;
+    private String read2Url;
 
-    public ReadInspectStageInputUrls(String readUrl) {
-        this.readUrl = readUrl;
+
+
+    public ReadInspectStageInputUrls(String read1Url,String read2Url) {
+        this.read1Url = read1Url;
+        this.read2Url = read2Url;
     }
 
     public ReadInspectStageInputUrls() {
     }
 
-    public String getReadUrl() {
-        return readUrl;
+    public String getRead1Url() {
+        return read1Url;
     }
 
-    public void setReadUrl(String readUrl) {
-        this.readUrl = readUrl;
+
+    public void setRead1Url(String read1Url) {
+        this.read1Url = read1Url;
     }
+
+    public String getRead2Url() {
+        return read2Url;
+    }
+
+    public void setRead2Url(String read2Url) {
+        this.read2Url = read2Url;
+    }
+
+    
 
     
 

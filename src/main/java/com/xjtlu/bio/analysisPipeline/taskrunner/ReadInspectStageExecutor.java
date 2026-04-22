@@ -1,20 +1,76 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
-import com.xjtlu.bio.analysisPipeline.meta.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.context.ReadMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadInspectStageOutput;
+
+class FastQIO{
+
+
+
+
+    public static boolean isGzip(Path p){
+        String fileName = p.getFileName().toString();
+        return fileName.endsWith(".gz");
+    }
+
+    public static BufferedReader getReader(Path in) throws IOException{
+
+        InputStream is = Files.newInputStream(in);
+
+        if (isGzip(in)) {
+            is = new GZIPInputStream(is);
+        }
+
+        return new BufferedReader(
+                new InputStreamReader(is, StandardCharsets.UTF_8)
+        );
+    }
+
+    public static BufferedWriter getWriter(Path out) throws IOException{
+
+
+        OutputStream os = Files.newOutputStream(out);
+
+        if(isGzip(out)){
+            os = new GZIPOutputStream(os);
+        }
+
+        return new BufferedWriter(
+            new OutputStreamWriter(os)
+        );
+    }
+}
+
+
+
 
 @Component
 public class ReadInspectStageExecutor
@@ -93,6 +149,122 @@ public class ReadInspectStageExecutor
         return new int[] { encoding, readLenType };
     }
 
+    private static class SplitInterleavedResult {
+        Path r1;
+        Path r2;
+        boolean success;
+        boolean brokenInput;
+
+        public SplitInterleavedResult(Path r1, Path r2, boolean success, boolean brokenInput) {
+            this.r1 = r1;
+            this.r2 = r2;
+            this.success = success;
+            this.brokenInput = brokenInput;
+        }
+
+    }
+
+    private SplitInterleavedResult splitIfLeaved(Path read, Path workDir) {
+
+        String fileName = read.getFileName().toString();
+        String baseName = fileName;
+        boolean decompressed = false;
+        String format = null;
+        if (baseName.endsWith(".fastq.gz")) {
+            decompressed = true;
+            baseName = baseName.substring(0, baseName.length() - ".fastq.gz".length());
+            format = ".fastq.gz";
+        } else if (baseName.endsWith(".fq.gz")) {
+            decompressed = true;
+            baseName = baseName.substring(0, baseName.length() - ".fq.gz".length());
+            format = ".fq.gz";
+        } else if (baseName.endsWith(".fastq")) {
+            baseName = baseName.substring(0, baseName.length() - ".fastq".length());
+            format = ".fastq";
+        } else if (baseName.endsWith(".fq")) {
+            baseName = baseName.substring(0, baseName.length() - ".fq".length());
+            format = ".fq";
+        }
+
+        Path r1 = workDir.resolve(baseName + "_r1" + format);
+        Path r2 = workDir.resolve(baseName + "_r2" + format);
+
+        BufferedReader br = null;
+        BufferedWriter w1 = null;
+        BufferedWriter w2 = null;
+
+        try {
+
+            br = FastQIO.getReader(read);
+            w1 = FastQIO.getWriter(r1);
+            w2 = FastQIO.getWriter(r2);
+
+            
+
+
+            while (true) {
+
+                String[] r1Lines = new String[4];
+                String[] r2Lines = new String[4];
+
+                for (int i = 0; i < 4; i++) {
+                    r1Lines[i] = br.readLine();
+                    if (r1Lines[i] == null) {
+                        return new SplitInterleavedResult(r1, r2, false, true);
+                    }
+                }
+
+                for (int i = 0; i < 4; i++) {
+                    r2Lines[i] = br.readLine();
+                    if (r2Lines[i] == null) {
+                        return new SplitInterleavedResult(null, null, false, true);
+                    }
+                }
+
+                for (String l : r1Lines) {
+                    w1.write(l);
+                    w1.newLine();
+                }
+
+                for (String l : r2Lines) {
+                    w2.write(l);
+                    w2.newLine();
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Spliting expcetion", e);
+            return new SplitInterleavedResult(null, null, false, false);
+        } finally {
+
+            if(br!=null){
+                try {
+                    br.close();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                }
+            }
+
+            if(w1!=null){
+                try {
+                    w1.close();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                }
+            }
+
+            if(w2!=null){
+                try {
+                    w2.close();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    
+                }
+            }
+            
+        }
+
+    }
+
     @Override
     protected StageRunResult<ReadInspectStageOutput> _execute(
             StageExecutionInput stageExecutionInput)
@@ -101,19 +273,33 @@ public class ReadInspectStageExecutor
 
         ReadInspectStageInputUrls readInspectStageInputUrls = stageExecutionInput.input;
 
-        String readUrl = readInspectStageInputUrls.getReadUrl();
-        Path readLocalPath = stageExecutionInput.inputDir.resolve(readUrl.substring(readUrl.lastIndexOf("/") + 1));
+        String read1Url = readInspectStageInputUrls.getRead1Url();
+        String read2Url = readInspectStageInputUrls.getRead2Url();
 
-        Map<String, Path> loadMap = Map.of(readUrl, readLocalPath);
+        Path readLocalPath = stageExecutionInput.inputDir.resolve(read1Url.substring(read1Url.lastIndexOf("/") + 1));
+
+        Map<String, Path> loadMap = Map.of(read1Url, readLocalPath);
         loadInput(loadMap);
 
+        int encoding = -1;
+        int readLen = -1;
+
+        SplitInterleavedResult splitInterleavedResult = null;
         try {
             int[] result = checkQualityEncodingAndReadLen(readLocalPath);
 
-            int encoding = result[0];
-            int readLEen = result[1];
+            encoding = result[0];
+            readLen = result[1];
 
-            return StageRunResult.OK(new ReadInspectStageOutput(encoding, readLEen), stageExecutionInput.stageContext);
+            if (StringUtils.isBlank(read2Url)) {
+                splitInterleavedResult = splitIfLeaved(readLocalPath, stageExecutionInput.workDir);
+            }
+
+
+
+
+
+
 
         } catch (IOException e) {
 

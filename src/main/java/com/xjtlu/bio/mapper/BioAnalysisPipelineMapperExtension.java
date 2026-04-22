@@ -15,8 +15,8 @@ public interface BioAnalysisPipelineMapperExtension {
 
 
 
-    @Select("SELECT pipeline_type FROM bio_analysis_pipeline WHERE pipeline_id = (SELECT pipeline_id FROM bio_pipeline_stage WHERE stage_id = #{stageId})")
-    public Integer selectPipelineTypeByStageId(long stageId);
+    @Select("SELECT * FROM bio_analysis_pipeline WHERE pipeline_id = (SELECT pipeline_id FROM bio_pipeline_stage WHERE stage_id = #{stageId})")
+    public BioAnalysisPipeline selectPipelineTypeByStageId(long stageId);
 
 
 }

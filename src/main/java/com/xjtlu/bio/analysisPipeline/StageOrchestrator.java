@@ -840,6 +840,8 @@ public class StageOrchestrator {
             return this.makePlanDownstreamVisurFactor(allStages, currentStage);
         } else if (currentStage.getStageType() == PIPELINE_STAGE_CONSENSUS) {
             return this.makeDownstreamPlanConsensus(allStages, currentStage);
+        }else if(currentStage.getStageType() == PIPELINE_STAGE_SEROTYPE){
+            return this.makePlanDownstreamSerotype();
         }
         return null;
 

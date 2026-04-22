@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.meta;
+package com.xjtlu.bio.analysisPipeline.context;
 
 public class ReadMeta {
 
@@ -30,7 +30,5 @@ public class ReadMeta {
     }
 
     
-
-
 
 }

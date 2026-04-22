@@ -8,22 +8,34 @@ public class ReadInspectStageOutput implements StageOutput{
     private int qualityEncoding;
     private int readLenType;
 
-    
+    private Path r1Path;
+    private Path r2Path;
 
 
 
 
-
-    public ReadInspectStageOutput(int qualityEncoding, int readLenType) {
-        this.qualityEncoding = qualityEncoding;
-        this.readLenType = readLenType;
+    public Path getR1Path() {
+        return r1Path;
     }
 
+    public void setR1Path(Path r1Path) {
+        this.r1Path = r1Path;
+    }
 
+    public Path getR2Path() {
+        return r2Path;
+    }
 
+    public void setR2Path(Path r2Path) {
+        this.r2Path = r2Path;
+    }
 
-
-
+    public ReadInspectStageOutput(int qualityEncoding, int readLenType, Path r1Path, Path r2Path) {
+        this.qualityEncoding = qualityEncoding;
+        this.readLenType = readLenType;
+        this.r1Path = r1Path;
+        this.r2Path = r2Path;
+    }
 
     public int getQualityEncoding() {
         return qualityEncoding;
