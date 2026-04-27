@@ -299,6 +299,12 @@ public class PipelineService {
         }
     }
 
+
+    public BioPipelineStage queryStageById(long stageId){
+        BioPipelineStage bioPipelineStage = this.bioPipelineStageMapper.selectByPrimaryKey(stageId);
+        return bioPipelineStage;
+    }
+
     private List<PipelineSampleInput> buildSampleInputs(List<BioPipelineInputFile> inputs,
             BioAnalysisPipeline pipeline) {
 

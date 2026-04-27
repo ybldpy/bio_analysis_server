@@ -5,6 +5,9 @@ public class StageContext {
     private long runStageId;
     private int version;
     private int stageType;
+    private long pipelineId;
+
+    
 
 
 

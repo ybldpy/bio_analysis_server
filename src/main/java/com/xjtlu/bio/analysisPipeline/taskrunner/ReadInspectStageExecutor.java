@@ -14,12 +14,13 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
@@ -31,17 +32,14 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInpu
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadInspectStageOutput;
 
-class FastQIO{
+class FastQIO {
 
-
-
-
-    public static boolean isGzip(Path p){
+    public static boolean isGzip(Path p) {
         String fileName = p.getFileName().toString();
         return fileName.endsWith(".gz");
     }
 
-    public static BufferedReader getReader(Path in) throws IOException{
+    public static BufferedReader getReader(Path in) throws IOException {
 
         InputStream is = Files.newInputStream(in);
 
@@ -50,32 +48,31 @@ class FastQIO{
         }
 
         return new BufferedReader(
-                new InputStreamReader(is, StandardCharsets.UTF_8)
-        );
+                new InputStreamReader(is, StandardCharsets.UTF_8));
     }
 
-    public static BufferedWriter getWriter(Path out) throws IOException{
-
+    public static BufferedWriter getWriter(Path out) throws IOException {
 
         OutputStream os = Files.newOutputStream(out);
 
-        if(isGzip(out)){
+        if (isGzip(out)) {
             os = new GZIPOutputStream(os);
         }
 
         return new BufferedWriter(
-            new OutputStreamWriter(os)
-        );
+                new OutputStreamWriter(os));
     }
 }
-
-
-
 
 @Component
 public class ReadInspectStageExecutor
         extends AbstractPipelineStageExector<ReadInspectStageOutput, ReadInspectStageInputUrls, BaseStageParams>
         implements PipelineStageExecutor<ReadInspectStageOutput> {
+
+    private static final double IS_INTERLEAVED_RATIO = 0.9;
+    private static final double NON_INTERLEAVED_MAX_RATIO = 0.1;
+
+    private static final int LONG_READ_THRESHOLD = 500;
 
     @Override
     protected Class<ReadInspectStageInputUrls> stageInputType() {
@@ -89,93 +86,50 @@ public class ReadInspectStageExecutor
         return BaseStageParams.class;
     }
 
-    private int[] checkQualityEncodingAndReadLen(Path p) throws IOException {
+    private static String substractRecordId(String header) {
+        // 去掉开头 '@'
+        String id = header.charAt(0) == '@' ? header.substring(1) : header;
+        // 只取空格前（兼容 Illumina / SRA）
+        int spaceIdx = id.indexOf(' ');
+        if (spaceIdx > 0) {
+            id = id.substring(0, spaceIdx);
+        }
+        // 处理 /1 /2（老式 Illumina）
+        if (id.endsWith("/1") || id.endsWith("/2")) {
+            id = id.substring(0, id.length() - 2);
+        }
 
-        int encoding = ReadMeta.QUALITY_ENCODING_33;
-        int readLenType = ReadMeta.READ_LEN_TYPE_SHORT;
-
-        int minQual = Integer.MAX_VALUE;
-        int maxQual = Integer.MIN_VALUE;
-
-        int totalLen = 0;
-        int count = 0;
-
-        try (BufferedReader br = Files.newBufferedReader(p)) {
-
-            String line;
-            int lineIndex = 0;
-
-            while ((line = br.readLine()) != null && count < 1000) {
-
-                int mod = lineIndex % 4;
-
-                // sequence line
-                if (mod == 1) {
-                    totalLen += line.length();
-                    count++;
-                }
-
-                // quality line
-                if (mod == 3) {
-                    for (char c : line.toCharArray()) {
-                        int v = (int) c;
-                        minQual = Math.min(minQual, v);
-                        maxQual = Math.max(maxQual, v);
-                    }
-                }
-
-                lineIndex++;
+        // 处理 .1 .2（常见 SRA/转换格式）
+        int lastDot = id.lastIndexOf('.');
+        if (lastDot > 0) {
+            String suffix = id.substring(lastDot + 1);
+            if ("1".equals(suffix) || "2".equals(suffix)) {
+                id = id.substring(0, lastDot);
             }
         }
 
-        // 判断 encoding
-        if (minQual >= 33 && maxQual <= 74) {
-            encoding = ReadMeta.QUALITY_ENCODING_33;
-        } else if (minQual >= 64) {
-            encoding = ReadMeta.QUALITY_ENCODING_64;
-        }
-
-        // 判断 read length
-        if (count > 0) {
-            int avgLen = totalLen / count;
-
-            if (avgLen >= 500) {
-                readLenType = ReadMeta.READ_LEN_TYPE_LONG;
-            } else {
-                readLenType = ReadMeta.READ_LEN_TYPE_SHORT;
-            }
-        }
-
-        return new int[] { encoding, readLenType };
+        return id;
     }
 
-    private static class SplitInterleavedResult {
-        Path r1;
-        Path r2;
-        boolean success;
-        boolean brokenInput;
-
-        public SplitInterleavedResult(Path r1, Path r2, boolean success, boolean brokenInput) {
-            this.r1 = r1;
-            this.r2 = r2;
-            this.success = success;
-            this.brokenInput = brokenInput;
-        }
-
+    private static boolean checkInterleaved(double ratio) {
+        return ratio > IS_INTERLEAVED_RATIO;
     }
 
-    private SplitInterleavedResult splitIfLeaved(Path read, Path workDir) {
+    private static boolean checkSingleRead(double ratio) {
+        return ratio < NON_INTERLEAVED_MAX_RATIO;
+    }
 
-        String fileName = read.getFileName().toString();
+    private StageRunResult<ReadInspectStageOutput> inspect(Path read1, boolean possibleInterleaved,
+            StageExecutionInput stageExecutionInput) {
+
+        String fileName = read1.getFileName().toString();
         String baseName = fileName;
-        boolean decompressed = false;
         String format = null;
+
         if (baseName.endsWith(".fastq.gz")) {
-            decompressed = true;
             baseName = baseName.substring(0, baseName.length() - ".fastq.gz".length());
             format = ".fastq.gz";
         } else if (baseName.endsWith(".fq.gz")) {
-            decompressed = true;
             baseName = baseName.substring(0, baseName.length() - ".fq.gz".length());
             format = ".fq.gz";
         } else if (baseName.endsWith(".fastq")) {
@@ -186,81 +140,166 @@ public class ReadInspectStageExecutor
             format = ".fq";
         }
 
+        int qualityEncoding = ReadMeta.QUALITY_ENCODING_33;
+        int readLenType = ReadMeta.READ_LEN_TYPE_SHORT;
+
+        Path workDir = stageExecutionInput.workDir;
         Path r1 = workDir.resolve(baseName + "_r1" + format);
         Path r2 = workDir.resolve(baseName + "_r2" + format);
 
-        BufferedReader br = null;
-        BufferedWriter w1 = null;
-        BufferedWriter w2 = null;
+        boolean checkedLen = false;
+        int checkReadLenTypePoint = 1000;
+        int[] readLens = new int[checkReadLenTypePoint];
+        int recordLenRecordIndex = 0;
 
-        try {
+        try (BufferedReader br = FastQIO.getReader(read1);
+                BufferedWriter w1 = FastQIO.getWriter(r1);
+                BufferedWriter w2 = FastQIO.getWriter(r2)) {
 
-            br = FastQIO.getReader(read);
-            w1 = FastQIO.getWriter(r1);
-            w2 = FastQIO.getWriter(r2);
+            int recordTravered = 0;
+            int paired = 0;
 
-            
+            int checkPointRecordNum = 4000;
 
+            String[][] recordBuffer = new String[2][4];
+
+            int recordBufferIndex = 0;
+            String r1HeaderId = null;
+
+            boolean checkedInterleaved = false;
+            boolean isInterleaved = false;
 
             while (true) {
+                String header = br.readLine();
+                if (header == null) {
+                    break;
+                }
 
-                String[] r1Lines = new String[4];
-                String[] r2Lines = new String[4];
+                if (possibleInterleaved) {
+                    recordBuffer[recordBufferIndex][0] = header;
+                }
 
-                for (int i = 0; i < 4; i++) {
-                    r1Lines[i] = br.readLine();
-                    if (r1Lines[i] == null) {
-                        return new SplitInterleavedResult(r1, r2, false, true);
+                for (int i = 0; i < 3; i++) {
+                    String followingLine = br.readLine();
+                    if (followingLine == null) {
+                        return this.runFail(stageExecutionInput.stageContext, followingLine);
+                    }
+
+                    if (possibleInterleaved) {
+                        recordBuffer[recordBufferIndex][1 + i] = followingLine;
+                    }
+                    if (!checkedLen && i == 0) {
+                        int readLen = followingLine.length();
+                        readLens[recordLenRecordIndex] = readLen;
+                        recordLenRecordIndex++;
+                        if (recordLenRecordIndex >= checkReadLenTypePoint) {
+                            checkedLen = true;
+                            Arrays.sort(readLens);
+                            int medianLen = readLens[(readLens.length - 1) / 2];
+                            if (medianLen >= LONG_READ_THRESHOLD) {
+                                readLenType = ReadMeta.READ_LEN_TYPE_LONG;
+                            }
+                        }
                     }
                 }
 
-                for (int i = 0; i < 4; i++) {
-                    r2Lines[i] = br.readLine();
-                    if (r2Lines[i] == null) {
-                        return new SplitInterleavedResult(null, null, false, true);
+                if (possibleInterleaved) {
+                    if (recordBufferIndex == 0) {
+                        r1HeaderId = substractRecordId(header);
+
+                    } else {
+                        String r2HeaderId = substractRecordId(header);
+                        if (Objects.equals(r1HeaderId, r2HeaderId)) {
+                            String r1Record = String.join("\n", recordBuffer[0]);
+                            String r2Record = String.join("\n", recordBuffer[1]);
+                            w1.write(r1Record);
+                            w1.newLine();
+                            w2.write(r2Record);
+                            w2.newLine();
+                            paired++;
+                        } else {
+                            // not paired with previous, may be read 1 of next pair
+                            recordBuffer[0] = recordBuffer[1];
+                            recordBufferIndex = 0;
+                        }
                     }
                 }
 
-                for (String l : r1Lines) {
-                    w1.write(l);
-                    w1.newLine();
+                if (possibleInterleaved) {
+                    recordBufferIndex = (recordBufferIndex + 1) % 2;
+                    recordTravered += 1;
                 }
 
-                for (String l : r2Lines) {
-                    w2.write(l);
-                    w2.newLine();
+                if (possibleInterleaved && !checkedInterleaved && recordTravered >= checkPointRecordNum) {
+                    checkedInterleaved = true;
+                    double ratio = (paired * 2.0) / recordTravered;
+                    isInterleaved = checkInterleaved(ratio);
+                    if (!isInterleaved) {
+                        if (checkSingleRead(ratio)) {
+                            return StageRunResult.OK(
+                                    new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                                    stageExecutionInput.stageContext);
+                        } else {
+                            logger.warn(
+                                    "stage = {}, ambiguous FASTQ input, unable to determine layout, " +
+                                            "records = {}, paired = {}, ratio = {}",
+                                    stageExecutionInput.stageContext.getRunStageId(),
+                                    recordTravered,
+                                    paired,
+                                    String.format("%.4f", ratio));
+
+                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型");
+                        }
+                    }
                 }
             }
+
+            if (!checkedLen) {
+                Arrays.sort(readLens, 0, recordLenRecordIndex);
+                int median = readLens[(recordLenRecordIndex - 1) / 2];
+                if (median >= LONG_READ_THRESHOLD) {
+                    readLenType = ReadMeta.READ_LEN_TYPE_LONG;
+                }
+            }
+
+            if (possibleInterleaved) {
+
+                if (checkedInterleaved) {
+                    return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, r1, r2, stageExecutionInput.workDir),
+                            stageExecutionInput.stageContext);
+                }
+                else {
+                    double ratio = (paired * 2.0) / recordTravered;
+                    if (!checkInterleaved(ratio)) {
+                        if (checkSingleRead(ratio)) {
+                            return StageRunResult.OK(
+                                    new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                                    stageExecutionInput.stageContext);
+                        } else {
+                            logger.warn(
+                                    "stage = {}, ambiguous FASTQ input, unable to determine layout, " +
+                                            "records = {}, paired = {}, ratio = {}",
+                                    stageExecutionInput.stageContext.getRunStageId(),
+                                    recordTravered,
+                                    paired,
+                                    String.format("%.4f", ratio));
+
+                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型");
+                        }
+                    }
+
+                    return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, null, null, stageExecutionInput.workDir), stageExecutionInput.stageContext);
+                }
+            } else {
+
+                return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                        stageExecutionInput.stageContext);
+            }
+
         } catch (Exception e) {
-            logger.error("Spliting expcetion", e);
-            return new SplitInterleavedResult(null, null, false, false);
-        } finally {
-
-            if(br!=null){
-                try {
-                    br.close();
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                }
-            }
-
-            if(w1!=null){
-                try {
-                    w1.close();
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                }
-            }
-
-            if(w2!=null){
-                try {
-                    w2.close();
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    
-                }
-            }
-            
+            logger.error("Inspection exception, run stage id = {}", stageExecutionInput.stageContext.getRunStageId(),
+                    e);
+            return this.runFail(stageExecutionInput.stageContext, "Inspection exception");
         }
 
     }
@@ -281,31 +320,7 @@ public class ReadInspectStageExecutor
         Map<String, Path> loadMap = Map.of(read1Url, readLocalPath);
         loadInput(loadMap);
 
-        int encoding = -1;
-        int readLen = -1;
-
-        SplitInterleavedResult splitInterleavedResult = null;
-        try {
-            int[] result = checkQualityEncodingAndReadLen(readLocalPath);
-
-            encoding = result[0];
-            readLen = result[1];
-
-            if (StringUtils.isBlank(read2Url)) {
-                splitInterleavedResult = splitIfLeaved(readLocalPath, stageExecutionInput.workDir);
-            }
-
-
-
-
-
-
-
-        } catch (IOException e) {
-
-            logger.error("stage = {} exception", stageExecutionInput.stageContext.getRunStageId(), e);
-            return this.runFail(stageExecutionInput.stageContext, "run exception");
-        }
+        return this.inspect(readLocalPath, StringUtils.isBlank(read2Url), stageExecutionInput);
 
     }
 

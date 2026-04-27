@@ -6,8 +6,6 @@ import com.xjtlu.bio.analysisPipeline.context.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MLSTStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.utils.JsonUtil;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

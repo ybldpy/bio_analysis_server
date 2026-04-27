@@ -11,6 +11,7 @@ public class ReadInspectStageOutput implements StageOutput{
     private Path r1Path;
     private Path r2Path;
 
+    private Path workDir;
 
 
 
@@ -30,20 +31,18 @@ public class ReadInspectStageOutput implements StageOutput{
         this.r2Path = r2Path;
     }
 
-    public ReadInspectStageOutput(int qualityEncoding, int readLenType, Path r1Path, Path r2Path) {
+    public ReadInspectStageOutput(int qualityEncoding, int readLenType, Path r1Path, Path r2Path, Path workDir) {
         this.qualityEncoding = qualityEncoding;
         this.readLenType = readLenType;
         this.r1Path = r1Path;
         this.r2Path = r2Path;
+        this.workDir = workDir;
     }
+
 
     public int getQualityEncoding() {
         return qualityEncoding;
     }
-
-
-
-
 
 
 
@@ -80,9 +79,16 @@ public class ReadInspectStageOutput implements StageOutput{
     @Override
     public Path getParentPath() {
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getParentPath'");
+        return workDir;
     }
 
+    public Path getWorkDir() {
+        return workDir;
+    }
+
+    public void setWorkDir(Path workDir) {
+        this.workDir = workDir;
+    }
 
 
 }

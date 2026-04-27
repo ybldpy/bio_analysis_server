@@ -7,9 +7,7 @@ import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.xjtlu.bio.analysisPipeline.taskrunner.AbstractPipelineStageExector;
 import com.xjtlu.bio.analysisPipeline.taskrunner.PipelineStageExecutor;
-import com.xjtlu.bio.service.PipelineService;
 
 @Configuration
 public class StageExecutorConfig {

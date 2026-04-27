@@ -183,14 +183,14 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
         handleFail(bioPipelineStage, deleteDir);
     }
 
-    protected int updateStageFinish(BioPipelineStage bioPipelineStage, String outputUrl) {
+    protected int updateStageFinish(StageContext bioPipelineStage, String outputUrl) {
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setOutputUrl(outputUrl);
         updateStage.setVersion(bioPipelineStage.getVersion() + 1);
         updateStage.setEndTime(new Date());
         updateStage.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
         return pipelineService.updateStageFromVersion(
-                new UpdateStageCommand(updateStage, bioPipelineStage.getStageId(), bioPipelineStage.getVersion()));
+                new UpdateStageCommand(updateStage, bioPipelineStage.getRunStageId(), bioPipelineStage.getVersion()));
     }
 
     protected int updateStageFromVersion(BioPipelineStage bioPipelineStage, long updateStageId, int currentVersion) {
