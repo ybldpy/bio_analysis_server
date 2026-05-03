@@ -2,12 +2,14 @@ package com.xjtlu.bio.analysisPipeline;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.xjtlu.bio.analysisPipeline.context.ReadMeta;
 import com.xjtlu.bio.analysisPipeline.context.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SeroTypeStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
@@ -16,6 +18,7 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.AMRParamters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SeroTypingStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VFParameters;
@@ -23,6 +26,7 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParamete
 import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.MappingResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.QcResult;
+import com.xjtlu.bio.analysisPipeline.stageResult.ReadInspectStageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.VarientCallStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.SeroTypingStageExectuor;
@@ -132,7 +136,6 @@ public class StageOrchestrator {
 
     }
 
-
     private OrchestratePlan planDownstreamQc(List<BioPipelineStage> allStages, BioPipelineStage qcStage,
             int pipelineType)
             throws JsonProcessingException, MissingUpstreamException {
@@ -143,25 +146,25 @@ public class StageOrchestrator {
             BioPipelineStage taxonomy = findStageFromStages(allStages, PIPELINE_STAGE_TAXONOMY);
 
             OrchestratePlan nextRunPlan = new OrchestratePlan();
-            if(assembly!=null){
+            if (assembly != null) {
                 OrchestratePlan assemblyPlan = makePlan(allStages, assembly.getStageId());
                 nextRunPlan.runStages.addAll(assemblyPlan.runStages);
                 nextRunPlan.updateStageCommands.addAll(assemblyPlan.updateStageCommands);
             }
 
-            if(taxonomy!=null){
+            if (taxonomy != null) {
                 OrchestratePlan taxonomyPlan = makePlan(allStages, taxonomy.getStageId());
                 nextRunPlan.runStages.addAll(taxonomyPlan.runStages);
                 nextRunPlan.updateStageCommands.addAll(taxonomyPlan.updateStageCommands);
             }
 
-
             return nextRunPlan;
 
-        } else if(pipelineType == Constants.PipelineType.PIPELINE_VIRUS || pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID){
+        } else if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS
+                || pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID) {
 
             BioPipelineStage assembly = findStageFromStages(allStages, PIPELINE_STAGE_ASSEMBLY);
-            if(assembly!=null){
+            if (assembly != null) {
                 return makePlan(allStages, assembly.getStageId());
             }
 
@@ -169,22 +172,22 @@ public class StageOrchestrator {
 
             return makePlan(allStages, mapping.getStageId());
 
-        }else if(pipelineType == Constants.PipelineType.PIPELINE_SNP_SUB_ANALYSIS){
-            //TODO: implement later
+        } else if (pipelineType == Constants.PipelineType.PIPELINE_SNP_SUB_ANALYSIS) {
+            // TODO: implement later
 
             return null;
         }
 
-
         return null;
     }
 
-    //病原学特征分析
-    private OrchestratePlan planBacteriaPathogenAnalysis(List<BioPipelineStage> allStages) throws MissingUpstreamException, JsonMappingException, JsonProcessingException{
+    // 病原学特征分析
+    private OrchestratePlan planBacteriaPathogenAnalysis(List<BioPipelineStage> allStages)
+            throws MissingUpstreamException, JsonMappingException, JsonProcessingException {
 
         BioPipelineStage assembly = findStageFromStages(allStages, PIPELINE_STAGE_ASSEMBLY);
         BioPipelineStage taxonomy = findStageFromStages(allStages, PIPELINE_STAGE_TAXONOMY);
-        if(assembly != null && assembly.getStatus()!=PIPELINE_STAGE_STATUS_FINISHED){
+        if (assembly != null && assembly.getStatus() != PIPELINE_STAGE_STATUS_FINISHED) {
             return new OrchestratePlan();
         }
 
@@ -193,24 +196,24 @@ public class StageOrchestrator {
 
         OrchestratePlan plan = new OrchestratePlan();
 
-        if(amr.getStatus()==PIPELINE_STAGE_STATUS_PENDING){
+        if (amr.getStatus() == PIPELINE_STAGE_STATUS_PENDING) {
             OrchestratePlan amrPlan = makePlan(allStages, amr.getStageId());
             plan.runStages.addAll(amrPlan.runStages);
             plan.updateStageCommands.addAll(amrPlan.updateStageCommands);
         }
 
-        if(vf.getStatus() == PIPELINE_STAGE_STATUS_PENDING){
+        if (vf.getStatus() == PIPELINE_STAGE_STATUS_PENDING) {
             OrchestratePlan vfPlan = makePlan(allStages, vf.getStageId());
             plan.runStages.addAll(vfPlan.getRunStages());
             plan.updateStageCommands.addAll(vfPlan.getUpdateStageCommands());
         }
 
-        //the result has been comfirmed
-        if(taxonomy.getStatus() == PIPELINE_STAGE_STATUS_FINISHED){
+        // the result has been comfirmed
+        if (taxonomy.getStatus() == PIPELINE_STAGE_STATUS_FINISHED) {
 
             BioPipelineStage mlst = findStageFromStages(allStages, PIPELINE_STAGE_MLST);
             BioPipelineStage serotypeStage = findStageFromStages(allStages, PIPELINE_STAGE_SEROTYPE);
-            
+
             OrchestratePlan mlstPlan = makePlan(allStages, mlst.getStageId());
             OrchestratePlan seroTypePlan = makePlan(allStages, serotypeStage.getStageId());
 
@@ -221,15 +224,15 @@ public class StageOrchestrator {
             plan.updateStageCommands.addAll(seroTypePlan.updateStageCommands);
         }
 
-        return plan;    
+        return plan;
 
     }
 
-    private OrchestratePlan planDownstreamAssembly(List<BioPipelineStage> allStages, BioPipelineStage assembly, int pipelineType)
+    private OrchestratePlan planDownstreamAssembly(List<BioPipelineStage> allStages, BioPipelineStage assembly,
+            int pipelineType)
             throws JsonProcessingException, MissingUpstreamException {
 
-
-        if(pipelineType == Constants.PipelineType.PIPELINE_REGULAR_BACTERIA){
+        if (pipelineType == Constants.PipelineType.PIPELINE_REGULAR_BACTERIA) {
             return planBacteriaPathogenAnalysis(allStages);
         }
 
@@ -239,9 +242,7 @@ public class StageOrchestrator {
             return makePlan(allStages, mappingStage.getStageId());
         }
 
-
         return new OrchestratePlan();
-
 
     }
 
@@ -372,7 +373,8 @@ public class StageOrchestrator {
         BioPipelineStage qcStage = upstreamStages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC)
                 .findFirst().orElse(null);
         // BioPipelineStage readDetectLengthStage = upstreamStages.stream()
-        //         .filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).findFirst().orElse(null);
+        // .filter(s -> s.getStageType() ==
+        // PIPELINE_STAGE_READ_LENGTH_DETECT).findFirst().orElse(null);
 
         QcResult qcResult = JsonUtil.toObject(qcStage.getOutputUrl(), QcResult.class);
         AssemblyInputUrls assemblyInputUrls = new AssemblyInputUrls();
@@ -397,7 +399,7 @@ public class StageOrchestrator {
         BioPipelineStage patch = new BioPipelineStage();
 
         List<BioPipelineStage> qcAndAssemblyAndReadLenStages = upstreamStages.stream()
-                .filter(s->s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
+                .filter(s -> s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
                 .toList();
         BioPipelineStage qcStage = qcAndAssemblyAndReadLenStages.stream()
                 .filter(s -> s.getStageType() == PIPELINE_STAGE_QC).findFirst().orElse(null);
@@ -490,16 +492,39 @@ public class StageOrchestrator {
         plan.runStages.add(consensusStage);
 
         return plan;
-
     }
 
-    private OrchestratePlan planForQc(BioPipelineStage qcStage, List<BioPipelineStage> upstreamStages)
+    private static ReadMeta buildReadMeta(ReadInspectStageResult readInspectStageResult) {
+        return new ReadMeta(readInspectStageResult.getQualityEncoding(), readInspectStageResult.getReadLenType());
+    }
+
+    private OrchestratePlan planForQc(BioPipelineStage qcStage, List<BioPipelineStage> pipelineStages)
             throws JsonMappingException, JsonProcessingException {
 
+        BioPipelineStage readInspectStage = findStageFromStages(pipelineStages, PIPELINE_STAGE_READ_INSPECT);
         OrchestratePlan plan = new OrchestratePlan();
         BioPipelineStage patch = new BioPipelineStage();
 
-        this.applyUpdatesToUpdateStage(patch, qcStage, (String) null, null, PIPELINE_STAGE_STATUS_QUEUING,
+        ReadInspectStageResult readInspectStageResult = JsonUtil.toObject(readInspectStage.getOutputUrl(),
+                ReadInspectStageResult.class);
+
+        String r1Url = readInspectStageResult.getR1Url();
+        String r2Url = readInspectStageResult.getR2Url();
+
+        ReadMeta readMeta = buildReadMeta(readInspectStageResult);
+
+        QcParameters qcParameters = JsonUtil.toObject(qcStage.getParameters(), QcParameters.class);
+        qcParameters.setReadMeta(readMeta);
+
+        String serializedQcParameters = JsonUtil.toJson(qcParameters);
+        QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
+        qcStageInputUrls.setRead1(r1Url);
+        qcStageInputUrls.setRead2(r2Url);
+
+        String serializedInputUrls = JsonUtil.toJson(qcStageInputUrls);
+
+        this.applyUpdatesToUpdateStage(patch, qcStage, serializedInputUrls, serializedQcParameters,
+                PIPELINE_STAGE_STATUS_QUEUING,
                 qcStage.getVersion());
         plan.updateStageCommands.add(new UpdateStageCommand(patch, qcStage.getStageId(), qcStage.getVersion() - 1));
         plan.runStages.add(qcStage);
@@ -510,45 +535,55 @@ public class StageOrchestrator {
         return null;
     }
 
-    // private List<BioPipelineStage> findUpstreamStages(List<BioPipelineStage> stages, BioPipelineStage stage) {
+    // private List<BioPipelineStage> findUpstreamStages(List<BioPipelineStage>
+    // stages, BioPipelineStage stage) {
 
-    //     int stageType = stage.getStageType();
-    //     switch (stageType) {
-    //         case PIPELINE_STAGE_QC:
-    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_READ_LENGTH_DETECT).toList();
-    //         case PIPELINE_STAGE_ASSEMBLY:
-    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC).toList();
-    //         case PIPELINE_STAGE_MAPPING:
-    //             return stages.stream().filter(
-    //                     s -> s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
-    //                     .toList();
-    //         case PIPELINE_STAGE_VARIANT_CALL:
-    //             return stages.stream().filter(
-    //                     s -> s.getStageType() == PIPELINE_STAGE_MAPPING || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
-    //                     .toList();
-    //         case PIPELINE_STAGE_CONSENSUS:
-    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_VARIANT_CALL
-    //                     || s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
-    //         case PIPELINE_STAGE_TAXONOMY:
-    //             return stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_QC).toList();
-    //         case PIPELINE_STAGE_AMR:
-    //             return stages.stream().filter(
-    //                     s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
-    //                     .toList();
-    //         case PIPELINE_STAGE_MLST:
-    //             return stages.stream().filter(
-    //                     s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() == PIPELINE_STAGE_ASSEMBLY)
-    //                     .toList();
-    //         case PIPELINE_STAGE_SEROTYPE:
-    //             return stages.stream()
-    //                     .filter(s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY
-    //                             || s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() == PIPELINE_STAGE_QC)
-    //                     .toList();
-    //         default:
-    //             break;
-    //     }
+    // int stageType = stage.getStageType();
+    // switch (stageType) {
+    // case PIPELINE_STAGE_QC:
+    // return stages.stream().filter(s -> s.getStageType() ==
+    // PIPELINE_STAGE_READ_LENGTH_DETECT).toList();
+    // case PIPELINE_STAGE_ASSEMBLY:
+    // return stages.stream().filter(s -> s.getStageType() ==
+    // PIPELINE_STAGE_QC).toList();
+    // case PIPELINE_STAGE_MAPPING:
+    // return stages.stream().filter(
+    // s -> s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() ==
+    // PIPELINE_STAGE_QC)
+    // .toList();
+    // case PIPELINE_STAGE_VARIANT_CALL:
+    // return stages.stream().filter(
+    // s -> s.getStageType() == PIPELINE_STAGE_MAPPING || s.getStageType() ==
+    // PIPELINE_STAGE_ASSEMBLY)
+    // .toList();
+    // case PIPELINE_STAGE_CONSENSUS:
+    // return stages.stream().filter(s -> s.getStageType() ==
+    // PIPELINE_STAGE_VARIANT_CALL
+    // || s.getStageType() == PIPELINE_STAGE_ASSEMBLY).toList();
+    // case PIPELINE_STAGE_TAXONOMY:
+    // return stages.stream().filter(s -> s.getStageType() ==
+    // PIPELINE_STAGE_QC).toList();
+    // case PIPELINE_STAGE_AMR:
+    // return stages.stream().filter(
+    // s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() ==
+    // PIPELINE_STAGE_ASSEMBLY)
+    // .toList();
+    // case PIPELINE_STAGE_MLST:
+    // return stages.stream().filter(
+    // s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY || s.getStageType() ==
+    // PIPELINE_STAGE_ASSEMBLY)
+    // .toList();
+    // case PIPELINE_STAGE_SEROTYPE:
+    // return stages.stream()
+    // .filter(s -> s.getStageType() == PIPELINE_STAGE_TAXONOMY
+    // || s.getStageType() == PIPELINE_STAGE_ASSEMBLY || s.getStageType() ==
+    // PIPELINE_STAGE_QC)
+    // .toList();
+    // default:
+    // break;
+    // }
 
-    //     return null;
+    // return null;
     // }
 
     private OrchestratePlan planForTaxonomy(List<BioPipelineStage> upstreamStages, BioPipelineStage taxStage)
@@ -669,14 +704,15 @@ public class StageOrchestrator {
         BioPipelineStage assembly = findStageFromStages(upstreamStages, PIPELINE_STAGE_ASSEMBLY);
 
         AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
-        //TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(), TaxonomyResult.class);
+        // TaxonomyResult taxonomyResult = JsonUtil.toObject(taxonomy.getOutputUrl(),
+        // TaxonomyResult.class);
 
         AMRInputUrls amrInputUrls = new AMRInputUrls();
         amrInputUrls.setContigsUrl(assemblyResult.getContigsUrl());
 
-        //TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
+        // TaxonomyContext taxonomyContext = TaxonomyContext.of(taxonomyResult);
         AMRParamters params = JsonUtil.toObject(amrStage.getParameters(), AMRParamters.class);
-        //params.setTaxonomyContext(taxonomyContext);
+        // params.setTaxonomyContext(taxonomyContext);
 
         String serializedInput = JsonUtil.toJson(amrInputUrls);
         String serializedParams = JsonUtil.toJson(params);
@@ -725,15 +761,18 @@ public class StageOrchestrator {
 
     }
 
-    // private OrchestratePlan makePlanDownstreamTaxonomy(List<BioPipelineStage> allStages, BioPipelineStage taxonomyStage)
-    //         throws JsonMappingException, JsonProcessingException, MissingUpstreamException {
-    //     BioPipelineStage assemblyStage = findStageFromStages(allStages, PIPELINE_STAGE_ASSEMBLY);
+    // private OrchestratePlan makePlanDownstreamTaxonomy(List<BioPipelineStage>
+    // allStages, BioPipelineStage taxonomyStage)
+    // throws JsonMappingException, JsonProcessingException,
+    // MissingUpstreamException {
+    // BioPipelineStage assemblyStage = findStageFromStages(allStages,
+    // PIPELINE_STAGE_ASSEMBLY);
 
-    //     if (assemblyStage.getStatus() != PIPELINE_STAGE_STATUS_FINISHED) {
-    //         return new OrchestratePlan();
-    //     }
+    // if (assemblyStage.getStatus() != PIPELINE_STAGE_STATUS_FINISHED) {
+    // return new OrchestratePlan();
+    // }
 
-    //     return planForPathogenGenomicCharacterization(allStages);
+    // return planForPathogenGenomicCharacterization(allStages);
 
     // }
 
@@ -785,7 +824,8 @@ public class StageOrchestrator {
         // prerequisize: cannot be null
         BioPipelineStage startStage = stages.stream().filter(s -> s.getStageId() == runStageId).findFirst()
                 .orElse(null);
-        // List<BioPipelineStage> upstreamStages = findUpstreamStages(stages, startStage);
+        // List<BioPipelineStage> upstreamStages = findUpstreamStages(stages,
+        // startStage);
 
         if (startStage.getStageType() == PIPELINE_STAGE_ASSEMBLY) {
             return this.planForAssembly(startStage, stages);
@@ -805,7 +845,7 @@ public class StageOrchestrator {
             return this.planForAMR(stages, startStage);
         } else if (startStage.getStageType() == PIPELINE_STAGE_SEROTYPE) {
             return this.planForSeroType(stages, startStage);
-        }else if(startStage.getStageType() == PIPELINE_STAGE_VIRULENCE){
+        } else if (startStage.getStageType() == PIPELINE_STAGE_VIRULENCE) {
             return this.planForVirulenFactorStage(stages, startStage);
         }
         return null;
@@ -815,6 +855,14 @@ public class StageOrchestrator {
     private OrchestratePlan makeDownstreamPlanConsensus(List<BioPipelineStage> allStages,
             BioPipelineStage consensusStage) {
         return noDownstreamPlan();
+    }
+
+    private OrchestratePlan makeDownstreamPlanReadInspect(List<BioPipelineStage> allStages, int pipelineType)
+            throws JsonMappingException, JsonProcessingException, MissingUpstreamException {
+
+        BioPipelineStage qcStage = findStageFromStages(allStages, PIPELINE_STAGE_QC);
+        return makePlan(allStages, qcStage.getStageId());
+
     }
 
     public OrchestratePlan makeDownstreamPlan(BioPipelineStage currentStage, List<BioPipelineStage> allStages,
@@ -840,8 +888,10 @@ public class StageOrchestrator {
             return this.makePlanDownstreamVisurFactor(allStages, currentStage);
         } else if (currentStage.getStageType() == PIPELINE_STAGE_CONSENSUS) {
             return this.makeDownstreamPlanConsensus(allStages, currentStage);
-        }else if(currentStage.getStageType() == PIPELINE_STAGE_SEROTYPE){
+        } else if (currentStage.getStageType() == PIPELINE_STAGE_SEROTYPE) {
             return this.makePlanDownstreamSerotype();
+        } else if (currentStage.getStageType() == PIPELINE_STAGE_READ_INSPECT) {
+            return this.makeDownstreamPlanReadInspect(allStages, pipelineType);
         }
         return null;
 
