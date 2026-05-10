@@ -18,28 +18,33 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VarientCallInputUrls
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
-import com.xjtlu.bio.utils.JsonUtil;
 
+import jakarta.annotation.Resource;
 
 @Component
-public class VarientExecutor extends AbstractPipelineStageExector<VariantStageOutput, VarientCallInputUrls, VarientCallParameters> implements PipelineStageExecutor<VariantStageOutput>{
+public class VarientExecutor
+        extends AbstractPipelineStageExector<VariantStageOutput, VarientCallInputUrls, VarientCallParameters>
+        implements PipelineStageExecutor<VariantStageOutput> {
 
 
-
-@Override
-protected Class<VarientCallInputUrls> stageInputType() {
-    return VarientCallInputUrls.class;
-}
-
-@Override
-protected Class<VarientCallParameters> stageParameterType() {
-    return VarientCallParameters.class;
-}
+    @Resource
+    private FaiBuilder faiBuilder;
+    
+    @Override
+    protected Class<VarientCallInputUrls> stageInputType() {
+        return VarientCallInputUrls.class;
+    }
 
     @Override
-    public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
+    protected Class<VarientCallParameters> stageParameterType() {
+        return VarientCallParameters.class;
+    }
+
+    @Override
+    public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput)
+            throws JsonMappingException, JsonProcessingException {
         // TODO Auto-generated method stub
 
         StageContext bioPipelineStage = stageExecutionInput.stageContext;
@@ -47,16 +52,16 @@ protected Class<VarientCallParameters> stageParameterType() {
         VarientCallParameters varientCallParameters = stageExecutionInput.stageParameters;
 
         RefSeqConfig refSeqConfig = varientCallParameters.getRefSeqConfig();
-        if(refSeqConfig == null){
+        if (refSeqConfig == null) {
             logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage);
-            return StageRunResult.fail("未能加载参考基因文件",bioPipelineStage, null);
+            return StageRunResult.fail("未能加载参考基因文件", bioPipelineStage, null);
         }
 
         File refseq = null;
-        if(refSeqConfig.isInnerRefSeq()){
+        if (refSeqConfig.isInnerRefSeq()) {
             refseq = this.refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId());
-            
-        }else {
+
+        } else {
             refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
         }
 
@@ -75,11 +80,15 @@ protected Class<VarientCallParameters> stageParameterType() {
             e.printStackTrace();
         }
 
+
+
         Path bam = inputTempDir.resolve("aln.bam");
         Path bai = inputTempDir.resolve("aln.bam.bai");
 
         // 先用 samtools 生成参考索引
-        File refSeqIndexFile = refSeqConfig.getRefseqId()>=0?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
+
+        Path refseqIndex = 
+        
 
         if (refSeqIndexFile == null || !refSeqIndexFile.exists() || refSeqIndexFile.length() < 1) {
             return this.runFail(bioPipelineStage, "生成参考索引失败");
@@ -88,7 +97,8 @@ protected Class<VarientCallParameters> stageParameterType() {
         Path refSeqIndexFileLinkPath = null;
 
         try {
-            refSeqIndexFileLinkPath = Files.createSymbolicLink(inputTempDir.resolve("reference.fai"), refSeqIndexFile.toPath());
+            refSeqIndexFileLinkPath = Files.createSymbolicLink(inputTempDir.resolve("reference.fai"),
+                    refSeqIndexFile.toPath());
         } catch (IOException e) {
             // TODO Auto-generated catch block
             return this.runFail(bioPipelineStage, "加载参考基因组索引失败", e, inputTempDir, workDir);
@@ -111,7 +121,7 @@ protected Class<VarientCallParameters> stageParameterType() {
 
         // 中间与最终产物
         Path bcfRaw = workDir.resolve("raw.bcf");
-        
+
         Path vcfGz = stageExecutionInput.workDir.resolve(VariantStageOutput.VCF_GZ);
         Path vcfTbi = stageExecutionInput.workDir.resolve(VariantStageOutput.VCF_TBI);
 
@@ -137,13 +147,14 @@ protected Class<VarientCallParameters> stageParameterType() {
         cmd.add(bam.toString());
 
         ExecuteResult executeResult = _execute(cmd, workDir);
-        if(!executeResult.success()){
+        if (!executeResult.success()) {
             return this.runFail(bioPipelineStage, "生成bcf.gz失败", executeResult.ex, inputTempDir, workDir);
         }
 
         List<StageOutputValidationResult> errorOutputValidationResults = validateOutputFiles(bcfRaw);
-        if(!errorOutputValidationResults.isEmpty()){
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null, inputTempDir, workDir);
         }
 
         // ---------- 2) call: BCF -> VCF.GZ ----------
@@ -162,15 +173,15 @@ protected Class<VarientCallParameters> stageParameterType() {
 
         executeResult = _execute(cmd, workDir);
 
-        if(!executeResult.success()){
+        if (!executeResult.success()) {
             return this.runFail(bioPipelineStage, "生成VCF.gz失败", executeResult.ex, inputTempDir, workDir);
         }
 
         errorOutputValidationResults = validateOutputFiles(vcfGz);
-        if(!errorOutputValidationResults.isEmpty()){
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null, inputTempDir, workDir);
         }
-
 
         // ---------- 3) index: VCF.GZ -> TBI ----------
         cmd = new ArrayList<>();
@@ -182,19 +193,17 @@ protected Class<VarientCallParameters> stageParameterType() {
         cmd.add(vcfGz.toString());
 
         executeResult = _execute(cmd, workDir);
-        if(!executeResult.success()){
-             return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
+        if (!executeResult.success()) {
+            return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
         }
 
-        
-
-        vcfTbi = workDir.resolve(vcfGz.getFileName()+".tbi");
+        vcfTbi = workDir.resolve(vcfGz.getFileName() + ".tbi");
         errorOutputValidationResults = validateOutputFiles(vcfTbi);
-        if(!errorOutputValidationResults.isEmpty()){
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults), null, inputTempDir, workDir);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null, inputTempDir, workDir);
         }
 
-        
         return StageRunResult.OK(new VariantStageOutput(vcfGz.toString(), vcfTbi.toString()), bioPipelineStage);
     }
 

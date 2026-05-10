@@ -17,14 +17,11 @@ import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
-import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
 public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput, QcStageInputUrls, QcParameters> implements PipelineStageExecutor<QCStageOutput> {

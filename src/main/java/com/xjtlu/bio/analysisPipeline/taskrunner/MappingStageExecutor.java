@@ -3,7 +3,6 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MAPPING;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,18 +14,10 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
-import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
-import jakarta.annotation.Resource;
-import org.apache.commons.io.FileUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.utils.JsonUtil;
-import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
 @Component
 public class MappingStageExecutor

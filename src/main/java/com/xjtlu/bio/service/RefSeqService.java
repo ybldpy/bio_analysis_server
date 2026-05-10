@@ -39,6 +39,13 @@ public class RefSeqService {
     public final static int VIRUS_TYPE = 1;
     public final static int BACTERIA_TYPE = 2;
 
+    
+
+
+    public String getVirusRefSeqObjectName(BioRefseq bioRefseq){
+        return "virus/refseq/"+bioRefseq.getRefseqPath();
+    }
+
     @Resource
     private StorageService storageService;
     @Resource
