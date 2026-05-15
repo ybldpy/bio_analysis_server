@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.context;
+package com.xjtlu.bio.analysisPipeline.context.domain;
 
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 

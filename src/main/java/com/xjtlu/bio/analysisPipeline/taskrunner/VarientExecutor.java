@@ -8,18 +8,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VarientCallInputUrls;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder;
-import com.xjtlu.bio.service.StorageService.GetObjectResult;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder.FaiBuildException;
 
 import jakarta.annotation.Resource;
 
@@ -44,7 +45,7 @@ public class VarientExecutor
 
     @Override
     public StageRunResult<VariantStageOutput> _execute(StageExecutionInput stageExecutionInput)
-            throws JsonMappingException, JsonProcessingException {
+            throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
         StageContext bioPipelineStage = stageExecutionInput.stageContext;
@@ -57,28 +58,14 @@ public class VarientExecutor
             return StageRunResult.fail("未能加载参考基因文件", bioPipelineStage, null);
         }
 
-        File refseq = null;
-        if (refSeqConfig.isInnerRefSeq()) {
-            refseq = this.refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId());
 
-        } else {
-            refseq = this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
-        }
 
-        String bamPath = varientCallInputUrls.getBamUrl();
-        String bamIndexPath = varientCallInputUrls.getBamIndexUrl();
+        String bamUrl = varientCallInputUrls.getBamUrl();
+        String bamIndexUrl = varientCallInputUrls.getBamIndexUrl();
 
         Path inputTempDir = stageExecutionInput.inputDir;
         // 结果目录
         Path workDir = stageExecutionInput.workDir;
-
-        Path refSeqFileLink = null;
-        try {
-            refSeqFileLink = Files.createSymbolicLink(inputTempDir.resolve(refseq.getName()), refseq.toPath());
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
 
 
 
@@ -87,33 +74,29 @@ public class VarientExecutor
 
         // 先用 samtools 生成参考索引
 
-        Path refseqIndex = 
-        
+        String refseqUrl = varientCallParameters.getRefSeqConfig().getRefseqObjectName();
 
-        if (refSeqIndexFile == null || !refSeqIndexFile.exists() || refSeqIndexFile.length() < 1) {
-            return this.runFail(bioPipelineStage, "生成参考索引失败");
-        }
 
-        Path refSeqIndexFileLinkPath = null;
+        Path refseqLocalPath = inputTempDir.resolve(refseqUrl.substring(refseqUrl.lastIndexOf("/")+1));
+        loadInput(Map.of(bamUrl, bam, bamIndexUrl, bai, refseqUrl, refseqLocalPath));
+
 
         try {
-            refSeqIndexFileLinkPath = Files.createSymbolicLink(inputTempDir.resolve("reference.fai"),
-                    refSeqIndexFile.toPath());
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            return this.runFail(bioPipelineStage, "加载参考基因组索引失败", e, inputTempDir, workDir);
+            faiBuilder.build(refseqLocalPath);
+        } catch (IOException | InterruptedException | FaiBuildException e) {
+            logger.error("Failed to build fai for reference: {}", refseqLocalPath, e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+
+            String msg = String.format(
+                    "Failed to build reference index for reference %s: %s",
+                    refseqLocalPath,
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            return this.runFail(bioPipelineStage, msg);
         }
 
-        GetObjectResult bamFileGetResult = this.storageService.getObject(bamPath, bam.toString());
-        if (!bamFileGetResult.success()) {
-            this.deleteTmpFiles(List.of(inputTempDir.toFile()));
-            return StageRunResult.fail("bam文件加载失败", bioPipelineStage, bamFileGetResult.e());
-        }
-
-        GetObjectResult baiFileGetResult = this.storageService.getObject(bamIndexPath, bai.toString());
-        if (!baiFileGetResult.success()) {
-            return this.runFail(bioPipelineStage, "加载bai文件失败", baiFileGetResult.e(), inputTempDir, workDir);
-        }
+        
 
         // 工具路径与参数
 
@@ -131,7 +114,7 @@ public class VarientExecutor
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.add("mpileup");
         cmd.add("-f");
-        cmd.add(refSeqFileLink.toString());
+        cmd.add(refseqLocalPath.toString());
         cmd.add("-q");
         cmd.add("20"); // 最小比对质量
         cmd.add("-Q");
@@ -141,7 +124,7 @@ public class VarientExecutor
         cmd.add("--threads");
         cmd.add(String.valueOf(threads));
         cmd.add("-O");
-        cmd.add("u"); // uncompressed BCF in memory format
+        // cmd.add("u"); // uncompressed BCF in memory format
         cmd.add("-o");
         cmd.add(bcfRaw.toString()); // 直接落盘
         cmd.add(bam.toString());

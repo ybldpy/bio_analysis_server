@@ -1,9 +1,13 @@
 package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
 
-import com.xjtlu.bio.analysisPipeline.context.ReadMeta;
-import com.xjtlu.bio.analysisPipeline.context.TaxonomyContext;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.context.domain.TaxonomyContext;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 
 public class BaseStageParams {
+
+
+    
 
 
 

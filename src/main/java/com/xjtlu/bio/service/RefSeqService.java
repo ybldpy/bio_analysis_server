@@ -43,7 +43,7 @@ public class RefSeqService {
 
 
     public String getVirusRefSeqObjectName(BioRefseq bioRefseq){
-        return "virus/refseq/"+bioRefseq.getRefseqPath();
+        return PREFIX_VIRUS_REFSEQ_OBJECT_NAME + bioRefseq.getRefseqPath();
     }
 
     @Resource
@@ -64,6 +64,11 @@ public class RefSeqService {
     private Map<String, Object> virusIndex;
 
     private static final Logger logger = LoggerFactory.getLogger(RefSeqService.class);
+
+    private static final String PREFIX_VIRUS_REFSEQ_OBJECT_NAME = "refseq/virus/refseqs";
+
+
+
 
 
     @PostConstruct

@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import com.xjtlu.bio.analysisPipeline.context.ReadMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.taskrunner.ReadInspectStageExecutor;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;

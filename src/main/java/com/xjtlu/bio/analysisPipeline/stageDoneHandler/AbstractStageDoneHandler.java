@@ -7,7 +7,7 @@ import com.xjtlu.bio.service.PipelineService;
 import com.xjtlu.bio.service.StorageService;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;

@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.taskrunner.PipelineStageExecutor;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
@@ -99,17 +99,6 @@ public class PipelineStageTaskDispatcher implements Runnable {
         // this.notifyPipelineService(stageRunResult);
     }
 
-    // private void notifyPipelineService(StageRunResult stageRunResult) {
-    //     this.pipelineService.pipelineStageDone(stageRunResult);
-    // }
-
-    // public boolean isStageInWaittingQueue(long stageId) {
-    //     return this.stageInQueueIdSet.contains(stageId);
-    // }
-
-    // public boolean isStageInRunning(long stageId) {
-    //     return this.stageInRunningIdSet.contains(stageId);
-    // }
 
     public boolean isStageIn(long stageId) {
         return this.inStageIdSet.contains(stageId);

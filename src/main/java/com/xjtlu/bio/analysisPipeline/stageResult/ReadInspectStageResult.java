@@ -1,12 +1,21 @@
 package com.xjtlu.bio.analysisPipeline.stageResult;
 
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+
 public class ReadInspectStageResult implements StageResult{
 
-    private int qualityEncoding;
-    private int readLenType;
+    private ReadMeta readMeta;
 
     private String r1Url;
     private String r2Url;
+
+    public ReadMeta getReadMeta() {
+        return readMeta;
+    }
+
+    public void setReadMeta(ReadMeta readMeta) {
+        this.readMeta = readMeta;
+    }
 
     public String getR1Url() {
         return r1Url;
@@ -27,21 +36,6 @@ public class ReadInspectStageResult implements StageResult{
     public ReadInspectStageResult() {
     }
 
-    public ReadInspectStageResult(int qualityEncoding, int readLenType) {
-        this.qualityEncoding = qualityEncoding;
-        this.readLenType = readLenType;
-    }
-    public int getQualityEncoding() {
-        return qualityEncoding;
-    }
-    public void setQualityEncoding(int qualityEncoding) {
-        this.qualityEncoding = qualityEncoding;
-    }
-    public int getReadLenType() {
-        return readLenType;
-    }
-    public void setReadLenType(int readLenType) {
-        this.readLenType = readLenType;
-    }
+    
 
 }

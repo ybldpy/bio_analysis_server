@@ -6,9 +6,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
@@ -38,9 +41,54 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
     }
 
     private static final Logger logger = LoggerFactory.getLogger(QcStageExecutor.class);
+    private static final int TOOL_CODE_FASTQ = 0;
+    private static final int TOOL_CODE_FASTQ_LONG = 1;
 
+
+    private List<String> buildQcRunCmd(int toolCode, Path read1InputPath, Path read2InputPath, Path outputRead1Path, Path outputRead2Path, Path jsonPath, Path htmlPath){
+
+        List<String> cmd = new ArrayList<>();
+
+        if(toolCode == TOOL_CODE_FASTQ){
+            cmd.addAll(analysisPipelineToolsConfig.getFastp());
+            cmd.add("-i");
+            cmd.add(read1InputPath.toString());
+            cmd.add("-o");
+            cmd.add(outputRead1Path.toString());
+            cmd.add("--json");
+            cmd.add(jsonPath.toString());
+            cmd.add("--html");
+            cmd.add(htmlPath.toString());
+
+            if(read2InputPath != null){
+                cmd.add("-I");
+                cmd.add(read2InputPath.toString());
+                cmd.add("-O");
+                cmd.add(outputRead2Path.toString());
+            }
+
+        }else {
+            cmd.addAll(analysisPipelineToolsConfig.getFastplong());
+            cmd.addAll(
+                List.of(
+                    "-i",
+                    read1InputPath.toString(),
+                    "-o",
+                    outputRead1Path.toString(),
+                    "-j",
+                    jsonPath.toString(),
+                    "-h",
+                    htmlPath.toString()
+                )
+            );
+
+        }
+
+        return cmd;
+    }
+ 
     @Override
-    public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException {
+    public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
         StageContext bioPipelineStage = stageExecutionInput.stageContext;
@@ -48,10 +96,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
 
         
 
-        String inputUrl1 = qcStageInputUrls.getRead1();
-        String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
-        String inputUrl2 =  StringUtils.isBlank(qcStageInputUrls.getRead2()) ? null : qcStageInputUrls.getRead2();
-        String input2FileName = inputUrl2 == null ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
+        
 
         Path outputDir = stageExecutionInput.workDir;
         Path inputDir = stageExecutionInput.inputDir;
@@ -60,18 +105,26 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         QcParameters qcParams = stageExecutionInput.stageParameters;
 
 
+        
+
+        String inputUrl1 = qcStageInputUrls.getRead1();
+        String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
+        String inputUrl2 =  StringUtils.isBlank(qcStageInputUrls.getRead2()) ? null : qcStageInputUrls.getRead2();
+
+        boolean hasR2 = inputUrl2 != null && qcParams.getReadMeta().getReadLenType()!=ReadMeta.READ_LEN_TYPE_LONG;
+
+        String input2FileName = !hasR2? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
         boolean isGz = input1FileName.endsWith(".gz");
         QCStageOutput qcStageOutput = new QCStageOutput(outputDir.resolve(input1FileName).toString(), 
-        input2FileName == null?null:outputDir.resolve(input2FileName).toString(), 
+        !hasR2? null:outputDir.resolve(input2FileName).toString(), 
         outputDir.resolve("cleaned.html").toString(),
-        outputDir.resolve("cleaned.json").toString(), 
-        isGz);
+        outputDir.resolve("cleaned.json").toString(), isGz);
 
         Path trimmedR1Path = Path.of(qcStageOutput.getR1Path());
-        Path trimmedR2Path = inputUrl2 == null ? null
+        Path trimmedR2Path = !hasR2 ? null
                 : Path.of(qcStageOutput.getR2Path());
 
-        if(inputUrl2 == null){
+        if(!hasR2){
             qcStageOutput.setR2Path(null);
         }
         Path outputQcJson = Path.of(qcStageOutput.getJsonPath());
@@ -79,53 +132,17 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
 
 
         Path r1Path = inputDir.resolve(input1FileName);
-        Path r2Path = inputUrl2 == null? null: inputDir.resolve(input2FileName);
+        Path r2Path = !hasR2? null: inputDir.resolve(input2FileName);
 
-
-        GetObjectResult objectResult = storageService.getObject(inputUrl1, r1Path.toString());
-        if (!objectResult.success()) {
-            if(objectResult.e()==null){
-                logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1);
-            }else {
-                logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1, objectResult.e());
-            }
-            return StageRunResult.fail("加载read1失败", bioPipelineStage,objectResult.e());
+        HashMap<String,Path> loadMap = new HashMap<>();
+        loadMap.put(inputUrl1, r1Path);
+        if(hasR2){
+            loadMap.put(inputUrl2, r2Path);
         }
 
-        File inputFile1 = objectResult.objectFile();
-        File inputFile2 = null;
-        if (StringUtils.isNotBlank(inputUrl2)) {
-            GetObjectResult r2ObjectGetResult = storageService.getObject(inputUrl2, r2Path.toString());
-            if (!r2ObjectGetResult.success()) {
-                if(objectResult.e()==null){
-                    logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1);
-                }else {
-                    logger.error("{} 加载input url {} 失败", bioPipelineStage, inputUrl1, objectResult.e());
-                }
-                return StageRunResult.fail("加载read2失败", bioPipelineStage, r2ObjectGetResult.e());
-            }
-            inputFile2 = r2ObjectGetResult.objectFile();
-        }
+        loadInput(loadMap);
 
-        List<String> cmd = new ArrayList<>();
-        cmd.addAll(this.analysisPipelineToolsConfig.getFastp());
-        if (inputUrl2 != null) {
-            // 双端
-            cmd.addAll(List.of(
-                    "-i", inputFile1.getAbsolutePath(),
-                    "-I", inputFile2.getAbsolutePath(),
-                    "-o", trimmedR1Path.toString(),
-                    "-O", trimmedR2Path.toString()));
-        } else {
-            // 单端
-            cmd.addAll(List.of(
-                    "-i", inputFile1.getAbsolutePath(),
-                    "-o", trimmedR1Path.toString()));
-        }
-        cmd.addAll(List.of(
-                "--json", outputQcJson.toString(),
-                "--html", outputQcHtml.toString(),
-                "--thread", String.valueOf(Math.max(2, Runtime.getRuntime().availableProcessors() / 4))));
+        List<String> cmd = buildQcRunCmd(qcParams.getReadMeta().getReadLenType() == ReadMeta.READ_LEN_TYPE_SHORT?TOOL_CODE_FASTQ:TOOL_CODE_FASTQ_LONG, r1Path, r2Path, trimmedR1Path, trimmedR2Path, outputQcJson, outputQcHtml);
 
         int runResult = 0;
         Exception runException = null;

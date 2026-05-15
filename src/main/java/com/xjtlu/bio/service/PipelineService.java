@@ -90,6 +90,9 @@ public class PipelineService {
     private BioRefseqMapper bioRefseqMapper;
 
     @Resource
+    private RefSeqService refSeqService;
+
+    @Resource
     private BioAnalysisPipelineMapper bioAnalysisPipelineMapper;
 
     @Resource
@@ -122,18 +125,10 @@ public class PipelineService {
     private static final String INPUT_KEY_DEFAULT_READ1_MATCH = "sample_0/0";
     private static final String INPUT_KEY_DEFAULT_READ2_MATCH = "sample_0/1";
 
-    // public static final int PIPELINE_STATUS_PENDING_UPLOADING = 0;
     public static final int PIPELINE_STATUS_RUNNING = 1;
     public static final int PIPELINE_STATUS_COMPELETE = 2;
     public static final int PIPELINE_STATUS_PENDING = 3;
 
-    // public static final int PIPELINE_VIRUS = 100;
-    // public static final int PIPELINE_VIRUS_COVID = 101;
-    // public static final int PIPELINE_REGULAR_BACTERIA = 200;
-
-    // public static final int PIPELINE_SNP_ANALYSIS = 300;
-    // public static final int PIPELINE_SNP_SUB_ANALYSIS = 301;
-    // public static final int PIPELINE_SNP_ANALYSIS_MERGE = 302;
 
     public static final int PIPELINE_METAGENOME_AMPLicon16s = 400;
     public static final int PIPELINE_METAGENOME_SHOTGUN = 401;
@@ -149,7 +144,6 @@ public class PipelineService {
     private static final int SCHEDULE_UPSTREAM_NOT_READY = 300;
     private static final int SCHEDULE_PIPELINE_COMPELETE = 400;
 
-    private Set<Long> pipelineLock = ConcurrentHashMap.newKeySet();
 
     @Transactional
     public Result<Long> createPipeline(CreateAnalysisPipelineRequest createAnalysisPipelineRequest) {
@@ -189,47 +183,6 @@ public class PipelineService {
         long pipelineId = bioAnalysisPipeline.getPipelineId();
 
         return new Result<Long>(Result.SUCCESS, pipelineId, null);
-
-        // String read1OriginalName =
-        // createAnalysisPipelineRequest.getRead1OriginName();
-        // String read2OriginalName =
-        // createAnalysisPipelineRequest.getRead2OriginName();
-
-        // List<String> fileNames = new ArrayList<>();
-        // List<Integer> fileRoles = new ArrayList<>();
-        // fileNames.add(read1OriginalName);
-        // fileRoles.add(PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R1);
-        // if (createAnalysisPipelineRequest.isPair()) {
-        // fileNames.add(read2OriginalName);
-        // fileRoles.add(PipelineInputService.PIPELINE_INPUT_FILE_ROLE_R2);
-        // }
-
-        // Result createRes = this.pipelineInputService.createInputs(fileRoles,
-        // fileNames, pipelineId);
-        // if (createRes.getStatus() != Result.SUCCESS) {
-        // return new Result<>(Result.INTERNAL_FAIL, null, "创建失败");
-        // }
-
-        // BioPipelineInputFileExample bioPipelineInputFileExample = new
-        // BioPipelineInputFileExample();
-        // bioPipelineInputFileExample.createCriteria().andPipelineIdEqualTo(pipelineId);
-
-        // List<BioPipelineInputFile> bioPipelineInputFiles = this.pipelineInputService
-        // .queryInputs(bioPipelineInputFileExample);
-        // List<InputFile> inputFiles = new ArrayList<>();
-
-        // for (BioPipelineInputFile bioPipelineInputFile : bioPipelineInputFiles) {
-        // InputFile inputFile = new InputFile();
-        // inputFile.setInputId(bioPipelineInputFile.getInputFileId());
-        // inputFile.setInputRole(bioPipelineInputFile.getFileRole());
-        // inputFiles.add(inputFile);
-        // }
-
-        // CreatePipelineResponse createPipelineResponse = new CreatePipelineResponse();
-        // createPipelineResponse.setPipelineId(pipelineId);
-        // createPipelineResponse.setInputFiles(inputFiles);
-
-        // return new Result<>(Result.SUCCESS, createPipelineResponse, null);
 
     }
 
@@ -374,7 +327,7 @@ public class PipelineService {
         }).findAny().orElse(null);
 
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
-        pipelineConfigurations.setCustomReferenceSequenceObjectName(refseqFile.getFilePath());
+        pipelineConfigurations.setRefseqObjName(refseqFile.getFilePath());
 
         List<List<BioPipelineStage>> subPipelineStagesList = new ArrayList<>();
 
@@ -647,12 +600,6 @@ public class PipelineService {
 
     }
 
-    private boolean isLegalPipelineType(int pipelineType) {
-        return pipelineType == Constants.PipelineType.PIPELINE_VIRUS
-                || pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID
-                || pipelineType == Constants.PipelineType.PIPELINE_REGULAR_BACTERIA;
-    }
-
     public int startStageExecute(BioPipelineStage pipelineStage) {
         BioPipelineStage updateStage = new BioPipelineStage();
         int currentVersion = pipelineStage.getVersion();
@@ -679,65 +626,6 @@ public class PipelineService {
         }
     }
 
-    private void batchInsertStages(List<BioPipelineStage> insertStages) {
-
-        BioPipelineStageMapper stageMapper = batchSqlSessionTemplate.getMapper(BioPipelineStageMapper.class);
-
-        for (BioPipelineStage bioPipelineStage : insertStages) {
-            stageMapper.insertSelective(bioPipelineStage);
-        }
-
-        List<BatchResult> batchResults = batchSqlSessionTemplate.flushStatements();
-
-    }
-
-    // @Transactional(rollbackFor = Exception.class)
-    // public Result<Long> createPipeline(BioSample bioSample,
-    // PipelineStageParameters pipelineStageParams) {
-
-    // boolean noRefseq = pipelineStageParams.getTaxId() == null;
-
-    // List<BioRefseq> candiates = null;
-
-    // if (!noRefseq) {
-    // BioRefseqExample bioRefseqExample = new BioRefseqExample();
-    // bioRefseqExample.createCriteria().andTaxIdEqualTo(pipelineStageParams.getTaxId());
-    // candiates = bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqExample);
-    // if (candiates.isEmpty()) {
-    // return new Result<Long>(Result.BUSINESS_FAIL, -1l, "未能找到参考基因组");
-    // }
-    // }
-
-    // BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
-    // bioAnalysisPipeline.setPipelineType();
-    // bioAnalysisPipeline.setSampleId(bioSample.getSid());
-    // int insertRes = this.bioAnalysisPipelineMapper.insert(bioAnalysisPipeline);
-    // if (insertRes < 1) {
-    // TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-    // return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
-    // }
-
-    // List<BioPipelineStage> stages = this.buildPipelineStages(bioSample,
-    // bioAnalysisPipeline, candiates);
-    // if (stages == null || stages.isEmpty()) {
-    // TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-    // return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
-    // }
-
-    // for (BioPipelineStage stage : stages) {
-    // stage.setVersion(0);
-    // }
-
-    // insertRes = this.bioAnalysisStageMapperExtension.batchInsert(stages);
-    // if (insertRes != stages.size()) {
-    // TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-    // return new Result<Long>(Result.INTERNAL_FAIL, -1l, "创建分析流水线失败");
-    // }
-
-    // return new Result<Long>(Result.SUCCESS, bioAnalysisPipeline.getPipelineId(),
-    // null);
-    // }
-
     public Result<List<BioAnalysisPipeline>> queryPipelines(BioAnalysisPipelineExample condition) {
 
         try {
@@ -750,11 +638,6 @@ public class PipelineService {
 
     }
 
-    private BioRefseq getOriginalCovid2Refseqs(List<BioRefseq> covid2Refseqs) {
-        return covid2Refseqs.stream().filter(refseq -> {
-            return refseq.getAccessions().contains(originalCovid2Accession);
-        }).findFirst().orElse(null);
-    }
 
     private BioRefseq getBestCandicateRefSeqs(List<BioRefseq> candiatesRefseqs)
             throws JsonMappingException, JsonProcessingException {
@@ -854,9 +737,7 @@ public class PipelineService {
         List<BioPipelineStage> stages = Collections.emptyList();
 
         if (refseq != null) {
-            pipelineConfigurations.setRefId(refseq.getRefId());
-            List<String> accessions = JsonUtil.toObject(refseq.getAccessions(), List.class);
-            pipelineConfigurations.setRefseqAccessions(accessions);
+            pipelineConfigurations.setRefseqObjName(this.refSeqService.getVirusRefSeqObjectName(refseq));
         }
 
         if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS
@@ -876,8 +757,6 @@ public class PipelineService {
         return stages;
     }
 
-    // TODO: this is an quick method for just test. Never Use it in production env
-    // or treat it as normal service method
     public Result<Boolean> restartStage(long stageId) {
 
         List<BioPipelineStage> allStages = this.bioAnalysisStageMapperExtension

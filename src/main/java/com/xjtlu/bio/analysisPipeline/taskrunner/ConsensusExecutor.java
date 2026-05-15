@@ -2,7 +2,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_CONSENSUS;
 
-import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,30 +13,32 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
-import com.xjtlu.bio.analysisPipeline.taskrunner.AbstractPipelineStageExector.StageExecutionInput;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.utils.JsonUtil;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder.FaiBuildException;
 
+import jakarta.annotation.Resource;
 
 @Component
-public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusStageOutput, ConsensusStageInputUrls, ConsensusStageParameters> implements PipelineStageExecutor<ConsensusStageOutput>{
-
-
+public class ConsensusExecutor
+        extends AbstractPipelineStageExector<ConsensusStageOutput, ConsensusStageInputUrls, ConsensusStageParameters>
+        implements PipelineStageExecutor<ConsensusStageOutput> {
 
     @Value("${analysis-pipeline.stage.consensus.fastaFileName}")
     private String consensusFastaFileName;
-
 
     @Value("${analysis-pipeline.stage.varient.vcfFileName}")
     private String vcfFileName;
 
     @Value("${analysis-pipeline.stage.varient.vcfIndexFileName}")
     private String vcfTbiFileName;
+
+    @Resource
+    private FaiBuilder faiBuilder;
 
     @Override
     protected Class<ConsensusStageInputUrls> stageInputType() {
@@ -48,9 +50,9 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         return ConsensusStageParameters.class;
     }
 
-
     @Override
-    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput) throws JsonMappingException, JsonProcessingException, LoadFailException {
+    public StageRunResult<ConsensusStageOutput> _execute(StageExecutionInput stageExecutionInput)
+            throws JsonMappingException, JsonProcessingException, LoadFailException {
         // TODO Auto-generated method stub
 
         StageContext bioPipelineStage = stageExecutionInput.stageContext;
@@ -59,28 +61,9 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
 
         RefSeqConfig refSeqConfig = consensusStageParameters.getRefSeqConfig();
 
-
         if (refSeqConfig == null) {
             return this.runFail(bioPipelineStage, "未找到参考基因文件");
         }
-
-        // File refseqFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefseq(refSeqConfig.getRefseqId()):this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
-        File refseqFile = null;
-
-        if(refSeqConfig.isInnerRefSeq()){
-            refseqFile = refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId());
-        }else {
-            refseqFile = refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
-        }
-
-        if(refseqFile == null){
-            return this.runFail(bioPipelineStage, "未能加载参考基因文件");
-        }
-        File refSeqIndexFile = refSeqConfig.isInnerRefSeq()?this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqId()):this.refSeqService.getRefSeqIndex(refSeqConfig.getRefseqObjectName());
-        if (refSeqIndexFile==null || !refSeqIndexFile.exists()) {
-            return this.runFail(bioPipelineStage, "未找到参考基因索引文件");
-        }
-
 
         Path inputTmpDir = stageExecutionInput.inputDir;
         Path resultDir = stageExecutionInput.workDir;
@@ -91,40 +74,55 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         Path vcfGzTmpPath = inputTmpDir.resolve(vcfFileName);
         Path vcfTbiTmpPath = inputTmpDir.resolve(vcfTbiFileName);
 
-        
-        loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
-        
+        String referenceObjName = refSeqConfig.getRefseqObjectName();
+        String referenceFileName = referenceObjName.substring(referenceObjName.lastIndexOf("/") + 1);
+        Path refseqLocalPath = inputTmpDir.resolve(referenceFileName);
+
+        loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath, referenceObjName, refseqLocalPath));
+
+        try {
+            faiBuilder.build(refseqLocalPath);
+        } catch (IOException | InterruptedException | FaiBuildException e) {
+
+            logger.error("Failed to build fai for reference: {}", refseqLocalPath, e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+
+            String msg = String.format(
+                    "Failed to build fai for reference %s: %s",
+                    refseqLocalPath,
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            return this.runFail(bioPipelineStage, msg);
+        }
 
         
-        
+
         String consensus = "consensus";
         Path consensusPath = stageExecutionInput.workDir.resolve(consensusFastaFileName);
 
-        ConsensusStageOutput consensusStageOutput = new ConsensusStageOutput(stageExecutionInput.workDir.resolve(consensusFastaFileName).toString());
+        ConsensusStageOutput consensusStageOutput = new ConsensusStageOutput(
+                stageExecutionInput.workDir.resolve(consensusFastaFileName).toString());
 
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.addAll(List.of(
-            consensus,
-            "-f",
-            refseqFile.getAbsolutePath(),
-            "-H",
-            String.valueOf(1),
-            "-o",
-            consensusPath.toString(),
-            vcfGzTmpPath.toString()
-        )
-        );
-
-
-
-
+                consensus,
+                "-f",
+                refseqLocalPath.toString(),
+                "-H",
+                String.valueOf(1),
+                "-o",
+                consensusPath.toString(),
+                vcfGzTmpPath.toString()));
 
         boolean runFail = false;
         Exception runFailException = null;
         try {
             int code = this.runSubProcess(cmd, resultDir);
-            if(code!=0){runFail = true;}
+            if (code != 0) {
+                runFail = true;
+            }
         } catch (Exception e) {
             runFail = true;
             runFailException = e;
@@ -135,10 +133,10 @@ public class ConsensusExecutor extends AbstractPipelineStageExector<ConsensusSta
         }
 
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(consensusPath);
-        if(!errOutputValidationResults.isEmpty()){
+        if (!errOutputValidationResults.isEmpty()) {
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
         }
-        
+
         return StageRunResult.OK(consensusStageOutput, bioPipelineStage);
     }
 

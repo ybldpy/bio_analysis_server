@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.context;
+package com.xjtlu.bio.analysisPipeline.context.runtime;
 
 public class StageContext {
 
@@ -14,13 +14,20 @@ public class StageContext {
     public StageContext(){
         
     }
-    public StageContext(long runStageId, int version, int stageType) {
+    public StageContext(long runStageId, int version, int stageType, int pipelineId) {
         this.runStageId = runStageId;
         this.version = version;
         this.stageType = stageType;
+        this.pipelineId = pipelineId;
     }
 
     
+    public long getPipelineId() {
+        return pipelineId;
+    }
+    public void setPipelineId(long pipelineId) {
+        this.pipelineId = pipelineId;
+    }
     public long getRunStageId() {
         return runStageId;
     }

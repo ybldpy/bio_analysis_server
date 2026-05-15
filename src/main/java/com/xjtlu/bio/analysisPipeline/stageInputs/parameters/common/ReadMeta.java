@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.context;
+package com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common;
 
 public class ReadMeta {
 
@@ -8,14 +8,28 @@ public class ReadMeta {
     public static final int READ_LEN_TYPE_SHORT = 0;
     public static final int READ_LEN_TYPE_LONG = 1;
 
-    public ReadMeta(int qualityEncoding, int readLenType) {
+    
+
+    public ReadMeta(int qualityEncoding, int readLenType, int sequencingPlatform) {
         this.qualityEncoding = qualityEncoding;
         this.readLenType = readLenType;
+        this.sequencingPlatform = sequencingPlatform;
     }
     public ReadMeta() {
     }
+    public int getSequencingPlatform() {
+        return sequencingPlatform;
+    }
+    public void setSequencingPlatform(int sequencingPlatform) {
+        this.sequencingPlatform = sequencingPlatform;
+    }
     private int qualityEncoding;
     private int readLenType;
+    private int sequencingPlatform;
+
+
+
+
     public int getQualityEncoding() {
         return qualityEncoding;
     }
@@ -28,7 +42,5 @@ public class ReadMeta {
     public void setReadLenType(int readLenType) {
         this.readLenType = readLenType;
     }
-
-    
 
 }

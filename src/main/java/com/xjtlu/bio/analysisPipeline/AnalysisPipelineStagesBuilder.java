@@ -16,8 +16,8 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUr
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
@@ -30,14 +30,14 @@ public class AnalysisPipelineStagesBuilder {
         private boolean requireSNPAnnotation;
         private boolean requireCoverageDepth;
 
+        private int sequencingPlatform;
 
         private String refseqObjName;
 
         public PipelineConfigurations() {
             this.refId = -1;
+            this.sequencingPlatform = Constants.SequencingPlatform.UNKNOWN;
         }
-
-        
 
         public long getRefId() {
             return refId;
@@ -71,16 +71,20 @@ public class AnalysisPipelineStagesBuilder {
             this.refseqAccessions = refseqAccessions;
         }
 
-
-
         public String getRefseqObjName() {
             return refseqObjName;
         }
 
-
-
         public void setRefseqObjName(String refseqObjName) {
             this.refseqObjName = refseqObjName;
+        }
+
+        public int getSequencingPlatform() {
+            return sequencingPlatform;
+        }
+
+        public void setSequencingPlatform(int sequencingPlatform) {
+            this.sequencingPlatform = sequencingPlatform;
         }
 
     }
@@ -148,6 +152,8 @@ public class AnalysisPipelineStagesBuilder {
 
         BioPipelineStage qc = new BioPipelineStage();
         qc.setStageType(PIPELINE_STAGE_QC);
+        qc.setStageIndex(-1);
+
         stages.add(qc);
 
     }
@@ -159,8 +165,12 @@ public class AnalysisPipelineStagesBuilder {
 
         int readType = pipelineInput.getReadType();
 
+        BioPipelineStage entry = null;
+
         if (readType == PipelineSampleInput.READ_TYPE_FASTQ) {
             buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
+
+            entry = stages.stream().filter(s -> s.getStageIndex() == 0).findAny().orElse(null);
 
             BioPipelineStage assembly = new BioPipelineStage();
             assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
@@ -176,7 +186,8 @@ public class AnalysisPipelineStagesBuilder {
             taxonomyStageInputUrls.setR1(pipelineInput.getR1());
             taxonomyStageInputUrls.setR2(pipelineInput.getR2());
             taxonomy.setInputUrl(JsonUtil.toJson(taxonomyStageInputUrls));
-
+            taxonomy.setStageIndex(0);
+            entry = taxonomy;
         }
 
         BioPipelineStage amr = new BioPipelineStage();
@@ -197,20 +208,15 @@ public class AnalysisPipelineStagesBuilder {
 
         BaseStageParams baseStageParams = new BaseStageParams();
         String serializedPamras = JsonUtil.toJson(baseStageParams);
-        stages.forEach(s -> {
-            if (readType == PipelineSampleInput.READ_TYPE_FASTQ && s.getStageType() == PIPELINE_STAGE_QC) {
-                s.setStageIndex(0);
-            } else if (readType == PipelineSampleInput.READ_TYPE_FASTA
-                    && s.getStageType() == PIPELINE_STAGE_TAXONOMY) {
-                s.setStageIndex(0);
-            } else {
-                s.setStageIndex(-1);
+
+        for (BioPipelineStage stage : stages) {
+            if (stage != entry) {
+                stage.setStageIndex(-1);
             }
-            s.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-            // TODO: now all use base params here. To be improved later
-            s.setParameters(serializedPamras);
-            s.setStageName(STAGE_NAME_MAP.get(s.getStageType()));
-        });
+            stage.setParameters(serializedPamras);
+            stage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+            stage.setStageName(STAGE_NAME_MAP.get(stage.getStageType()));
+        }
 
         return stages;
 
@@ -290,43 +296,22 @@ public class AnalysisPipelineStagesBuilder {
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
-        String qcInputRead1 = pipelineInput.getR1();
-        String qcInputRead2 = pipelineInput.getR2();
 
-        long refseqId = pipelineConfigurations.getRefId();
         RefSeqConfig refSeqConfig = new RefSeqConfig();
-        refSeqConfig.setAccessions(pipelineConfigurations.getRefseqAccessions());
-        // refSeqConfig.setRefseqId(refseqId);
-        // refSeqConfig.setInnerRefSeq(refseqId >= 0);
         refSeqConfig.setRefseqObjectName(pipelineConfigurations.getRefseqObjName());
         BaseStageParams baseStageParams = new BaseStageParams(refSeqConfig, null);
 
-
-
         BioPipelineStage startStage = null;
-        if (pipelineInput.getReadType() == PipelineSampleInput.READ_TYPE_FASTQ) {
-            buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
 
-            startStage = stages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_READ_INSPECT).findAny().orElse(null);
+        buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
 
-            if (refSeqConfig.getRefseqId() == -1) {
-                BioPipelineStage assembly = new BioPipelineStage();
-                assembly.setStageType(PIPELINE_STAGE_ASSEMBLY);
-                stages.add(assembly);
-            }
-        } else {
-            refSeqConfig.setRefseqObjectName(pipelineInput.getR1());
-            
-        }
-
+        startStage = stages.stream().filter(s -> s.getStageIndex() == 0).findAny().orElse(null);
 
         BioPipelineStage mapping = new BioPipelineStage();
         mapping.setStageType(PIPELINE_STAGE_MAPPING);
         stages.add(mapping);
-        if(StringUtils.isNotBlank(refSeqConfig.getRefseqObjectName())){
-            startStage = mapping;
-        }
 
+        
         BioPipelineStage varientCall = new BioPipelineStage();
         varientCall.setStageType(PIPELINE_STAGE_VARIANT_CALL);
         stages.add(varientCall);

@@ -5,6 +5,13 @@ import java.nio.file.Path;
 public class ReadInspectStageOutput implements StageOutput{
 
 
+    public static final int ENCODING_64 = 0;
+    public static final int ENCODING_32 = 1;
+
+    public static final int READ_SHORT = 0;
+    public static final int READ_LONG = 1;
+
+
     private int qualityEncoding;
     private int readLenType;
 

@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
+package com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common;
 
 import java.util.List;
 

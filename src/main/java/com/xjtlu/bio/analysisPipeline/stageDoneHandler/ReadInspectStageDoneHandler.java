@@ -1,21 +1,22 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.tomcat.util.bcel.classfile.Constant;
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageResult.ReadInspectStageResult;
-import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadInspectStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
+
+@Component
 public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadInspectStageOutput>
         implements StageDoneHandler<ReadInspectStageOutput> {
 
@@ -95,8 +96,12 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
         }
 
         ReadInspectStageResult readInspectStageResult = new ReadInspectStageResult();
-        readInspectStageResult.setQualityEncoding(readInspectStageOutput.getQualityEncoding());
-        readInspectStageResult.setReadLenType(readInspectStageOutput.getReadLenType());
+
+        
+        ReadMeta readMeta = new ReadMeta();
+        readMeta.setQualityEncoding(readInspectStageOutput.getQualityEncoding() == ReadInspectStageOutput.ENCODING_64?ReadMeta.QUALITY_ENCODING_64: ReadMeta.QUALITY_ENCODING_33);
+        readMeta.setReadLenType(readInspectStageOutput.getReadLenType() == ReadInspectStageOutput.READ_LONG?ReadMeta.READ_LEN_TYPE_LONG:ReadMeta.READ_LEN_TYPE_SHORT);
+        readInspectStageResult.setReadMeta(readMeta);
 
         readInspectStageResult.setR1Url(r1Url);
         readInspectStageResult.setR2Url(r2Url);

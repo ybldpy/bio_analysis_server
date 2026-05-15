@@ -44,6 +44,7 @@ analysis-pipeline:
         kaptive: ["${analysis-pipeline.conda}", "run", "-n", "kaptive", "kaptive", "-k", "/home/jcy/refereceTmp/kaptive_db"]
         seroBA: ["${analysis-pipeline.conda}", "run", "-n", "seroba", "seroba"]
         vep: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
+        fastplong: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
         
 
 

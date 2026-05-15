@@ -143,6 +143,16 @@ public class AnalysisPipelineToolsConfig {
         this.samtools = samtools;
     }
 
+    public List<String> getFastplong() {
+        return fastplong;
+    }
+
+    public void setFastplong(List<String> fastplong) {
+        this.fastplong = fastplong;
+    }
+
+    private List<String> fastplong;
+
     private List<String> samtools;
     private List<String> minimap2;
     private List<String> bcftools;

@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
@@ -77,8 +77,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         Path inputDir;
     }
 
-    
-
     protected Logger logger = LoggerFactory.getLogger(getClass());
 
     // @Resource
@@ -139,13 +137,9 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         }
     }
 
-
-    protected void asyncRunFinished(StageRunResult<T> stageRunResult){
+    protected void asyncRunFinished(StageRunResult<T> stageRunResult) {
 
         postExecute(stageRunResult);
-
-
-
 
     }
 
@@ -273,10 +267,10 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         } catch (LoadFailException e) {
             logger.error("stage = {} load failed. ", bioPipelineStage.getStageId(), e.causeException);
             stageRunResult = this.runException(stageContext, e);
-        }catch(NotGetRefSeqException e){
+        } catch (NotGetRefSeqException e) {
             logger.error("stage = {}. Not get Refseq. reason = {}", bioPipelineStage.getStageId(), e.getReason());
             stageRunResult = this.runException(stageContext, e);
-        }catch(Exception e){
+        } catch (Exception e) {
             logger.error("[Stage running exception] Stage = {}, ", bioPipelineStage.getStageId(), e);
         }
         postExecute(stageRunResult);
@@ -562,7 +556,8 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     }
 
-    private void runSubProcessAync(List<String> cmd, Path workDir, Path stdout,Path stdErr, boolean append, Consumer<Process> onFinish) throws IOException{
+    private void runSubProcessAync(List<String> cmd, Path workDir, Path stdout, Path stdErr, boolean append,
+            Consumer<Process> onFinish) throws IOException {
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir.toFile());
@@ -584,7 +579,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         } else {
             pb.redirectError(ProcessBuilder.Redirect.INHERIT); // 或 DISCARD
         }
-
 
         Process p = pb.start();
         p.onExit().thenAccept(onFinish);
@@ -663,15 +657,30 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
         int runCode = -1;
         Exception runEx = null;
+
+        logger.info("Start executing command. workDir={}, cmd={}",
+                workDir,
+                String.join(" ", cmd));
+
         try {
             runCode = runSubProcess(cmd, workDir);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             runEx = e;
+
+            logger.error("Command execution failed due to IOException. workDir={}, cmd={}",
+                    workDir,
+                    String.join(" ", cmd),
+                    e);
         } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             Thread.currentThread().interrupt();
             runEx = e;
+            
+            logger.error("Command execution interrupted. workDir={}, cmd={}",
+                    workDir,
+                    String.join(" ", cmd),
+                    e);
         }
 
         if (runEx != null) {

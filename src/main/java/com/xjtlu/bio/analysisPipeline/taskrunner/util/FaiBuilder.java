@@ -1,6 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner.util;
 
-import com.xjtlu.bio.analysisPipeline.config.ToolProperties;
+
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 
 import org.slf4j.Logger;
@@ -52,8 +52,11 @@ public class FaiBuilder {
      *
      * @param src FASTA 文件路径
      * @return 生成后的 fai 路径
+     * @throws FaiBuildException 
+     * @throws InterruptedException 
+     * @throws IOException 
      */
-    public Path build(Path src) {
+    public Path build(Path src) throws IOException, InterruptedException, FaiBuildException {
         Path defaultFai = getDefaultFaiPath(src);
         build(src, defaultFai);
         return defaultFai;
@@ -89,8 +92,11 @@ public class FaiBuilder {
 
     /**
      * 如果目标已存在则直接返回；不存在才构建。
+     * @throws FaiBuildException 
+     * @throws InterruptedException 
+     * @throws IOException 
      */
-    public Path ensure(Path src) {
+    public Path ensure(Path src) throws IOException, InterruptedException, FaiBuildException {
         Path defaultFai = getDefaultFaiPath(src);
         if (Files.exists(defaultFai)) {
             return defaultFai;

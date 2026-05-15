@@ -9,10 +9,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.xjtlu.bio.analysisPipeline.context.StageContext;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
 import org.springframework.stereotype.Component;
 
@@ -56,20 +57,9 @@ public class MappingStageExecutor
             return StageRunResult.fail("未能加载参考基因", bioPipelineStage, null);
         }
 
-        File refSeq = null;
-        try {
-            refSeq = refSeqConfig.getRefseqId() >= 0
-                    ? this.refSeqService.getRefSeqByRefSeqId(refSeqConfig.getRefseqId())
-                    : this.refSeqService.getRefseq(refSeqConfig.getRefseqObjectName());
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            this.logErr("参考基因组加载失败", e);
-        }
+        
 
-        if (refSeq == null) {
-            return StageRunResult.fail("参考基因组加载失败", bioPipelineStage, null);
-        }
-
+        String refseqUrl = refSeqConfig.getRefseqObjectName();
         String inputR1Url = mappingInputUrls.getR1Url();
         String inputR2Url = mappingInputUrls.getR2Url();
 
@@ -80,34 +70,30 @@ public class MappingStageExecutor
         Path r2TmpPath = inputR2Url == null ? null
                 : inputTmpPath.resolve(inputR2Url.substring(inputR2Url.lastIndexOf("/") + 1));
 
+        Path refseqLocalPath = inputTmpPath.resolve(refseqUrl.substring(refseqUrl.lastIndexOf("/")+1));
+
+
         Map<String, Path> loadMap = new HashMap<>();
         loadMap.put(inputR1Url, r1TmpPath);
+        loadMap.put(refseqUrl, refseqLocalPath);
         if (r2TmpPath != null) {
             loadMap.put(inputR2Url, r2TmpPath);
         }
+
+
         this.loadInput(loadMap);
 
-        // Path samTmp = workDir.resolve("aln.sam");
-        // Path bamTmp = workDir.resolve("aln.bam"); // view 输出的 BAM（未排序）
-
-        // MappingStageOutput mappingStageOutput = bioStageUtil.mappingOutput(bioPipelineStage, workDir);
         Path bamSortedTmp = stageExecutionInput.workDir.resolve("aln_sorted.bam");
         Path bamIndexTmp = stageExecutionInput.workDir.resolve("aln_sorted.bam.bai");
 
-        // String pipelineCmd = buildMappingPipelineCmd(refSeq, r1TmpPath, r2TmpPath,
-        // bamSortedTmp);
-        // logger.info("{} run cmd {}", bioPipelineStage, pipelineCmd);
-        // List<String> cmd = new ArrayList<>();
-        // cmd.add("sh");
-        // cmd.add("-c");
-        // cmd.add(pipelineCmd);
-
+        
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getMinimap2());
         cmd.add("-ax");
-        cmd.add("sr");
-        cmd.add(refSeq.getAbsolutePath());
+        cmd.add(parameters.getReadMeta().getReadLenType() == ReadMeta.READ_LEN_TYPE_SHORT? "sr":"map-ont");
+        cmd.add(refseqLocalPath.toString());
         cmd.add(r1TmpPath.toString());
+        
         if (r2TmpPath != null) {
             cmd.add(r2TmpPath.toString());
         }

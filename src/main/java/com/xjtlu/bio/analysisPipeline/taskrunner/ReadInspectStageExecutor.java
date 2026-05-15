@@ -22,7 +22,6 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
-import com.xjtlu.bio.analysisPipeline.context.ReadMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadInspectStageOutput;
@@ -135,8 +134,8 @@ public class ReadInspectStageExecutor
             format = ".fq";
         }
 
-        int qualityEncoding = ReadMeta.QUALITY_ENCODING_33;
-        int readLenType = ReadMeta.READ_LEN_TYPE_SHORT;
+        int qualityEncoding = ReadInspectStageOutput.ENCODING_64;
+        int readLenType = ReadInspectStageOutput.READ_SHORT;
 
         Path workDir = stageExecutionInput.workDir;
         Path r1 = workDir.resolve(baseName + "_r1" + format);
@@ -192,7 +191,9 @@ public class ReadInspectStageExecutor
                             Arrays.sort(readLens);
                             int medianLen = readLens[(readLens.length - 1) / 2];
                             if (medianLen >= LONG_READ_THRESHOLD) {
-                                readLenType = ReadMeta.READ_LEN_TYPE_LONG;
+                                readLenType = ReadInspectStageOutput.READ_LONG;
+                                possibleInterleaved = false;
+                                return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, readLenType,read1, null, workDir), stageExecutionInput.stageContext);
                             }
                         }
                     }
@@ -227,7 +228,7 @@ public class ReadInspectStageExecutor
 
                 if (possibleInterleaved && !checkedInterleaved && recordTravered >= checkPointRecordNum) {
                     checkedInterleaved = true;
-                    double ratio = (paired * 2.0) / recordTravered;
+                    double ratio = (paired * 2.0d) / recordTravered;
                     isInterleaved = checkInterleaved(ratio);
                     if (!isInterleaved) {
                         if (checkSingleRead(ratio)) {
@@ -253,7 +254,7 @@ public class ReadInspectStageExecutor
                 Arrays.sort(readLens, 0, recordLenRecordIndex);
                 int median = readLens[(recordLenRecordIndex - 1) / 2];
                 if (median >= LONG_READ_THRESHOLD) {
-                    readLenType = ReadMeta.READ_LEN_TYPE_LONG;
+                    readLenType = ReadInspectStageOutput.READ_LONG;
                 }
             }
 
