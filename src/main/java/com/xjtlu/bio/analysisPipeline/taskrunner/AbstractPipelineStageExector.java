@@ -137,11 +137,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         }
     }
 
-    protected void asyncRunFinished(StageRunResult<T> stageRunResult) {
+    // protected void asyncRunFinished(StageRunResult<T> stageRunResult) {
 
-        postExecute(stageRunResult);
+    //     postExecute(stageRunResult);
 
-    }
+    // }
 
     protected static class NotGetRefSeqException extends Exception {
 
@@ -197,12 +197,12 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         return null;
     }
 
-    protected void postExecute(StageRunResult stageRunResult) {
-        Path inputDir = this.stageInputPath(stageRunResult.getStageContext());
+    protected void postExecute(StageExecutionInput stageExecutionInput) {
+        Path inputDir = stageExecutionInput.inputDir;
         FileUtils.deleteQuietly(inputDir.toFile());
-        if (!stageRunResult.isSuccess()) {
-            FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStageContext()).toFile());
-        }
+        // if (!stageRunResult.isSuccess()) {
+        //     FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStageContext()).toFile());
+        // }
     }
 
     protected boolean _execute(List<String> runCmd, Path redirectOutputStream, StageExecutionInput stageExecutionInput,
@@ -232,14 +232,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         stageContext.setVersion(bioPipelineStage.getVersion());
         stageContext.setStageType(bioPipelineStage.getStageType());
 
-        try {
-            preExecute(stageContext);
-        } catch (Exception e) {
-            logger.error("{} exception happens at preExecute", bioPipelineStage, e);
-            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", stageContext, e);
-            postExecute(stageRunResult);
-            return stageRunResult;
-        }
+
 
         Path workDir = this.workDirPath(stageContext);
         Path inputDir = this.stageInputPath(stageContext);
@@ -248,6 +241,18 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         stageExecutionInput.stageContext = stageContext;
         stageExecutionInput.inputDir = inputDir;
         stageExecutionInput.workDir = workDir;
+
+
+        try {
+            preExecute(stageContext);
+        } catch (Exception e) {
+            logger.error("{} exception happens at preExecute", bioPipelineStage, e);
+            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", workDir, stageContext,e);
+            postExecute(stageExecutionInput);
+            return stageRunResult;
+        }
+
+        
 
         StageRunResult<T> stageRunResult = null;
         try {
@@ -259,21 +264,22 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         } catch (JsonMappingException e) {
             // TODO Auto-generated catch block
             logger.error("JSON mapping exception while executing stage. input={}", stageExecutionInput, e);
-            stageRunResult = this.runException(stageContext, e);
+            stageRunResult = this.runException(stageContext, workDir, e);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("JSON processing exception while executing stage. input={}", stageExecutionInput, e);
-            stageRunResult = this.runException(stageContext, e);
+            stageRunResult = this.runException(stageContext, workDir, e);
         } catch (LoadFailException e) {
             logger.error("stage = {} load failed. ", bioPipelineStage.getStageId(), e.causeException);
-            stageRunResult = this.runException(stageContext, e);
+            stageRunResult = this.runException(stageContext, workDir, e);
         } catch (NotGetRefSeqException e) {
             logger.error("stage = {}. Not get Refseq. reason = {}", bioPipelineStage.getStageId(), e.getReason());
-            stageRunResult = this.runException(stageContext, e);
+            stageRunResult = this.runException(stageContext, workDir, e);
         } catch (Exception e) {
             logger.error("[Stage running exception] Stage = {}, ", bioPipelineStage.getStageId(), e);
+            stageRunResult = this.runException(stageContext, workDir, e);
         }
-        postExecute(stageRunResult);
+        postExecute(stageExecutionInput);
         return stageRunResult;
     }
 
@@ -285,16 +291,22 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     protected abstract StageRunResult<T> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException, NotGetRefSeqException;
 
-    protected StageRunResult<T> runException(StageContext bioPipelineStage, Exception e) {
-        return runFail(bioPipelineStage, "异常\n" + e.getMessage());
+    protected StageRunResult<T> runException(StageContext bioPipelineStage, Path workDir, Exception e) {
+        return runFail(bioPipelineStage, "异常\n" + e.getMessage(), workDir);
     }
 
-    protected StageRunResult<T> runFail(StageContext stageContext, String errorMsg, Exception e) {
-        return StageRunResult.fail(errorMsg, stageContext, e);
+    protected StageRunResult<T> runFail(StageContext stageContext, Path workDir, String errorMsg, Exception e) {
+        return StageRunResult.fail(errorMsg, workDir, stageContext, e);
     }
 
-    protected StageRunResult<T> runFail(StageContext bioPipelineStage, String msg) {
-        return runFail(bioPipelineStage, msg, null);
+    protected StageRunResult<T> runFail(StageContext bioPipelineStage, String msg, Path workDir) {
+        return runFail(bioPipelineStage, workDir, msg, (Exception) null);
+    }
+
+
+    protected StageRunResult<T> OK(T stageOutput, StageExecutionInput stageExecutionInput){
+        StageRunResult stageRunResult = StageRunResult.OK(stageOutput, stageExecutionInput.stageContext, stageExecutionInput.workDir); 
+        return stageRunResult;
     }
 
     public Path stageInputPath(StageContext bioPipelineStage) {
@@ -404,10 +416,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     }
 
     protected StageRunResult<T> runFail(StageContext stageContext, String errorMessge, Exception e,
-            Path inputDir,
             Path workDir) {
-        this.deleteTmpFiles(List.of(inputDir.toFile(), workDir.toFile()));
-        return this.runFail(stageContext, errorMessge, e);
+
+
+        
+        return this.runFail(stageContext, workDir, errorMessge, e);
     }
 
     protected static String appendSuffixBeforeExtensions(String fileName, String suffix) {
@@ -460,10 +473,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     }
 
     public abstract int id();
-
-    protected StageRunResult parseError(StageContext bioPipelineStage) {
-        return runFail(bioPipelineStage, PARSE_JSON_ERROR);
-    }
 
     protected static boolean isMap(Object obj) {
         return (obj != null) && obj instanceof Map;

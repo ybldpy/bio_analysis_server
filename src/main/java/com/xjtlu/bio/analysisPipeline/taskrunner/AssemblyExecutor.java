@@ -99,7 +99,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
 
         ExecuteResult executeResult = _execute(cmd, workDir);
         if(!executeResult.success()){
-            return this.runFail(bioPipelineStage, "运行spades tool失败", executeResult.ex, tempInputDir, workDir);
+            return this.runFail(bioPipelineStage, "运行spades tool失败", executeResult.ex, workDir);
         }
 
 
@@ -112,7 +112,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(contigs);
         
         if(!errOutputValidationResults.isEmpty()){
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults), stageExecutionInput.workDir);
         }
 
         boolean hasScaffold = true;
@@ -128,7 +128,7 @@ public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStage
         if(!hasScaffold){
             assemblyStageOutput.setScaffoldPath(null);
         }
-        return StageRunResult.OK(assemblyStageOutput, bioPipelineStage);
+        return OK(assemblyStageOutput, stageExecutionInput);
     }
 
     @Override

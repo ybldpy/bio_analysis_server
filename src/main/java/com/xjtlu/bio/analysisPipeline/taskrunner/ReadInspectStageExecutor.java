@@ -176,7 +176,7 @@ public class ReadInspectStageExecutor
                 for (int i = 0; i < 3; i++) {
                     String followingLine = br.readLine();
                     if (followingLine == null) {
-                        return this.runFail(stageExecutionInput.stageContext, followingLine);
+                        return this.runFail(stageExecutionInput.stageContext, "不完整的输入", stageExecutionInput.workDir);
                     }
 
                     if (possibleInterleaved) {
@@ -193,7 +193,7 @@ public class ReadInspectStageExecutor
                             if (medianLen >= LONG_READ_THRESHOLD) {
                                 readLenType = ReadInspectStageOutput.READ_LONG;
                                 possibleInterleaved = false;
-                                return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, readLenType,read1, null, workDir), stageExecutionInput.stageContext);
+                                return OK(new ReadInspectStageOutput(qualityEncoding, readLenType,read1, null, workDir), stageExecutionInput);
                             }
                         }
                     }
@@ -232,9 +232,9 @@ public class ReadInspectStageExecutor
                     isInterleaved = checkInterleaved(ratio);
                     if (!isInterleaved) {
                         if (checkSingleRead(ratio)) {
-                            return StageRunResult.OK(
+                            return OK(
                                     new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
-                                    stageExecutionInput.stageContext);
+                                    stageExecutionInput);
                         } else {
                             logger.warn(
                                     "stage = {}, ambiguous FASTQ input, unable to determine layout, " +
@@ -244,7 +244,7 @@ public class ReadInspectStageExecutor
                                     paired,
                                     String.format("%.4f", ratio));
 
-                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型");
+                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型", stageExecutionInput.workDir);
                         }
                     }
                 }
@@ -261,16 +261,16 @@ public class ReadInspectStageExecutor
             if (possibleInterleaved) {
 
                 if (checkedInterleaved) {
-                    return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, r1, r2, stageExecutionInput.workDir),
-                            stageExecutionInput.stageContext);
+                    return OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, r1, r2, stageExecutionInput.workDir),
+                            stageExecutionInput);
                 }
                 else {
                     double ratio = (paired * 2.0) / recordTravered;
                     if (!checkInterleaved(ratio)) {
                         if (checkSingleRead(ratio)) {
-                            return StageRunResult.OK(
+                            return OK(
                                     new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
-                                    stageExecutionInput.stageContext);
+                                    stageExecutionInput);
                         } else {
                             logger.warn(
                                     "stage = {}, ambiguous FASTQ input, unable to determine layout, " +
@@ -280,22 +280,22 @@ public class ReadInspectStageExecutor
                                     paired,
                                     String.format("%.4f", ratio));
 
-                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型");
+                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型", stageExecutionInput.workDir);
                         }
                     }
 
-                    return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, null, null, stageExecutionInput.workDir), stageExecutionInput.stageContext);
+                    return OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, null, null, stageExecutionInput.workDir), stageExecutionInput);
                 }
             } else {
 
-                return StageRunResult.OK(new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
-                        stageExecutionInput.stageContext);
+                return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                        stageExecutionInput);
             }
 
         } catch (Exception e) {
             logger.error("Inspection exception, run stage id = {}", stageExecutionInput.stageContext.getRunStageId(),
                     e);
-            return this.runFail(stageExecutionInput.stageContext, "Inspection exception");
+            return this.runFail(stageExecutionInput.stageContext, "Inspection exception", stageExecutionInput.workDir);
         }
 
     }

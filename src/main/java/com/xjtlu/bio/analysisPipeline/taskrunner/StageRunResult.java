@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Path;
 import java.util.Map;
 
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
@@ -19,6 +20,10 @@ public class StageRunResult<T extends StageOutput> {
     private T stageOutput;
 
     private Exception e;
+
+    private Path workDir;
+
+    
 
     
 
@@ -45,12 +50,13 @@ public class StageRunResult<T extends StageOutput> {
 
 
 
-    public StageRunResult(boolean success, String failReason,Map<String,String> outputPath, StageContext stageContext,Exception e) {
+    public StageRunResult(boolean success, Path workDir, String failReason,Map<String,String> outputPath, StageContext stageContext,Exception e) {
         this.success = success;
         this.failReason = failReason;
         this.outputPath = outputPath;
         this.e = e;
         this.stageContext = stageContext;
+        this.workDir = workDir;
     }
 
     
@@ -80,17 +86,17 @@ public class StageRunResult<T extends StageOutput> {
         this.stage = stage;
     }
 
-    public static StageRunResult OK(Map<String,String> outputPath, StageContext stageContext){
-        return new StageRunResult(true, null, outputPath, stageContext, null);
-    }
+    // public static StageRunResult OK(Map<String,String> outputPath, StageContext stageContext){
+    //     return new StageRunResult(true, null, outputPath, stageContext, null);
+    // }
 
-    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, StageContext stageContext){
-        StageRunResult<T> stageRunResult = new StageRunResult<>(true, null, null, stageContext, null);
+    public static <T extends StageOutput> StageRunResult<T> OK(T stageOutput, StageContext stageContext, Path workDir){
+        StageRunResult<T> stageRunResult = new StageRunResult<>(true, workDir,null, null, stageContext, null);
         stageRunResult.setStageOutput(stageOutput);
         return stageRunResult;
     }
-    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, StageContext stage,Exception e){
-        return new StageRunResult<>(false, failReason, null, stage, e);
+    public static <T extends StageOutput> StageRunResult<T> fail(String failReason, Path workDir, StageContext stage,Exception e){
+        return new StageRunResult<>(false, workDir, failReason, null, stage, e);
     }
 
 
@@ -142,6 +148,14 @@ public class StageRunResult<T extends StageOutput> {
     }
     public void setFailReason(String failReason) {
         this.failReason = failReason;
+    }
+
+    public Path getWorkDir() {
+        return workDir;
+    }
+
+    public void setWorkDir(Path workDir) {
+        this.workDir = workDir;
     }
 
     

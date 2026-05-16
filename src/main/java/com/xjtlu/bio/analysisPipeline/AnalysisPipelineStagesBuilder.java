@@ -12,10 +12,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -302,6 +304,33 @@ public class AnalysisPipelineStagesBuilder {
         BaseStageParams baseStageParams = new BaseStageParams(refSeqConfig, null);
 
         BioPipelineStage startStage = null;
+
+        if(pipelineInput.readType == PipelineSampleInput.READ_TYPE_FASTA){
+
+            BioPipelineStage referenceComparison = new BioPipelineStage();
+            referenceComparison.setStageIndex(0);
+
+            ReferenceComparisonStageParameters referenceComparisonStageParameters = new ReferenceComparisonStageParameters();
+            referenceComparisonStageParameters.setRefSeqConfig(refSeqConfig);
+
+            ReferenceComparisonStageInputUrls referenceComparisonStageInputUrls = new ReferenceComparisonStageInputUrls();
+            referenceComparisonStageInputUrls.setFastaUrl(pipelineInput.getR1());
+
+            String serializedInput = JsonUtil.toJson(referenceComparisonStageInputUrls);
+            String serializedParameters = JsonUtil.toJson(referenceComparisonStageParameters);
+
+            referenceComparison.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+            referenceComparison.setStageType(Constants.StageType.PIPELINE_STAGE_REFERENCE_COMPARISON);
+            referenceComparison.setStageName(STAGE_NAME_MAP.get(Constants.StageType.PIPELINE_STAGE_REFERENCE_COMPARISON));
+            referenceComparison.setInputUrl(serializedInput);
+            referenceComparison.setParameters(serializedParameters);
+
+            stages.add(referenceComparison);
+
+            return stages;
+        }
+
+
 
         buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
 

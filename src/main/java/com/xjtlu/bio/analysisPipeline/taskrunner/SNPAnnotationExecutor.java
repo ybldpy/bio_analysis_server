@@ -84,9 +84,9 @@ public class SNPAnnotationExecutor extends AbstractPipelineStageExector<SNPAnnot
 
         boolean res = _execute(cmd, null, stageExecutionInput, outputPath);
         if(!res){
-            return this.runFail(bioPipelineStage, "run failed");
+            return this.runFail(bioPipelineStage, "run failed", stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new SNPAnnotationStageOutput(outputPath), bioPipelineStage);
+        return OK(new SNPAnnotationStageOutput(outputPath), stageExecutionInput);
 
     }
 

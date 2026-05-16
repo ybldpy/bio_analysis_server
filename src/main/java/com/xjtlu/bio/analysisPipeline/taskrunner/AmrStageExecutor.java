@@ -68,14 +68,16 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
         ExecuteResult executeResult = this._execute(runCmd, stageExecutionInput.workDir);
         if (!executeResult.success()){
             logger.error("{} amr run failed. run code = {}. ", stageContext.getRunStageId(), executeResult.runCode, executeResult.ex);
-            return this.runFail(stageContext, "amr run failed");
+            return this.runFail(stageContext, "amr run failed", stageExecutionInput.workDir);
         }
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(resultPath);
         if(!stageOutputValidationResults.isEmpty()){
             logger.error("{} amr run failed. {} Amr result not generated", stage, stageOutputValidationResults.get(0).path, stageOutputValidationResults.get(0).ioException);
-            return this.runFail(stageContext, "Amr result not generated");
+            return this.runFail(stageContext, "Amr result not generated", stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new AmrStageOutput(resultPath), stageContext);
+
+        
+        return this.OK(new AmrStageOutput(resultPath), stageExecutionInput);
     }
 
     @Override

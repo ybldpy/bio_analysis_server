@@ -85,7 +85,7 @@ public class ReferenceComparsionStageExecutor extends
                         workDir,
                         cmdText);
 
-                return runFail(stageExecutionInput.stageContext, msg);
+                return runFail(stageExecutionInput.stageContext, msg, stageExecutionInput.workDir);
             }
 
             String msg = String.format(
@@ -93,7 +93,7 @@ public class ReferenceComparsionStageExecutor extends
                     executeResult.runCode,
                     workDir,
                     cmdText);
-            return runFail(stageExecutionInput.stageContext, msg);
+            return runFail(stageExecutionInput.stageContext, msg, stageExecutionInput.workDir);
         }
 
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(alignmentPafPath);
@@ -104,7 +104,7 @@ public class ReferenceComparsionStageExecutor extends
                     alignmentPafPath,
                     stageOutputValidationResults);
 
-            return runFail(stageExecutionInput.stageContext, ERROR_EXECUTE_FAIL);
+            return runFail(stageExecutionInput.stageContext, ERROR_EXECUTE_FAIL, stageExecutionInput.workDir);
         }
 
         PafParseResult pafParseResult = PafParser.parseToDifferenceTsv(alignmentPafPath, differenceTsvPath);
@@ -117,11 +117,11 @@ public class ReferenceComparsionStageExecutor extends
                     differenceTsvPath,
                     pafParseResult.getException());
 
-            return runFail(stageExecutionInput.stageContext, ERROR_EXECUTE_FAIL);
+            return runFail(stageExecutionInput.stageContext, ERROR_EXECUTE_FAIL, stageExecutionInput.workDir);
         }
 
-        return StageRunResult.OK(new ReferenceComparisonStageOutput(alignmentPafPath, differenceTsvPath),
-                stageExecutionInput.stageContext);
+        return OK(new ReferenceComparisonStageOutput(alignmentPafPath, differenceTsvPath),
+                stageExecutionInput);
 
     }
 

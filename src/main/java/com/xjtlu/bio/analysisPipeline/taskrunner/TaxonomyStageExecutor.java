@@ -83,16 +83,16 @@ public class TaxonomyStageExecutor
 
         if(executeResult.runCode!=0 || executeResult.ex!=null){
             logger.error("stage = {} run failed. Code = {}", bioPipelineStage, executeResult.runCode, executeResult.ex);
-            return this.runFail(bioPipelineStage, "execution failed");
+            return this.runFail(bioPipelineStage, "execution failed", stageExecutionInput.workDir);
         }
 
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(reportPath);
         if(!stageOutputValidationResults.isEmpty()){
             logger.error("stage = {}. Validate file = {} failed", bioPipelineStage, stageOutputValidationResults.get(0).path.toString(), stageOutputValidationResults.get(0).ioException);
-            return this.runFail(bioPipelineStage, "validate output file failed");
+            return this.runFail(bioPipelineStage, "validate output file failed", stageExecutionInput.workDir);
         }
 
-        return StageRunResult.OK(new TaxonomyStageOutput(outputPath, reportPath), bioPipelineStage);
+        return OK(new TaxonomyStageOutput(outputPath, reportPath), stageExecutionInput);
 
     }
 

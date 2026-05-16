@@ -55,7 +55,7 @@ public class VarientExecutor
         RefSeqConfig refSeqConfig = varientCallParameters.getRefSeqConfig();
         if (refSeqConfig == null) {
             logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage);
-            return StageRunResult.fail("未能加载参考基因文件", bioPipelineStage, null);
+            return runFail(bioPipelineStage,"未能加载参考基因文件", stageExecutionInput.workDir);
         }
 
 
@@ -93,7 +93,7 @@ public class VarientExecutor
                     "Failed to build reference index for reference %s: %s",
                     refseqLocalPath,
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            return this.runFail(bioPipelineStage, msg);
+            return this.runFail(bioPipelineStage, msg, stageExecutionInput.workDir);
         }
 
         
@@ -124,20 +124,20 @@ public class VarientExecutor
         cmd.add("--threads");
         cmd.add(String.valueOf(threads));
         cmd.add("-O");
-        // cmd.add("u"); // uncompressed BCF in memory format
+        cmd.add("u"); // uncompressed BCF in memory format
         cmd.add("-o");
         cmd.add(bcfRaw.toString()); // 直接落盘
         cmd.add(bam.toString());
 
         ExecuteResult executeResult = _execute(cmd, workDir);
         if (!executeResult.success()) {
-            return this.runFail(bioPipelineStage, "生成bcf.gz失败", executeResult.ex, inputTempDir, workDir);
+            return this.runFail(bioPipelineStage, "生成bcf.gz失败", executeResult.ex, workDir);
         }
 
         List<StageOutputValidationResult> errorOutputValidationResults = validateOutputFiles(bcfRaw);
         if (!errorOutputValidationResults.isEmpty()) {
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
-                    null, inputTempDir, workDir);
+                    null, workDir);
         }
 
         // ---------- 2) call: BCF -> VCF.GZ ----------
@@ -157,13 +157,13 @@ public class VarientExecutor
         executeResult = _execute(cmd, workDir);
 
         if (!executeResult.success()) {
-            return this.runFail(bioPipelineStage, "生成VCF.gz失败", executeResult.ex, inputTempDir, workDir);
+            return this.runFail(bioPipelineStage, "生成VCF.gz失败", executeResult.ex, workDir);
         }
 
         errorOutputValidationResults = validateOutputFiles(vcfGz);
         if (!errorOutputValidationResults.isEmpty()) {
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
-                    null, inputTempDir, workDir);
+                    null, workDir);
         }
 
         // ---------- 3) index: VCF.GZ -> TBI ----------
@@ -177,17 +177,17 @@ public class VarientExecutor
 
         executeResult = _execute(cmd, workDir);
         if (!executeResult.success()) {
-            return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, inputTempDir, workDir);
+            return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, workDir);
         }
 
         vcfTbi = workDir.resolve(vcfGz.getFileName() + ".tbi");
         errorOutputValidationResults = validateOutputFiles(vcfTbi);
         if (!errorOutputValidationResults.isEmpty()) {
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
-                    null, inputTempDir, workDir);
+                    null, workDir);
         }
 
-        return StageRunResult.OK(new VariantStageOutput(vcfGz.toString(), vcfTbi.toString()), bioPipelineStage);
+        return OK(new VariantStageOutput(vcfGz.toString(), vcfTbi.toString()), stageExecutionInput);
     }
 
     @Override

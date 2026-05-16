@@ -56,15 +56,15 @@ public class MLSTStageExecutor extends AbstractPipelineStageExector<MLSTStageOut
 
         if(!executeResult.success()){
             logger.error("{} run failed. code = {}", stage, executeResult.runCode, executeResult.ex);
-            return this.runFail(stage, "run failed");
+            return this.runFail(stage, "run failed", stageExecutionInput.workDir);
         }
 
         List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(resultPath);
         if(!stageOutputValidationResults.isEmpty()){
             logger.error("{} no output", stage, stageOutputValidationResults.get(0).ioException);
-            return this.runFail(stage, "no output");
+            return this.runFail(stage, "no output", stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new MLSTStageOutput(resultPath), stage);
+        return OK(new MLSTStageOutput(resultPath), stageExecutionInput);
     }
 
     @Override

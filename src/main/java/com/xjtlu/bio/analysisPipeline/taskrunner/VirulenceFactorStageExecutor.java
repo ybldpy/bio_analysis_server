@@ -67,16 +67,16 @@ public class VirulenceFactorStageExecutor extends AbstractPipelineStageExector<V
         ExecuteResult executeResult = this._execute(runCmd, stageExecutionInput.workDir, resultPath, null);
         if(!executeResult.success()){
             logger.error("{} run failed. code = {}", stage, executeResult.runCode, executeResult.ex);
-            return this.runFail(stage, "run failed");
+            return this.runFail(stage, "run failed", stageExecutionInput.workDir);
         }
 
         List<StageOutputValidationResult> validationResults = validateOutputFiles(resultPath);
         if(!validationResults.isEmpty()){
             logger.error("{} no output generated", stage);
-            return this.runFail(stage, "no output generated");
+            return this.runFail(stage, "no output generated", stageExecutionInput.workDir);
         }
 
-        return StageRunResult.OK(new VirulenceFactorStageOutput(resultPath), stage);
+        return OK(new VirulenceFactorStageOutput(resultPath), stageExecutionInput);
     }
 
     @Override

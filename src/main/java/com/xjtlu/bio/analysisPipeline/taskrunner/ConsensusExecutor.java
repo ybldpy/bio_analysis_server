@@ -62,7 +62,7 @@ public class ConsensusExecutor
         RefSeqConfig refSeqConfig = consensusStageParameters.getRefSeqConfig();
 
         if (refSeqConfig == null) {
-            return this.runFail(bioPipelineStage, "未找到参考基因文件");
+            return this.runFail(bioPipelineStage, "未找到参考基因文件", stageExecutionInput.workDir);
         }
 
         Path inputTmpDir = stageExecutionInput.inputDir;
@@ -93,7 +93,7 @@ public class ConsensusExecutor
                     "Failed to build fai for reference %s: %s",
                     refseqLocalPath,
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            return this.runFail(bioPipelineStage, msg);
+            return this.runFail(bioPipelineStage, msg, stageExecutionInput.workDir);
         }
 
         
@@ -129,15 +129,15 @@ public class ConsensusExecutor
         }
 
         if (runFail) {
-            return this.runFail(bioPipelineStage, "运行consensus tool失败", runFailException, inputTmpDir, resultDir);
+            return this.runFail(bioPipelineStage, "运行consensus tool失败", runFailException, resultDir);
         }
 
         List<StageOutputValidationResult> errOutputValidationResults = validateOutputFiles(consensusPath);
         if (!errOutputValidationResults.isEmpty()) {
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults));
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errOutputValidationResults), stageExecutionInput.workDir);
         }
 
-        return StageRunResult.OK(consensusStageOutput, bioPipelineStage);
+        return OK(consensusStageOutput, stageExecutionInput);
     }
 
     @Override

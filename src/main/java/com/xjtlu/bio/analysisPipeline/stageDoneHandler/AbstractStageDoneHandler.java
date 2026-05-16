@@ -84,7 +84,7 @@ public abstract class AbstractStageDoneHandler<T extends StageOutput> implements
             return;
         }
 
-        deleteStageResultDir(stageRunResult.getStageOutput().getParentPath());
+        deleteStageResultDir(stageRunResult.getWorkDir().toString());
 
         BioPipelineStage updateStage = new BioPipelineStage();
         updateStage.setOutputUrl(serializedOutputMap);

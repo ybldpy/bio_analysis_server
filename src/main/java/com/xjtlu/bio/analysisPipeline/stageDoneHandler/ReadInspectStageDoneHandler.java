@@ -1,5 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
+import java.nio.file.Path;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,6 +39,8 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
         String r1Url = null;
         String r2Url = null;
 
+        Path resultDir = readInspectStageOutput.getWorkDir();
+
         if (readInspectStageOutput.getR1Path() == null) {
             BioPipelineStage runStage = null;
             try {
@@ -46,13 +49,13 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
             } catch (Exception e) {
                 logger.error("Failed to query run stage in ReadInspectStageDoneHandler, stageId={}",
                         runStageId, e);
-                handleFail(stageRunResult.getStageContext(), readInspectStageOutput.getParentPath().toString());
+                handleFail(stageRunResult.getStageContext(), resultDir.toString());
             }
 
             // unable to find run stage. Something must happen; discard update
             if (runStage == null) {
                 logger.debug("Cannot find run stage, stageId={}", runStageId);
-                handleFail(stageRunResult.getStageContext(), readInspectStageOutput.getParentPath().toString());
+                handleFail(stageRunResult.getStageContext(), resultDir.toString());
             }
 
             ReadInspectStageInputUrls readInspectStageInputUrls;
@@ -88,7 +91,7 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
             boolean uploadRes = this.batchUploadObjectsFromLocal(uploadMap);
 
             if (!uploadRes) {
-                handleFail(stageRunResult.getStageContext(), readInspectStageOutput.getParentPath().toString());
+                handleFail(stageRunResult.getStageContext(), stageRunResult.getWorkDir().toString());
                 return;
             }
             r1Url = r1ObjectName;
@@ -133,7 +136,7 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
                     e);
         }
 
-        this.deleteStageResultDir(readInspectStageOutput.getParentPath().toString());
+        this.deleteStageResultDir(stageRunResult.getWorkDir().toString());
 
     }
 

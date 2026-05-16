@@ -126,9 +126,9 @@ public class SeroTypingStageExectuor
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
 
         if (!res) {
-            return this.runFail(stageExecutionInput.stageContext, "未成功执行");
+            return this.runFail(stageExecutionInput.stageContext, "未成功执行", stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageContext);
+        return OK(new SeroTypingStageOutput(resultPath), stageExecutionInput);
     }
 
     private StageRunResult<SeroTypingStageOutput> executeECoilType(StageExecutionInput stageExecutionInput,
@@ -145,9 +145,9 @@ public class SeroTypingStageExectuor
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
 
         if (!res) {
-            return this.runFail(stageExecutionInput.stageContext, "未成功执行");
+            return this.runFail(stageExecutionInput.stageContext, "未成功执行", stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageContext);
+        return OK(new SeroTypingStageOutput(resultPath), stageExecutionInput);
 
     }
 
@@ -166,9 +166,9 @@ public class SeroTypingStageExectuor
 
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
         if (!res) {
-            return this.runFail(stageExecutionInput.stageContext, "未成功执行");
+            return this.runFail(stageExecutionInput.stageContext, "未成功执行", stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new SeroTypingStageOutput(resultPath), stageExecutionInput.stageContext);
+        return OK(new SeroTypingStageOutput(resultPath), stageExecutionInput);
     }
 
     private StageRunResult<SeroTypingStageOutput> executeStreptococcusType(StageExecutionInput stageExecutionInput,
@@ -185,8 +185,8 @@ public class SeroTypingStageExectuor
         Path resultFile = stageExecutionInput.workDir.resolve("pred.tsv");
 
         return _execute(cmd, null, stageExecutionInput, resultFile)
-                ? this.runFail(stageExecutionInput.stageContext, "未执行成功")
-                : StageRunResult.OK(new SeroTypingStageOutput(resultFile), stageExecutionInput.stageContext);
+                ? this.runFail(stageExecutionInput.stageContext, "未执行成功", stageExecutionInput.workDir)
+                : OK(new SeroTypingStageOutput(resultFile), stageExecutionInput);
 
     }
 
@@ -238,7 +238,7 @@ public class SeroTypingStageExectuor
                 break;
         }
 
-        return this.runFail(stage, "未匹配到适用的血清型分析工具");
+        return this.runFail(stage, "未匹配到适用的血清型分析工具", stageExecutionInput.workDir);
     }
 
     @Override

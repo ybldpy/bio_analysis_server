@@ -55,9 +55,9 @@ public class CoverageDepthStageExecutor extends AbstractPipelineStageExector<Cov
         Path summary = stageExecutionInput.workDir.resolve("summary.json");
         boolean executeRes = this._execute(cmd, null, stageExecutionInput, depthTable, summary);
         if(!executeRes){
-            return this.runFail(stageExecutionInput.stageContext, ERROR_EXECUTE_FAIL);
+            return this.runFail(stageExecutionInput.stageContext, ERROR_EXECUTE_FAIL, stageExecutionInput.workDir);
         }
-        return StageRunResult.OK(new CoverageDepthStageOutput(depthTable, summary), stageExecutionInput.stageContext);
+        return OK(new CoverageDepthStageOutput(depthTable, summary), stageExecutionInput);
 
     }
 

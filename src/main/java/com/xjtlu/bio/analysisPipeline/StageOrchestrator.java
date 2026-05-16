@@ -783,9 +783,15 @@ public class StageOrchestrator {
             return this.makePlanDownstreamSerotype();
         } else if (currentStage.getStageType() == PIPELINE_STAGE_READ_INSPECT) {
             return this.makeDownstreamPlanReadInspect(allStages, pipelineType);
+        }else if(currentStage.getStageType() == PIPELINE_STAGE_REFERENCE_COMPARISON){
+            return this.makeDownstreamPlanReferenceComparison();
         }
         return null;
+    }
 
+
+    private OrchestratePlan makeDownstreamPlanReferenceComparison(){
+        return new OrchestratePlan(true);
     }
 
     public OrchestratePlan makeDownstreamPlan(long finishedStageId, List<BioPipelineStage> allStages, int pipelineType)

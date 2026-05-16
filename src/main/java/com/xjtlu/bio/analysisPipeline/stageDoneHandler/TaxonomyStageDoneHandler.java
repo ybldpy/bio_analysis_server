@@ -160,7 +160,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
                     taxonomyStageOutput.getReport(),
                     e);
 
-            this.handleFail(taxonomyStage, taxonomyStageOutput.getParentPath().toString());
+            this.handleFail(taxonomyStage, stageRunResult.getWorkDir().toString());
             return;
         }
 
@@ -171,7 +171,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("stage = {}.json processing exception", taxonomyStage, e);
-            this.handleFail(taxonomyStage, taxonomyStageOutput.getParentPath().toString());
+            this.handleFail(taxonomyStage, stageRunResult.getWorkDir().toString());
         }
         BioPipelineStage patch = new BioPipelineStage();
         patch.setStatus(PIPELINE_STAGE_STATUS_FINISHED);

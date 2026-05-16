@@ -54,7 +54,7 @@ public class MappingStageExecutor
         RefSeqConfig refSeqConfig = parameters.getRefSeqConfig();
 
         if (refSeqConfig == null) {
-            return StageRunResult.fail("未能加载参考基因", bioPipelineStage, null);
+            return StageRunResult.fail("未能加载参考基因", stageExecutionInput.workDir, bioPipelineStage, null);
         }
 
         
@@ -103,14 +103,14 @@ public class MappingStageExecutor
         if (!executeResult.success()) {
             logger.error("stage id = {}, exit code = {}, exception = ", bioPipelineStage,
                     executeResult.runCode, executeResult.ex);
-            return this.runFail(bioPipelineStage, "运行mapping tool失败", executeResult.ex, inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, "运行mapping tool失败", executeResult.ex, workDir);
         }
 
         List<StageOutputValidationResult> errors = validateOutputFiles(samPath);
         if (!errors.isEmpty()) {
             StageOutputValidationResult error = errors.get(0);
             logger.error("stage id = {}. 未生成sam文件", bioPipelineStage, error.ioException);
-            return this.runFail(bioPipelineStage, "未生成文件", error.ioException, inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, "未生成文件", error.ioException,workDir);
         }
 
         Path bamPath = workDir.resolve("aln.bam");
@@ -131,7 +131,7 @@ public class MappingStageExecutor
         if (!executeResult.success()) {
             logger.error("stage id = {}, 生成bam失败. exit code = {}, exception = ", bioPipelineStage,
                     executeResult.runCode, executeResult.runCode);
-            return this.runFail(bioPipelineStage, "运行mapping tools失败", executeResult.ex, inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, "运行mapping tools失败", executeResult.ex, workDir);
         }
 
         List<StageOutputValidationResult> errorOutput = validateOutputFiles(bamPath);
@@ -139,8 +139,7 @@ public class MappingStageExecutor
 
             StageOutputValidationResult error = errorOutput.get(0);
             logger.error("stage id = {}. 未生成bam文件", bioPipelineStage, error.ioException);
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null,
-                    inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
         }
 
         cmd.clear();
@@ -155,15 +154,14 @@ public class MappingStageExecutor
         if (!executeResult.success()) {
             logger.error("stage id = {}, 生成bam sorted失败. exit code = {}, exception = ", bioPipelineStage,
                     executeResult.runCode, executeResult.ex);
-            return this.runFail(bioPipelineStage, "生成bam索引失败", executeResult.ex, inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, "生成bam索引失败", executeResult.ex, workDir);
         }
 
         errorOutput = validateOutputFiles(bamSortedTmp);
         if (!errorOutput.isEmpty()) {
             StageOutputValidationResult error = errorOutput.get(0);
             logger.error("stage id = {}, 未生成sorted文件. ", bioPipelineStage, error.ioException);
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null,
-                    inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
         }
 
         cmd.clear();
@@ -178,19 +176,17 @@ public class MappingStageExecutor
         if (!executeResult.success()) {
             logger.error("stage id = {}, 生成bam index失败. exit code = {}, exception = ", bioPipelineStage,
                     executeResult.runCode, executeResult.ex);
-            return this.runFail(bioPipelineStage, "生成bam索引失败", executeResult.ex, inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, "生成bam索引失败", executeResult.ex, workDir);
         }
 
         errorOutput = validateOutputFiles(bamIndexTmp);
         if (!errorOutput.isEmpty()) {
             StageOutputValidationResult error = errorOutput.get(0);
             logger.error("stage id = {}, 未生成index文件. ", bioPipelineStage, error.ioException);
-            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null,
-                    inputTmpPath, workDir);
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
         }
 
-        StageRunResult<MappingStageOutput> stageRunResult = StageRunResult
-                .OK(new MappingStageOutput(bamSortedTmp.toString(), bamIndexTmp.toString()), bioPipelineStage);
+        StageRunResult<MappingStageOutput> stageRunResult = OK(new MappingStageOutput(bamSortedTmp.toString(), bamIndexTmp.toString()), stageExecutionInput);
 
         return stageRunResult;
     }

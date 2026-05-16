@@ -777,7 +777,9 @@ public class PipelineService {
             return new Result<Boolean>(Result.SUCCESS, true, null);
         }
 
-        if (startStage.getStatus() == PIPELINE_STAGE_STATUS_QUEUING) {
+
+        //not in running status, this indicates it is very possible that the stage are not able to update its status or something bad happens; 
+        if (startStage.getStatus() == PIPELINE_STAGE_STATUS_QUEUING || startStage.getStatus() == PIPELINE_STAGE_STATUS_RUNNING) {
             this.addStageTask(startStage);
             return new Result<Boolean>(Result.SUCCESS, true, null);
         }
