@@ -2,12 +2,16 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_SEROTYPE;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -99,6 +103,36 @@ public class SeroTypingStageExectuor
 
     private StageRunResult<SeroTypingStageOutput> executeSalmonellaType(StageExecutionInput stageExecutionInput,
             Path r1Path, Path r2Path) {
+
+
+        // // seqSerio2 will only recognize file in working dir path
+        // Path r1WorKDirPath = stageExecutionInput.workDir.resolve(r1Path.getFileName());
+        // Path r2WorkDirPath = r2Path == null? null:stageExecutionInput.workDir.resolve(r2Path.getFileName());
+
+        // try {
+        //     Files.move(r1Path, r1WorKDirPath, StandardCopyOption.REPLACE_EXISTING);
+        //     if(r2WorkDirPath != null){
+        //         Files.move(r2Path, r2WorkDirPath, StandardCopyOption.REPLACE_EXISTING);
+        //     }
+
+        // } catch (IOException | UnsupportedOperationException | SecurityException e) {
+        //     // TODO Auto-generated catch block
+        //     String errorMsg = String.format(
+        //             "Failed to create soft links for SeqSero2 input files. workDir=%s, r1Path=%s, r2Path=%s",
+        //             stageExecutionInput.workDir,
+        //             r1Path,
+        //             r2Path);
+
+        //     logger.error(errorMsg, e);
+
+        //     return this.runFail(
+        //             stageExecutionInput.stageContext,
+        //             stageExecutionInput.workDir,
+        //             errorMsg,
+        //             e);
+        // }
+
+
         List<String> cmd = new ArrayList<>();
 
         cmd.addAll(this.analysisPipelineToolsConfig.getSeqsero2());
@@ -106,14 +140,13 @@ public class SeroTypingStageExectuor
         cmd.add(r1Path.toString());
         String mode = SeqSero2TMode.SINGLE;
 
-
         if (r2Path != null) {
             cmd.add(r2Path.toString());
             mode = SeqSero2TMode.PAIRED;
         }
 
         String fname = r1Path.getFileName().toString();
-        if(fname.endsWith(".fa") || fname.endsWith(".fasta") || fname.endsWith(".fna")){
+        if (fname.endsWith(".fa") || fname.endsWith(".fasta") || fname.endsWith(".fna")) {
             mode = SeqSero2TMode.ASSEMBLY;
         }
 
@@ -207,10 +240,12 @@ public class SeroTypingStageExectuor
         SeroTypingStageParameters parameters = stageExecutionInput.stageParameters;
 
         Path contigLocalPath = inputDir.resolve("input.contig");
-        Path r1Path = inputDir.resolve("r1.fastq.gz");
-        Path r2Path = inputDir.resolve("r2.fastq.gz");
+        Path r1Path = inputDir.resolve(r1Url.substring(r1Url.lastIndexOf("/") + 1));
+        Path r2Path = StringUtils.isBlank(r2Url) ? null : inputDir.resolve(r2Url.substring(r2Url.lastIndexOf("/") + 1));
+
         Map<String, Path> loadInputMap = contigUrl != null ? Map.of(contigUrl, contigLocalPath)
-                : (r2Path != null ? Map.of(r1Url, r1Path) : Map.of(r1Url, r1Path, r2Url, r2Path));
+                : (r2Path == null ? Map.of(r1Url, r1Path) : Map.of(r1Url, r1Path, r2Url, r2Path));
+
         loadInput(loadInputMap);
 
         TaxonomyContext taxonomyCtx = parameters.getTaxonomyContext();
@@ -219,7 +254,7 @@ public class SeroTypingStageExectuor
         switch (taxId) {
             case TAX_ID_SALMONELLA:
 
-                return executeSalmonellaType(stageExecutionInput, r1Path, r2Url == null ? null : r2Path);
+                return executeSalmonellaType(stageExecutionInput, r1Path, r2Path);
 
             case TAX_ID_ESCHERICHIA_COLI:
                 return executeECoilType(stageExecutionInput, contigLocalPath);

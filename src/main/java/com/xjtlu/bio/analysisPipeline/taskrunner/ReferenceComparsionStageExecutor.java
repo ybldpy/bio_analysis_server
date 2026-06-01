@@ -16,7 +16,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReferenceComparisonStageOutput;

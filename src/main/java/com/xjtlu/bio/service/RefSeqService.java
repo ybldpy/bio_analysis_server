@@ -65,7 +65,7 @@ public class RefSeqService {
 
     private static final Logger logger = LoggerFactory.getLogger(RefSeqService.class);
 
-    private static final String PREFIX_VIRUS_REFSEQ_OBJECT_NAME = "refseq/virus/refseqs";
+    private static final String PREFIX_VIRUS_REFSEQ_OBJECT_NAME = "refseq/virus/refseqs/";
 
 
 

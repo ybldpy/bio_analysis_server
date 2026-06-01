@@ -2,17 +2,12 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_ASSEMBLY;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +17,6 @@ import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.AssemblyStageOutput;
-import com.xjtlu.bio.entity.BioPipelineStage;
-import com.xjtlu.bio.service.PipelineService;
-import com.xjtlu.bio.service.StorageService.GetObjectResult;
-import com.xjtlu.bio.utils.JsonUtil;
 
 @Component
 public class AssemblyExecutor extends AbstractPipelineStageExector<AssemblyStageOutput, AssemblyInputUrls, BaseStageParams> {

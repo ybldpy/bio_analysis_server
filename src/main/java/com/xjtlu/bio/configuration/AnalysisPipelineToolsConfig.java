@@ -17,8 +17,27 @@ public class AnalysisPipelineToolsConfig {
 
     private List<String> amrfinder;
     private List<String> virulenceFactor;
+
+
+    private List getCopy(List tool){
+        return new ArrayList<>(tool);
+    }
+
+
+    public List<String> getFastANI() {
+        return getCopy(fastANI);
+    }
+
+    public void setFastANI(List<String> fastANI) {
+        this.fastANI = fastANI;
+    }
+
+    private List<String> fastANI;
+
+
+    
     public List<String> getVep() {
-        return new ArrayList(vep);
+        return getCopy(vep);
     }
 
     public void setVep(List<String> vep) {
@@ -40,7 +59,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getKaptive() {
-        return new ArrayList(kaptive);
+        return getCopy(kaptive);
     }
 
     public void setKaptive(List<String> kaptive) {
@@ -48,7 +67,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getSeroBA() {
-        return new ArrayList(seroBA);
+        return getCopy(seroBA);
     }
 
     public void setSeroBA(List<String> seroBA) {
@@ -64,7 +83,7 @@ public class AnalysisPipelineToolsConfig {
      
 
     public List<String> getSeqsero2() {
-        return new ArrayList(seqsero2);
+        return getCopy(seqsero2);
     }
 
     public void setSeqsero2(List<String> seqsero2) {
@@ -72,11 +91,11 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getMlst() {
-        return new ArrayList(mlst);
+        return getCopy(mlst);
     }
 
     public List<String> getKraken2() {
-        return new ArrayList(kraken2);
+        return getCopy(kraken2);
     }
 
     public void setKraken2(List<String> kraken2) {
@@ -88,7 +107,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getVirulenceFactor() {
-        return new ArrayList(virulenceFactor);
+        return getCopy(virulenceFactor);
     }
 
     public void setVirulenceFactor(List<String> virulenceFactor) {
@@ -96,7 +115,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getAmrfinder() {
-        return new ArrayList(amrfinder);
+        return getCopy(amrfinder);
     }
 
     public void setAmrfinder(List<String> amrfinder) {
@@ -128,7 +147,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getBcftools() {
-        return new ArrayList(bcftools);
+        return getCopy(bcftools);
     }
 
     public void setBcftools(List<String> bcftools) {
@@ -136,7 +155,7 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getSamtools() {
-        return new ArrayList(samtools);
+        return getCopy(samtools);
     }
 
     public void setSamtools(List<String> samtools) {

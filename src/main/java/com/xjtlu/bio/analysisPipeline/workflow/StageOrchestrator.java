@@ -1,8 +1,10 @@
-package com.xjtlu.bio.analysisPipeline;
+package com.xjtlu.bio.analysisPipeline.workflow;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.Constants.PipelineType;
 import com.xjtlu.bio.analysisPipeline.context.domain.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
@@ -302,6 +304,8 @@ public class StageOrchestrator {
             throw new MissingUpstreamException();
         }
 
+
+        
         if (runStage.getStageType() != PIPELINE_STAGE_MAPPING) {
             return;
         }

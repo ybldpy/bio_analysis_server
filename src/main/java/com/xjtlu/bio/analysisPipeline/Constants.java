@@ -5,6 +5,22 @@ import java.util.Map;
 
 public class Constants {
 
+    public static class TaxonomyClassification {
+
+        public static final int STATUS_CONFIDENT = 0;
+        // species difficult to distinguish
+        public static final int STATUS_AMBIGUOUS = 1;
+        // Require manual specification
+        public static final int STATUS_LOW_CONFIDENCE = 2;
+        // out classification SCOPE. Require manual specification
+        public static final int STATUS_OUT_PANEL = 3;
+
+        public static final String EVIDENCE_KRAKEN2 = "KRAKEN2";
+        public static final String EVIDENCE_FASTANI = "FASTANI";
+        public static final String EVIDENCE_USER_CONFIRMED = "USER_CONFIRMED";
+
+    }
+
     public static class StageStatus {
 
         public static final int PIPELINE_STAGE_STATUS_PENDING = 0;
@@ -234,7 +250,8 @@ public class Constants {
         public static final int PIPELINE_STAGE_DEPTH_COVERAGE = 42; // 覆盖度/深度图 mosdepth
 
         // 病毒 FASTA sequence-based 分析
-        public static final int PIPELINE_STAGE_REFERENCE_COMPARISON = 43; // input FASTA vs reference FASTA，输出 PAF + difference TSV
+        public static final int PIPELINE_STAGE_REFERENCE_COMPARISON = 43; // input FASTA vs reference FASTA，输出 PAF +
+                                                                          // difference TSV
 
         // SNP & 溯源
         public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP

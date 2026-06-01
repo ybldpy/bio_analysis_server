@@ -138,6 +138,8 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
 
         this.deleteStageResultDir(stageRunResult.getWorkDir().toString());
 
+        pipelineService.pipelineStageDone(stageRunResult.getStageContext().getRunStageId(), true);
+
     }
 
     @Override
