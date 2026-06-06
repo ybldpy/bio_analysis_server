@@ -1,20 +1,13 @@
 package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
 
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.context.domain.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 
 public class BaseStageParams {
 
-
-    
-
-
-
-
-
-
-    private ReadMeta readMeta;
+    private SequenceMeta readMeta;
 
     private RefSeqConfig refSeqConfig;
     private TaxonomyContext taxonomyContext;
@@ -22,7 +15,7 @@ public class BaseStageParams {
 
 
 
-    public BaseStageParams(RefSeqConfig refSeqConfig, TaxonomyContext taxonomyContext, ReadMeta readMeta) {
+    public BaseStageParams(RefSeqConfig refSeqConfig, TaxonomyContext taxonomyContext, SequenceMeta readMeta) {
         this.refSeqConfig = refSeqConfig;
         this.taxonomyContext = taxonomyContext;
         this.readMeta = readMeta;
@@ -38,14 +31,14 @@ public class BaseStageParams {
     public RefSeqConfig getRefSeqConfig() {
         return refSeqConfig;
     }
-    public ReadMeta getReadMeta() {
+    public SequenceMeta getSequenceMeta() {
         return readMeta;
     }
 
 
 
 
-    public void setReadMeta(ReadMeta readMeta) {
+    public void setReadMeta(SequenceMeta readMeta) {
         this.readMeta = readMeta;
     }
 

@@ -1,4 +1,4 @@
-package com.xjtlu.bio.analysisPipeline;
+package com.xjtlu.bio.analysisPipeline.workflow;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
@@ -6,9 +6,9 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageType.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.Constants.SequenceInput;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
@@ -20,6 +20,7 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
@@ -32,13 +33,11 @@ public class AnalysisPipelineStagesBuilder {
         private boolean requireSNPAnnotation;
         private boolean requireCoverageDepth;
 
-        private int sequencingPlatform;
-
         private String refseqObjName;
 
         public PipelineConfigurations() {
             this.refId = -1;
-            this.sequencingPlatform = Constants.SequencingPlatform.UNKNOWN;
+
         }
 
         public long getRefId() {
@@ -81,32 +80,45 @@ public class AnalysisPipelineStagesBuilder {
             this.refseqObjName = refseqObjName;
         }
 
-        public int getSequencingPlatform() {
-            return sequencingPlatform;
-        }
-
-        public void setSequencingPlatform(int sequencingPlatform) {
-            this.sequencingPlatform = sequencingPlatform;
-        }
-
     }
 
     public static class PipelineSampleInput {
 
         private String r1;
         private String r2;
+        private int sequenceLevel;
+        private int sequencePlatform;
 
-        private int readType;
+        public static final int SEQUENCE_LEVEL_UNKNOWN = SequenceMeta.SEQUENCE_LEVEL_UNKNOWN;
+        public static final int SEQUENCE_LEVEL_READ = SequenceMeta.SEQUENCE_LEVEL_READ;
+        public static final int SEQUENCE_LEVEL_ASSEMBLY = SequenceMeta.SEQUENCE_LEVEL_ASSEMBLY;
+        public static final int SEQUENCE_LEVEL_REFERENCE = SequenceMeta.SEQUENCE_LEVEL_REFERENCE;
+
+        
+
+        public int getSequenceLevel() {
+            return sequenceLevel;
+        }
+
+        public void setSequenceLevel(int sequenceLevel) {
+            this.sequenceLevel = sequenceLevel;
+        }
+
+        public int getSequencePlatform() {
+            return sequencePlatform;
+        }
+
+        public void setSequencePlatform(int sequencePlatform) {
+            this.sequencePlatform = sequencePlatform;
+        }
 
         public PipelineSampleInput() {
         }
 
-        public static int READ_TYPE_FASTA = 0;
-        public static int READ_TYPE_FASTQ = 1;
-
-        public PipelineSampleInput(String r1, String r2) {
+        public PipelineSampleInput(String r1, String r2, int sequenceLevel) {
             this.r1 = r1;
             this.r2 = r2;
+            this.sequenceLevel = sequenceLevel;
         }
 
         public String getR1() {
@@ -125,13 +137,13 @@ public class AnalysisPipelineStagesBuilder {
             this.r2 = r2;
         }
 
-        public int getReadType() {
-            return readType;
-        }
+        // public int getReadType() {
+        // return readType;
+        // }
 
-        public void setReadType(int readType) {
-            this.readType = readType;
-        }
+        // public void setReadType(int readType) {
+        // this.readType = readType;
+        // }
     }
 
     public static List<BioPipelineStage> buildBacteriaStages() {
@@ -165,11 +177,11 @@ public class AnalysisPipelineStagesBuilder {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>();
 
-        int readType = pipelineInput.getReadType();
+        int sequenceLevel = pipelineInput.getSequenceLevel();
 
         BioPipelineStage entry = null;
 
-        if (readType == PipelineSampleInput.READ_TYPE_FASTQ) {
+        if (sequenceLevel == PipelineSampleInput.SEQUENCE_LEVEL_READ) {
             buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
 
             entry = stages.stream().filter(s -> s.getStageIndex() == 0).findAny().orElse(null);
@@ -183,7 +195,7 @@ public class AnalysisPipelineStagesBuilder {
         taxonomy.setStageType(PIPELINE_STAGE_TAXONOMY);
         stages.add(taxonomy);
 
-        if (readType == PipelineSampleInput.READ_TYPE_FASTA) {
+        if (sequenceLevel == PipelineSampleInput.SEQUENCE_LEVEL_ASSEMBLY) {
             TaxonomyStageInputUrls taxonomyStageInputUrls = new TaxonomyStageInputUrls();
             taxonomyStageInputUrls.setR1(pipelineInput.getR1());
             taxonomyStageInputUrls.setR2(pipelineInput.getR2());
@@ -242,7 +254,7 @@ public class AnalysisPipelineStagesBuilder {
 
         BioPipelineStage firstStage = null;
 
-        if (pipelineInput.getReadType() == PipelineSampleInput.READ_TYPE_FASTQ) {
+        if () {
             BioPipelineStage qc = new BioPipelineStage();
             qc.setStageType(PIPELINE_STAGE_QC);
             QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
@@ -305,7 +317,7 @@ public class AnalysisPipelineStagesBuilder {
 
         BioPipelineStage startStage = null;
 
-        if(pipelineInput.readType == PipelineSampleInput.READ_TYPE_FASTA){
+        if (pipelineInput.sequenceLevel == PipelineSampleInput.SEQUENCE_LEVEL_ASSEMBLY) {
 
             BioPipelineStage referenceComparison = new BioPipelineStage();
             referenceComparison.setStageIndex(0);
@@ -321,7 +333,8 @@ public class AnalysisPipelineStagesBuilder {
 
             referenceComparison.setStatus(PIPELINE_STAGE_STATUS_PENDING);
             referenceComparison.setStageType(Constants.StageType.PIPELINE_STAGE_REFERENCE_COMPARISON);
-            referenceComparison.setStageName(STAGE_NAME_MAP.get(Constants.StageType.PIPELINE_STAGE_REFERENCE_COMPARISON));
+            referenceComparison
+                    .setStageName(STAGE_NAME_MAP.get(Constants.StageType.PIPELINE_STAGE_REFERENCE_COMPARISON));
             referenceComparison.setInputUrl(serializedInput);
             referenceComparison.setParameters(serializedParameters);
 
@@ -329,8 +342,6 @@ public class AnalysisPipelineStagesBuilder {
 
             return stages;
         }
-
-
 
         buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
 
@@ -340,7 +351,6 @@ public class AnalysisPipelineStagesBuilder {
         mapping.setStageType(PIPELINE_STAGE_MAPPING);
         stages.add(mapping);
 
-        
         BioPipelineStage varientCall = new BioPipelineStage();
         varientCall.setStageType(PIPELINE_STAGE_VARIANT_CALL);
         stages.add(varientCall);

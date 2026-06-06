@@ -1,19 +1,19 @@
 package com.xjtlu.bio.analysisPipeline.stageResult;
 
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 
 public class ReadInspectStageResult implements StageResult{
 
-    private ReadMeta readMeta;
+    private SequenceMeta readMeta;
 
     private String r1Url;
     private String r2Url;
 
-    public ReadMeta getReadMeta() {
+    public SequenceMeta getReadMeta() {
         return readMeta;
     }
 
-    public void setReadMeta(ReadMeta readMeta) {
+    public void setReadMeta(SequenceMeta readMeta) {
         this.readMeta = readMeta;
     }
 

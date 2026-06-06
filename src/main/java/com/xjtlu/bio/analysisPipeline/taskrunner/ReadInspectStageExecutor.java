@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.Constants.SequenceInput;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadInspectStageOutput;
@@ -70,13 +71,11 @@ public class ReadInspectStageExecutor
 
     @Override
     protected Class<ReadInspectStageInputUrls> stageInputType() {
-        // TODO Auto-generated method stub
         return ReadInspectStageInputUrls.class;
     }
 
     @Override
     protected Class<BaseStageParams> stageParameterType() {
-        // TODO Auto-generated method stub
         return BaseStageParams.class;
     }
 
@@ -91,6 +90,7 @@ public class ReadInspectStageExecutor
         // 处理 /1 /2（老式 Illumina）
         if (id.endsWith("/1") || id.endsWith("/2")) {
             id = id.substring(0, id.length() - 2);
+
         }
 
         // 处理 .1 .2（常见 SRA/转换格式）
@@ -100,6 +100,7 @@ public class ReadInspectStageExecutor
             if ("1".equals(suffix) || "2".equals(suffix)) {
                 id = id.substring(0, lastDot);
             }
+
         }
 
         return id;
@@ -120,18 +121,23 @@ public class ReadInspectStageExecutor
         String baseName = fileName;
         String format = null;
 
-        if (baseName.endsWith(".fastq.gz")) {
-            baseName = baseName.substring(0, baseName.length() - ".fastq.gz".length());
-            format = ".fastq.gz";
-        } else if (baseName.endsWith(".fq.gz")) {
-            baseName = baseName.substring(0, baseName.length() - ".fq.gz".length());
-            format = ".fq.gz";
-        } else if (baseName.endsWith(".fastq")) {
-            baseName = baseName.substring(0, baseName.length() - ".fastq".length());
-            format = ".fastq";
-        } else if (baseName.endsWith(".fq")) {
-            baseName = baseName.substring(0, baseName.length() - ".fq".length());
-            format = ".fq";
+        boolean readLevelFasta = baseName.endsWith(SequenceInput.FASTA);
+
+        if (baseName.endsWith(SequenceInput.FASTQ_GZ)) {
+            baseName = baseName.substring(0, baseName.length() - SequenceInput.FASTQ_GZ.length());
+            format = SequenceInput.FASTQ_GZ;
+        } else if (baseName.endsWith(SequenceInput.FQ_GZ)) {
+            baseName = baseName.substring(0, baseName.length() - SequenceInput.FQ_GZ.length());
+            format = SequenceInput.FQ_GZ;
+        } else if (baseName.endsWith(SequenceInput.FASTQ)) {
+            baseName = baseName.substring(0, baseName.length() - SequenceInput.FASTQ.length());
+            format = SequenceInput.FASTQ;
+        } else if (baseName.endsWith(SequenceInput.FQ)) {
+            baseName = baseName.substring(0, baseName.length() - SequenceInput.FQ.length());
+            format = SequenceInput.FQ;
+        } else if (readLevelFasta) {
+            baseName = baseName.substring(0, baseName.length() - SequenceInput.FASTA.length());
+            format = SequenceInput.FASTA;
         }
 
         int qualityEncoding = ReadInspectStageOutput.ENCODING_64;
@@ -142,8 +148,8 @@ public class ReadInspectStageExecutor
         Path r2 = workDir.resolve(baseName + "_r2" + format);
 
         boolean checkedLen = false;
-        int checkReadLenTypePoint = 1000;
-        int[] readLens = new int[checkReadLenTypePoint];
+        int checkReadLenTypeThreshold = 1000;
+        int[] readLens = new int[checkReadLenTypeThreshold];
         int recordLenRecordIndex = 0;
 
         try (BufferedReader br = FastQIO.getReader(read1);
@@ -155,7 +161,7 @@ public class ReadInspectStageExecutor
 
             int checkPointRecordNum = 4000;
 
-            String[][] recordBuffer = new String[2][4];
+            String[][] recordBuffer = new String[2][readLevelFasta ? 2 : 4];
 
             int recordBufferIndex = 0;
             String r1HeaderId = null;
@@ -163,8 +169,14 @@ public class ReadInspectStageExecutor
             boolean checkedInterleaved = false;
             boolean isInterleaved = false;
 
+            String header = br.readLine();
+            StringBuilder stringBuilder = null;
+            if (readLevelFasta) {
+                stringBuilder = new StringBuilder();
+            }
+
             while (true) {
-                String header = br.readLine();
+
                 if (header == null) {
                     break;
                 }
@@ -173,28 +185,67 @@ public class ReadInspectStageExecutor
                     recordBuffer[recordBufferIndex][0] = header;
                 }
 
-                for (int i = 0; i < 3; i++) {
-                    String followingLine = br.readLine();
-                    if (followingLine == null) {
-                        return this.runFail(stageExecutionInput.stageContext, "不完整的输入", stageExecutionInput.workDir);
-                    }
+                int currentRecordLen = 0;
 
-                    if (possibleInterleaved) {
-                        recordBuffer[recordBufferIndex][1 + i] = followingLine;
+                if (!readLevelFasta) {
+                    for (int i = 0; i < 3; i++) {
+                        String followingLine = br.readLine();
+                        if (StringUtils.isBlank(followingLine)) {
+                            return this.runFail(stageExecutionInput.stageContext, "不完整的输入",
+                                    stageExecutionInput.workDir);
+                        }
+
+                        if (possibleInterleaved) {
+                            recordBuffer[recordBufferIndex][1 + i] = followingLine;
+                        }
+
+                        if (i == 0) {
+                            currentRecordLen = followingLine.length();
+                        }
+                        // if (!checkedLen && i == 0) {
+                        // int readLen = followingLine.length();
+                        // readLens[recordLenRecordIndex] = readLen;
+                        // recordLenRecordIndex++;
+                        // if (recordLenRecordIndex >= checkReadLenTypeThreshold) {
+                        // checkedLen = true;
+                        // Arrays.sort(readLens);
+                        // int medianLen = readLens[(readLens.length - 1) / 2];
+                        // if (medianLen >= LONG_READ_THRESHOLD) {
+                        // readLenType = ReadInspectStageOutput.READ_LONG;
+                        // possibleInterleaved = false;
+                        // return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, read1,
+                        // null,
+                        // workDir), stageExecutionInput);
+                        // }
+                        // }
+                        // }
                     }
-                    if (!checkedLen && i == 0) {
-                        int readLen = followingLine.length();
-                        readLens[recordLenRecordIndex] = readLen;
-                        recordLenRecordIndex++;
-                        if (recordLenRecordIndex >= checkReadLenTypePoint) {
-                            checkedLen = true;
-                            Arrays.sort(readLens);
-                            int medianLen = readLens[(readLens.length - 1) / 2];
-                            if (medianLen >= LONG_READ_THRESHOLD) {
-                                readLenType = ReadInspectStageOutput.READ_LONG;
-                                possibleInterleaved = false;
-                                return OK(new ReadInspectStageOutput(qualityEncoding, readLenType,read1, null, workDir), stageExecutionInput);
-                            }
+                    header = br.readLine();
+                } else {
+                    stringBuilder.setLength(0);
+                    String line = br.readLine();
+                    while (line != null && !line.startsWith(">")) {
+                        stringBuilder.append(line);
+                        line = br.readLine();
+                    }
+                    recordBuffer[recordBufferIndex][0] = header;
+                    recordBuffer[recordBufferIndex][1] = stringBuilder.toString();
+                    header = line;
+                }
+
+                if (!checkedLen) {
+
+                    readLens[recordLenRecordIndex] = currentRecordLen;
+                    recordLenRecordIndex++;
+                    if (recordLenRecordIndex >= checkReadLenTypeThreshold) {
+                        checkedLen = true;
+                        Arrays.sort(readLens);
+                        int medianLen = readLens[(readLens.length - 1) / 2];
+                        if (medianLen >= LONG_READ_THRESHOLD) {
+                            readLenType = ReadInspectStageOutput.READ_LONG;
+                            possibleInterleaved = false;
+                            return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, read1, null,
+                                    workDir), stageExecutionInput);
                         }
                     }
                 }
@@ -206,6 +257,7 @@ public class ReadInspectStageExecutor
                     } else {
                         String r2HeaderId = substractRecordId(header);
                         if (Objects.equals(r1HeaderId, r2HeaderId)) {
+
                             String r1Record = String.join("\n", recordBuffer[0]);
                             String r2Record = String.join("\n", recordBuffer[1]);
                             w1.write(r1Record);
@@ -213,8 +265,10 @@ public class ReadInspectStageExecutor
                             w2.write(r2Record);
                             w2.newLine();
                             paired++;
+
                         } else {
-                            // not paired with previous, may be read 1 of next pair
+                            // not paired with previous, probably start of new pair. Discard old and start a
+                            // new one.
                             recordBuffer[0] = recordBuffer[1];
                             recordBufferIndex = 0;
                         }
@@ -233,7 +287,8 @@ public class ReadInspectStageExecutor
                     if (!isInterleaved) {
                         if (checkSingleRead(ratio)) {
                             return OK(
-                                    new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                                    new ReadInspectStageOutput(qualityEncoding, readLenType, null, null,
+                                            stageExecutionInput.workDir),
                                     stageExecutionInput);
                         } else {
                             logger.warn(
@@ -244,7 +299,8 @@ public class ReadInspectStageExecutor
                                     paired,
                                     String.format("%.4f", ratio));
 
-                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型", stageExecutionInput.workDir);
+                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型",
+                                    stageExecutionInput.workDir);
                         }
                     }
                 }
@@ -261,15 +317,17 @@ public class ReadInspectStageExecutor
             if (possibleInterleaved) {
 
                 if (checkedInterleaved) {
-                    return OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, r1, r2, stageExecutionInput.workDir),
+                    return OK(
+                            new ReadInspectStageOutput(qualityEncoding, checkReadLenTypeThreshold, r1, r2,
+                                    stageExecutionInput.workDir),
                             stageExecutionInput);
-                }
-                else {
+                } else {
                     double ratio = (paired * 2.0) / recordTravered;
                     if (!checkInterleaved(ratio)) {
                         if (checkSingleRead(ratio)) {
                             return OK(
-                                    new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                                    new ReadInspectStageOutput(qualityEncoding, readLenType, null, null,
+                                            stageExecutionInput.workDir),
                                     stageExecutionInput);
                         } else {
                             logger.warn(
@@ -280,15 +338,19 @@ public class ReadInspectStageExecutor
                                     paired,
                                     String.format("%.4f", ratio));
 
-                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型", stageExecutionInput.workDir);
+                            return this.runFail(stageExecutionInput.stageContext, "无法识别输入类型",
+                                    stageExecutionInput.workDir);
                         }
                     }
 
-                    return OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypePoint, null, null, stageExecutionInput.workDir), stageExecutionInput);
+                    return OK(new ReadInspectStageOutput(qualityEncoding, checkReadLenTypeThreshold, null, null,
+                            stageExecutionInput.workDir), stageExecutionInput);
                 }
             } else {
 
-                return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, null, null, stageExecutionInput.workDir),
+                return OK(
+                        new ReadInspectStageOutput(qualityEncoding, readLenType, null, null,
+                                stageExecutionInput.workDir),
                         stageExecutionInput);
             }
 

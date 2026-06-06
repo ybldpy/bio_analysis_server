@@ -25,6 +25,7 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SeroTypingStagePara
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VFParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.MappingResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.QcResult;
@@ -347,24 +348,10 @@ public class StageOrchestrator {
             throws JsonMappingException, JsonProcessingException {
         OrchestratePlan plan = new OrchestratePlan();
         BioPipelineStage patch = new BioPipelineStage();
-
-        // List<BioPipelineStage> qcAndReadInspectStages = upstreamStages.stream()
-        //         .filter(s -> s.getStageType() == PIPELINE_STAGE_QC || s.getStageType() == PIPELINE_STAGE_READ_INSPECT)
-        //         .toList();
         BioPipelineStage qcStage = allStages.stream().filter(s->s.getStageType() == PIPELINE_STAGE_QC).findAny().orElse(null);
-        // BioPipelineStage readInspect = qcAndReadInspectStages.stream()
-        //         .filter(s -> s.getStageType() == PIPELINE_STAGE_READ_INSPECT).findFirst().orElse(null);
 
         MappingParameters mappingParameters = JsonUtil.toObject(mappingStage.getParameters(), MappingParameters.class);
         MappingInputUrls mappingInputUrls = new MappingInputUrls();
-
-
-
-        // if (readInspect != null) {
-        //     ReadInspectStageResult readInspectStageResult = JsonUtil.toObject(readInspect.getOutputUrl(),
-        //             ReadInspectStageResult.class);
-        //     mappingParameters.setReadMeta(readInspectStageResult.getReadMeta());
-        // }
 
 
 
@@ -376,7 +363,7 @@ public class StageOrchestrator {
 
         QcParameters qcParameters = JsonUtil.toObject(qcStage.getParameters(), QcParameters.class);
         mappingParameters.setRefSeqConfig(qcParameters.getRefSeqConfig());
-        mappingParameters.setReadMeta(qcParameters.getReadMeta());
+        mappingParameters.setReadMeta(qcParameters.getSequenceMeta());
 
         this.applyUpdatesToUpdateStage(patch, mappingStage, JsonUtil.toJson(mappingInputUrls),
                 JsonUtil.toJson(mappingParameters), PIPELINE_STAGE_STATUS_QUEUING,
@@ -472,7 +459,7 @@ public class StageOrchestrator {
         String r1Url = readInspectStageResult.getR1Url();
         String r2Url = readInspectStageResult.getR2Url();
 
-        ReadMeta readMeta = readInspectStageResult.getReadMeta();
+        SequenceMeta readMeta = readInspectStageResult.getReadMeta();
 
         QcParameters qcParameters = JsonUtil.toObject(qcStage.getParameters(), QcParameters.class);
         qcParameters.setReadMeta(readMeta);

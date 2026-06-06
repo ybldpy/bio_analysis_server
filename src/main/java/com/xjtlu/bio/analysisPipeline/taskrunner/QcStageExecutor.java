@@ -2,15 +2,13 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_QC;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
 @Component
 public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput, QcStageInputUrls, QcParameters>
@@ -101,7 +98,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
         String inputUrl2 = StringUtils.isBlank(qcStageInputUrls.getRead2()) ? null : qcStageInputUrls.getRead2();
 
-        boolean hasR2 = inputUrl2 != null && qcParams.getReadMeta().getReadLenType() != ReadMeta.READ_LEN_TYPE_LONG;
+        boolean hasR2 = inputUrl2 != null && qcParams.getSequenceMeta().getReadLenType() != SequenceMeta.READ_LEN_TYPE_LONG;
 
         String input2FileName = !hasR2 ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
         boolean isGz = input1FileName.endsWith(".gz");
@@ -132,7 +129,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         loadInput(loadMap);
 
         List<String> cmd = buildQcRunCmd(
-                qcParams.getReadMeta().getReadLenType() == ReadMeta.READ_LEN_TYPE_SHORT ? TOOL_CODE_FASTQ
+                qcParams.getSequenceMeta().getReadLenType() == SequenceMeta.READ_LEN_TYPE_SHORT ? TOOL_CODE_FASTQ
                         : TOOL_CODE_FASTQ_LONG,
                 r1Path, r2Path, trimmedR1Path, trimmedR2Path, outputQcJson, outputQcHtml);
 

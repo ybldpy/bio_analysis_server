@@ -12,8 +12,8 @@ import java.util.Map;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
 import org.springframework.stereotype.Component;
 
@@ -90,7 +90,7 @@ public class MappingStageExecutor
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getMinimap2());
         cmd.add("-ax");
-        cmd.add(parameters.getReadMeta().getReadLenType() == ReadMeta.READ_LEN_TYPE_SHORT? "sr":"map-ont");
+        cmd.add(parameters.getSequenceMeta().getReadLenType() == SequenceMeta.READ_LEN_TYPE_SHORT? "sr":"map-ont");
         cmd.add(refseqLocalPath.toString());
         cmd.add(r1TmpPath.toString());
         

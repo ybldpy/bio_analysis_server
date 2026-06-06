@@ -19,9 +19,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.xjtlu.bio.analysisPipeline.taskrunner.util.TaxonomyReportParser.ReportParseException;
-import com.xjtlu.bio.analysisPipeline.taskrunner.util.TaxonomyReportParser.TaxonomyClassificationItem;
-
 import jakarta.annotation.PostConstruct;
 
 @Service
@@ -173,7 +170,6 @@ public class TaxonomyClassificationService {
 
         List<TaxonomyClassificationItem> items = new ArrayList<>();
         try (BufferedReader buffer = Files.newBufferedReader(report)) {
-            // String header = buffer.readLine();
 
             String line = null;
             while ((line = buffer.readLine()) != null) {

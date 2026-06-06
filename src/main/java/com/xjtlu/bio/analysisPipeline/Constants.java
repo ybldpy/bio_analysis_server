@@ -44,6 +44,26 @@ public class Constants {
 
     }
 
+    public static final class SequenceInput {
+
+        public static final String FASTQ_GZ = ".fastq.gz";
+        public static final String FQ_GZ = ".fq.gz";
+        public static final String FASTQ = ".fastq";
+        public static final String FQ = ".fq";
+
+        public static final String FASTA = ".fasta";
+        public static final String FNA = ".fna";
+
+        public static boolean isFastq(String fname) {
+            return fname.endsWith(FASTQ_GZ) || fname.endsWith(FQ_GZ) || fname.endsWith(FASTQ) || fname.endsWith(FQ);
+        }
+
+        public static boolean isFasta(String fname) {
+            return fname.endsWith(FASTA) || fname.endsWith(FNA);
+        }
+
+    }
+
     public static class SequencingPlatform {
 
         private SequencingPlatform() {

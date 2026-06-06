@@ -68,6 +68,46 @@ public class TaxonomyStageOutput implements StageOutput{
 
 
 
+    public int getStatus() {
+        return status;
+    }
+
+
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
+
+    public TaxonomyClassificationOutput getComfirmedTaxonomy() {
+        return comfirmedTaxonomy;
+    }
+
+
+    public void setComfirmedTaxonomy(TaxonomyClassificationOutput comfirmedTaxonomy) {
+        this.comfirmedTaxonomy = comfirmedTaxonomy;
+    }
+
+
+    public List<TaxonomyClassificationOutput> getCandicates() {
+        return candicates;
+    }
+
+
+    public void setCandicates(List<TaxonomyClassificationOutput> candicates) {
+        this.candicates = candicates;
+    }
+
+
+    public String getEvidenceResource() {
+        return evidenceResource;
+    }
+
+
+    public void setEvidenceResource(String evidenceResource) {
+        this.evidenceResource = evidenceResource;
+    }
+
+
     @Override
     public Path getParentPath() {
         // TODO Auto-generated method stub
