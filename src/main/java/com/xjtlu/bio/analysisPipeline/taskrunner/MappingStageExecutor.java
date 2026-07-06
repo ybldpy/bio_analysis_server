@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
@@ -90,7 +91,7 @@ public class MappingStageExecutor
         List<String> cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getMinimap2());
         cmd.add("-ax");
-        cmd.add(parameters.getSequenceMeta().getReadLenType() == SequenceMeta.READ_LEN_TYPE_SHORT? "sr":"map-ont");
+        cmd.add(parameters.getSequenceMeta().getReadLenType() == Constants.SequenceInput.READ_LEN_TYPE_SHORT? "sr":"map-ont");
         cmd.add(refseqLocalPath.toString());
         cmd.add(r1TmpPath.toString());
         

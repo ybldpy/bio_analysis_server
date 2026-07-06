@@ -57,20 +57,14 @@ public class TaxonomyResult implements StageResult {
         }
     }
 
-    private String status; // CONFIDENT / AMBIGUOUS / NO_HIT
+    private int status; // CONFIDENT / AMBIGUOUS / NO_HIT
     private Taxon best;
     private List<Taxon> candidates;
 
     public TaxonomyResult() {
     }
 
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
+    
 
     public Taxon getBest() {
         return best;
@@ -95,6 +89,18 @@ public class TaxonomyResult implements StageResult {
                 ", best=" + best +
                 ", candidates=" + candidates +
                 '}';
+    }
+
+
+
+    public int getStatus() {
+        return status;
+    }
+
+
+
+    public void setStatus(int status) {
+        this.status = status;
     }
 
 }

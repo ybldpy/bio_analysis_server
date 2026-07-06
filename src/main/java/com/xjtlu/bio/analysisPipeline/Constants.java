@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class Constants {
 
@@ -44,6 +45,61 @@ public class Constants {
 
     }
 
+    public static final class CompressedFormat {
+
+        private CompressedFormat() {
+        }
+
+        public static final String GZ = ".gz";
+        public static final String GZIP = ".gzip";
+        public static final String ZIP = ".zip";
+
+        public static final Set<String> GZIP_FORMAT_SET = Set.of(
+                GZ,
+                GZIP);
+
+        public static final Set<String> COMPRESSED_FORMAT_SET = Set.of(
+                GZ,
+                GZIP,
+                ZIP);
+
+        public static boolean isGzip(String fileName) {
+            if (fileName == null || fileName.isBlank()) {
+                return false;
+            }
+
+            String lower = fileName.toLowerCase();
+
+            return GZIP_FORMAT_SET.stream().anyMatch(lower::endsWith);
+        }
+
+        public static boolean isCompressed(String fileName) {
+            if (fileName == null || fileName.isBlank()) {
+                return false;
+            }
+
+            String lower = fileName.toLowerCase(Locale.ROOT);
+
+            return COMPRESSED_FORMAT_SET.stream().anyMatch(lower::endsWith);
+        }
+
+        public static String removeCompressedSuffix(String fileName) {
+            if (fileName == null || fileName.isBlank()) {
+                return fileName;
+            }
+
+            String lower = fileName.toLowerCase(Locale.ROOT);
+
+            for (String suffix : COMPRESSED_FORMAT_SET) {
+                if (lower.endsWith(suffix)) {
+                    return fileName.substring(0, fileName.length() - suffix.length());
+                }
+            }
+
+            return fileName;
+        }
+    }
+
     public static final class SequenceInput {
 
         public static final String FASTQ_GZ = ".fastq.gz";
@@ -53,13 +109,48 @@ public class Constants {
 
         public static final String FASTA = ".fasta";
         public static final String FNA = ".fna";
+        public static final String FASTA_GZ = ".fasta.gz";
+        public static final String FA = ".fa";
+
+        public static final Set<String> FASTA_FORMAT_SET = Set.of(
+                FASTA,
+                FNA,
+                FASTA_GZ,
+                FA);
+
+        public static final Set<String> FASTQ_FORMAT_SET = Set.of(
+                FASTQ_GZ,
+                FQ_GZ,
+                FQ,
+                FASTQ);
+
+        public static final int QUALITY_ENCODING_33 = 0;
+        public static final int QUALITY_ENCODING_64 = 1;
+
+        public static final int READ_LEN_TYPE_SHORT = 0;
+        public static final int READ_LEN_TYPE_LONG = 1;
+
+        public static final int SEQUENCE_LEVEL_UNKNOWN = -1;
+        public static final int SEQUENCE_LEVEL_READ = 0;
+        public static final int SEQUENCE_LEVEL_ASSEMBLY = 1;
+        public static final int SEQUENCE_LEVEL_REFERENCE = 2;
 
         public static boolean isFastq(String fname) {
-            return fname.endsWith(FASTQ_GZ) || fname.endsWith(FQ_GZ) || fname.endsWith(FASTQ) || fname.endsWith(FQ);
+            for (String fastqFormat : FASTQ_FORMAT_SET) {
+                if (fname.endsWith(fastqFormat)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static boolean isFasta(String fname) {
-            return fname.endsWith(FASTA) || fname.endsWith(FNA);
+            for (String fastaFormat : FASTA_FORMAT_SET) {
+                if (fname.endsWith(fastaFormat)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
     }

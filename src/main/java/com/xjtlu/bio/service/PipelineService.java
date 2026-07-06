@@ -23,19 +23,23 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
 import com.xjtlu.bio.analysisPipeline.Constants;
-import com.xjtlu.bio.analysisPipeline.StageOrchestrator;
-import com.xjtlu.bio.analysisPipeline.StageOrchestrator.MissingUpstreamException;
-import com.xjtlu.bio.analysisPipeline.StageOrchestrator.OrchestratePlan;
+import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator;
+import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator.MissingUpstreamException;
+import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator.OrchestratePlan;
 import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
+import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder;
+import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder.PipelineConfigurations;
+import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder.PipelineSampleInput;
 import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
@@ -58,9 +62,8 @@ import com.xjtlu.bio.utils.JsonUtil;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
 
-import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineConfigurations;
-import com.xjtlu.bio.analysisPipeline.AnalysisPipelineStagesBuilder.PipelineSampleInput;
 import com.xjtlu.bio.analysisPipeline.Constants.PipelineType;
+import com.xjtlu.bio.analysisPipeline.Constants.SequenceInput;
 
 import jakarta.annotation.Resource;
 
@@ -151,7 +154,7 @@ public class PipelineService {
         String serializedStageParameters = null;
 
         try {
-            serializedStageParameters = JsonUtil.toJson(createAnalysisPipelineRequest.getPipelineStageParameters());
+            serializedStageParameters = JsonUtil.toJson(createAnalysisPipelineRequest.getPipelineStageParameters() == null ? new PipelineStageParameters():createAnalysisPipelineRequest.getPipelineStageParameters());
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("[Creating pipeline] serializing pipeline stage parameters expcetion", e);
@@ -220,10 +223,10 @@ public class PipelineService {
         if (analysisPipeline.getPipelineType() != Constants.PipelineType.PIPELINE_SNP_ANALYSIS) {
 
             List<BioPipelineInputFile> readTypeInputs = bioPipelineInputFiles.stream()
-                    .filter(in -> in.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_READ).toList();
-
+                    .filter(in -> in.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_READ).toList();
+        
             if (readTypeInputs.isEmpty()) {
-                return "缺少输入文件";
+                return null;
             }
 
             int r1Index = -1;
@@ -258,60 +261,58 @@ public class PipelineService {
         return bioPipelineStage;
     }
 
-    private List<PipelineSampleInput> buildSampleInputs(List<BioPipelineInputFile> inputs,
-            BioAnalysisPipeline pipeline) {
+    // private List<PipelineSampleInput> buildSampleInputs(List<BioPipelineInputFile> inputs,
+    //         BioAnalysisPipeline pipeline) {
 
-        if (pipeline.getPipelineType() != Constants.PipelineType.PIPELINE_SNP_ANALYSIS) {
+    //     if (pipeline.getPipelineType() != Constants.PipelineType.PIPELINE_SNP_ANALYSIS) {
 
-            BioPipelineInputFile r1 = inputs.stream().filter(in -> {
-                String[] keys = in.getInputKey().split("/");
+    //         BioPipelineInputFile r1 = inputs.stream().filter(in -> {
+    //             String[] keys = in.getInputKey().split("/");
 
-                return Integer.parseInt(keys[keys.length - 1]) == 0;
+    //             return Integer.parseInt(keys[keys.length - 1]) == 0;
 
-            }).findFirst().orElse(null);
+    //         }).findFirst().orElse(null);
 
-            BioPipelineInputFile r2 = inputs.stream().filter(in -> {
-                String[] keys = in.getInputKey().split("/");
+    //         BioPipelineInputFile r2 = inputs.stream().filter(in -> {
+    //             String[] keys = in.getInputKey().split("/");
 
-                return Integer.parseInt(keys[keys.length - 1]) == 1;
-            }).findFirst().orElse(null);
+    //             return Integer.parseInt(keys[keys.length - 1]) == 1;
+    //         }).findFirst().orElse(null);
 
-            PipelineSampleInput sampleInput = new PipelineSampleInput(r1.getFilePath(),
-                    r2 == null ? null : r2.getFilePath());
-            return List.of(sampleInput);
-        } else {
-            // TODO: implement later
-            return null;
+    //         PipelineSampleInput sampleInput = new PipelineSampleInput(r1.getFilePath(),
+    //                 r2 == null ? null : r2.getFilePath(), sampleReadTypeCode(r1.getFileName()));
+    //         return List.of(sampleInput);
+    //     } else {
+    //         // TODO: implement later
+    //         return null;
 
-        }
+    //     }
 
-    }
+    // }
 
     private List<PipelineSampleInput> paritionSubPipelineSampleInputFiles(
             List<BioPipelineInputFile> pipelineInputFiles) {
 
         List<BioPipelineInputFile> sampleInputs = pipelineInputFiles.stream()
-                .filter(f -> f.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_READ).toList();
+                .filter(f -> f.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_READ || f.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY).toList();
 
         HashMap<String, PipelineSampleInput> subPipelineSampleInputsMap = new HashMap<>();
 
         for (BioPipelineInputFile sample : sampleInputs) {
             String key = sample.getInputKey();
 
-            int lastSplit = key.lastIndexOf("/");
-            String groupKey = key.substring(0, lastSplit);
+            String[] splitKey = key.split("/");
 
-            if (!subPipelineSampleInputsMap.containsKey(groupKey)) {
+            if (!subPipelineSampleInputsMap.containsKey(splitKey[1])) {
                 PipelineSampleInput pipelineSampleInput = new PipelineSampleInput();
-                int sampleReadTypeCode = sampleReadTypeCode(sample.getFileName());
-                pipelineSampleInput.setReadType(sampleReadTypeCode);
-                subPipelineSampleInputsMap.put(groupKey, pipelineSampleInput);
+                pipelineSampleInput.setSequenceLevel(getInputSequenceLevelFromCode(sample.getFileRole()));
+                subPipelineSampleInputsMap.put(splitKey[1], pipelineSampleInput);
             }
-            int slot = Integer.parseInt(key.substring(lastSplit + 1));
+            int slot = Integer.parseInt(splitKey[splitKey.length-1]);
             if (slot == 0) {
-                subPipelineSampleInputsMap.get(groupKey).setR1(sample.getFilePath());
+                subPipelineSampleInputsMap.get(splitKey[1]).setR1(sample.getFilePath());
             } else {
-                subPipelineSampleInputsMap.get(groupKey).setR2(sample.getFilePath());
+                subPipelineSampleInputsMap.get(splitKey[1]).setR2(sample.getFilePath());
             }
         }
 
@@ -504,6 +505,9 @@ public class PipelineService {
         List<BioPipelineStage> stages = this.buildRegularPipelineStages(bioAnalysisPipeline.getPipelineId(),
                 bioAnalysisPipeline.getPipelineType(), pipelineStageParameters, bioRefSeq, pipelineSampleInputs.get(0));
 
+        
+        
+
         try {
             int execRes = rcTransactionTemplate.execute((status) -> {
 
@@ -537,12 +541,12 @@ public class PipelineService {
                 stage.setVersion(0);
 
                 if (stage.getStageIndex() == 0) {
-                    entryStage = stage;
-                    break;
+                    stage.setStatus(Constants.StageStatus.PIPELINE_STAGE_STATUS_QUEUING);
+                    this.scheduleStage(stage, stages);
                 }
             }
 
-            this.scheduleStage(entryStage, stages);
+            
             return new Result(Result.SUCCESS, null, null);
 
         } catch (Exception e) {
@@ -563,7 +567,7 @@ public class PipelineService {
         boolean lockSuccess = this.pipelineInputService.lockDownPipelineUploading(pipelineId);
         if (!lockSuccess) {
             this.pipelineOperationLock.remove(pipelineId);
-            return new Result(Result.BUSINESS_FAIL, null, "分析任务正在上传，请稍后重试");
+            return new Result(Result.BUSINESS_FAIL, null, "分析任务数据正在上传，请稍后重试");
         }
 
         try {
@@ -715,18 +719,16 @@ public class PipelineService {
         return candidates.get(0);
     }
 
-    private int sampleReadTypeCode(String fileName) {
+    private int getInputSequenceLevelFromCode(int inputSequenceLevelCode) {
 
-        boolean isFastq = fileName.endsWith(".fastq") ||
-                fileName.endsWith(".fq") ||
-                fileName.endsWith(".fastq.gz") ||
-                fileName.endsWith(".fq.gz");
-
-        if (isFastq) {
-            return PipelineSampleInput.READ_TYPE_FASTQ;
+        if(inputSequenceLevelCode == PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_READ){
+            return Constants.SequenceInput.SEQUENCE_LEVEL_READ;
+        }else if(inputSequenceLevelCode == PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY){
+            return Constants.SequenceInput.SEQUENCE_LEVEL_ASSEMBLY;
         }
-
-        return PipelineSampleInput.READ_TYPE_FASTA;
+        
+        return Constants.SequenceInput.SEQUENCE_LEVEL_UNKNOWN;
+        
     }
 
     private List<BioPipelineStage> buildRegularPipelineStages(long pipelineId, int pipelineType,
@@ -864,6 +866,8 @@ public class PipelineService {
 
     }
 
+
+    @Async
     public void pipelineStageDone(long stageId, boolean success) {
 
         if (!success) {

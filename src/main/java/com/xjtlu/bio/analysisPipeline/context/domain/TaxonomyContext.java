@@ -7,7 +7,7 @@ public class TaxonomyContext {
     private Integer taxid;
     private String speciesName;
     private String rank; // S/G/...
-    private String status; // CONFIDENT/AMBIGUOUS/NO_HIT
+    private int status;
     private Double score;
 
     private TaxonomyContext() {
@@ -38,11 +38,11 @@ public class TaxonomyContext {
         this.rank = rank;
     }
 
-    public String getStatus() {
+    public int getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(int status) {
         this.status = status;
     }
 

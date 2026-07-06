@@ -1,5 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAGE_STATUS_ACTION_REQUIRED;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAGE_STATUS_FINISHED;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_TAXONOMY;
 
@@ -17,12 +18,14 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageResult.StageResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.Taxon;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput.TaxonomyClassificationOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
@@ -37,52 +40,52 @@ class TaxonomyParser {
     // 第一名至少比第二名高 20%
     private static final double MIN_CONFIDENT_RATIO = 1.2;
 
-    public static TaxonomyResult parseKraken2Output(Path reportFile) throws IOException {
-        TaxonomyResult result = new TaxonomyResult();
+    // public static TaxonomyResult parseKraken2Output(Path reportFile) throws IOException {
+    //     TaxonomyResult result = new TaxonomyResult();
 
-        if (reportFile == null || !Files.exists(reportFile)) {
-            result.setStatus("NO_HIT");
-            result.setCandidates(Collections.emptyList());
-            return result;
-        }
+    //     if (reportFile == null || !Files.exists(reportFile)) {
+    //         result.setStatus("NO_HIT");
+    //         result.setCandidates(Collections.emptyList());
+    //         return result;
+    //     }
 
-        List<TaxonomyResult.Taxon> taxa = parseSpeciesOnly(reportFile);
+    //     List<TaxonomyResult.Taxon> taxa = parseSpeciesOnly(reportFile);
 
-        if (taxa.isEmpty()) {
-            result.setStatus("NO_HIT");
-            result.setCandidates(Collections.emptyList());
-            return result;
-        }
+    //     if (taxa.isEmpty()) {
+    //         result.setStatus("NO_HIT");
+    //         result.setCandidates(Collections.emptyList());
+    //         return result;
+    //     }
 
-        taxa.sort(Comparator.comparingDouble(TaxonomyResult.Taxon::getScore).reversed());
+    //     taxa.sort(Comparator.comparingDouble(TaxonomyResult.Taxon::getScore).reversed());
 
-        List<TaxonomyResult.Taxon> topTaxa =
-                new ArrayList<>(taxa.subList(0, Math.min(MAX_CANDIDATES, taxa.size())));
+    //     List<TaxonomyResult.Taxon> topTaxa =
+    //             new ArrayList<>(taxa.subList(0, Math.min(MAX_CANDIDATES, taxa.size())));
 
-        TaxonomyResult.Taxon best = topTaxa.get(0);
-        result.setBest(best);
-        result.setCandidates(topTaxa);
+    //     TaxonomyResult.Taxon best = topTaxa.get(0);
+    //     result.setBest(best);
+    //     result.setCandidates(topTaxa);
 
-        if (topTaxa.size() == 1) {
-            if (best.getScore() >= MIN_CONFIDENT_SCORE) {
-                result.setStatus("CONFIDENT");
-            } else {
-                result.setStatus("AMBIGUOUS");
-            }
-            return result;
-        }
+    //     if (topTaxa.size() == 1) {
+    //         if (best.getScore() >= MIN_CONFIDENT_SCORE) {
+    //             result.setStatus("CONFIDENT");
+    //         } else {
+    //             result.setStatus("AMBIGUOUS");
+    //         }
+    //         return result;
+    //     }
 
-        TaxonomyResult.Taxon second = topTaxa.get(1);
-        double ratio = calcRatio(best.getScore(), second.getScore());
+    //     TaxonomyResult.Taxon second = topTaxa.get(1);
+    //     double ratio = calcRatio(best.getScore(), second.getScore());
 
-        if (best.getScore() >= MIN_CONFIDENT_SCORE && ratio >= MIN_CONFIDENT_RATIO) {
-            result.setStatus("CONFIDENT");
-        } else {
-            result.setStatus("AMBIGUOUS");
-        }
+    //     if (best.getScore() >= MIN_CONFIDENT_SCORE && ratio >= MIN_CONFIDENT_RATIO) {
+    //         result.setStatus("CONFIDENT");
+    //     } else {
+    //         result.setStatus("AMBIGUOUS");
+    //     }
 
-        return result;
-    }
+    //     return result;
+    // }
 
     private static List<TaxonomyResult.Taxon> parseSpeciesOnly(Path reportFile) throws IOException {
         List<TaxonomyResult.Taxon> taxa = new ArrayList<>();
@@ -149,38 +152,71 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         StageContext taxonomyStage = stageRunResult.getStageContext();
         TaxonomyStageOutput taxonomyStageOutput = stageRunResult.getStageOutput();
 
-        TaxonomyResult taxonomySortedResults = null;
-        try {
-            taxonomySortedResults = TaxonomyParser.parseKraken2Output(taxonomyStageOutput.getReport());
+        // TaxonomyResult taxonomySortedResults = null;
+        // try {
+        //     taxonomySortedResults = TaxonomyParser.parseKraken2Output(taxonomyStageOutput.getReport());
 
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            logger.error(
-                    "Failed to parse Kraken report. reportPath={}",
-                    taxonomyStageOutput.getReport(),
-                    e);
+        // } catch (IOException e) {
+        //     // TODO Auto-generated catch block
+        //     logger.error(
+        //             "Failed to parse Kraken report. reportPath={}",
+        //             taxonomyStageOutput.getReport(),
+        //             e);
 
-            this.handleFail(taxonomyStage, stageRunResult.getWorkDir().toString());
-            return;
+        //     this.handleFail(taxonomyStage, stageRunResult.getWorkDir().toString());
+        //     return;
+        // }
+
+        List<TaxonomyClassificationOutput> candicates = taxonomyStageOutput.getCandicates();
+        TaxonomyClassificationOutput comfirmedSpecies = taxonomyStageOutput.getComfirmedTaxonomy();
+        
+        TaxonomyResult taxonomyResult = new TaxonomyResult();
+        Taxon best = null;
+
+        boolean isConfident = taxonomyStageOutput.getStatus() == Constants.TaxonomyClassification.STATUS_CONFIDENT;
+        if(isConfident){
+            best = new Taxon();
+            best.setName(comfirmedSpecies.getSpeciesName());
+            best.setScore(comfirmedSpecies.getScore());
+            best.setRank("S");
+            best.setTaxid(comfirmedSpecies.getSpeciesTaxId());
         }
+
+        taxonomyResult.setBest(best);
+        taxonomyResult.setStatus(taxonomyStageOutput.getStatus());
+        List<Taxon> resultCandicates = taxonomyStageOutput.getCandicates().stream().map(
+            (s)->{
+                Taxon taxon = new Taxon();
+                taxon.setName(s.getSpeciesName());
+                taxon.setScore(s.getScore());
+                taxon.setTaxid(s.getSpeciesTaxId());
+                return taxon;
+            }
+        ).toList();
+
+        taxonomyResult.setCandidates(resultCandicates);
+
 
         String serializedResult = null;
 
         try {
-            serializedResult = JsonUtil.toJson(taxonomySortedResults);
+            serializedResult = JsonUtil.toJson(taxonomyResult);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("stage = {}.json processing exception", taxonomyStage, e);
             this.handleFail(taxonomyStage, stageRunResult.getWorkDir().toString());
         }
         BioPipelineStage patch = new BioPipelineStage();
-        patch.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+
+        patch.setStatus(isConfident?PIPELINE_STAGE_STATUS_FINISHED:PIPELINE_STAGE_STATUS_ACTION_REQUIRED);
         patch.setEndTime(new Date());
         patch.setOutputInline(serializedResult);
 
         
         int updateRes = updateStageFromVersion(patch, taxonomyStage.getRunStageId(), taxonomyStage.getVersion());
-        this.deleteStageResultDir(taxonomyStageOutput.getParentPath().toString());
+        // this.deleteStageResultDir(taxonomyStageOutput.getParentPath().toString());
+
+        pipelineService.pipelineStageDone(stageRunResult.getStageContext().getRunStageId(), updateRes >= 1);
         return;
     }
 

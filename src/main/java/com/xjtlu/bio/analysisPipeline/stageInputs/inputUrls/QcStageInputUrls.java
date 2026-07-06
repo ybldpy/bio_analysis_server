@@ -4,6 +4,9 @@ public class QcStageInputUrls implements StageInputUrls{
 
     private String read1;
     private String read2;
+
+    
+
     public QcStageInputUrls() {
     }
     public String getRead1() {

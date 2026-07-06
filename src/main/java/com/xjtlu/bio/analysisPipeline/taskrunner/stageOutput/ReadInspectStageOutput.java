@@ -5,18 +5,33 @@ import java.nio.file.Path;
 public class ReadInspectStageOutput implements StageOutput{
 
 
-    public static final int ENCODING_64 = 0;
-    public static final int ENCODING_32 = 1;
 
-    public static final int READ_SHORT = 0;
-    public static final int READ_LONG = 1;
-
+    
 
     private int qualityEncoding;
     private int readLenType;
 
     private Path r1Path;
     private Path r2Path;
+
+    private boolean useOriginalSequence;
+    private String originalSequenceUrl;
+
+    public boolean isUseOriginalSequence() {
+        return useOriginalSequence;
+    }
+
+    public void setUseOriginalSequence(boolean useOriginalSequence) {
+        this.useOriginalSequence = useOriginalSequence;
+    }
+
+    public String getOriginalSequenceUrl() {
+        return originalSequenceUrl;
+    }
+
+    public void setOriginalSequenceUrl(String originalSequenceUrl) {
+        this.originalSequenceUrl = originalSequenceUrl;
+    }
 
     private Path workDir;
 
@@ -38,12 +53,14 @@ public class ReadInspectStageOutput implements StageOutput{
         this.r2Path = r2Path;
     }
 
-    public ReadInspectStageOutput(int qualityEncoding, int readLenType, Path r1Path, Path r2Path, Path workDir) {
+    public ReadInspectStageOutput(int qualityEncoding, int readLenType, boolean useOriginalSequence, String originalSequenceUrl, Path r1Path, Path r2Path, Path workDir) {
         this.qualityEncoding = qualityEncoding;
         this.readLenType = readLenType;
         this.r1Path = r1Path;
         this.r2Path = r2Path;
         this.workDir = workDir;
+        this.useOriginalSequence = useOriginalSequence;
+        this.originalSequenceUrl = originalSequenceUrl;
     }
 
 

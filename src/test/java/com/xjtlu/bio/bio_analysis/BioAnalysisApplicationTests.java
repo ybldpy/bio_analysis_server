@@ -39,6 +39,14 @@ class BioAnalysisApplicationTests {
         // sampleService.testInsertDuplicate("1", 1);
     }
 
+
+
+    @Test
+    public void testTaxonomyExecutor() throws Exception{
+
+
+    }
+
     @Test
     public void testReadInspectExecutor() throws Exception {
 

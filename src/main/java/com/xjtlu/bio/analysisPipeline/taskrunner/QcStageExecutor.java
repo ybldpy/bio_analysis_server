@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
+import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
@@ -98,7 +98,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         String input1FileName = inputUrl1.substring(inputUrl1.lastIndexOf("/") + 1);
         String inputUrl2 = StringUtils.isBlank(qcStageInputUrls.getRead2()) ? null : qcStageInputUrls.getRead2();
 
-        boolean hasR2 = inputUrl2 != null && qcParams.getSequenceMeta().getReadLenType() != SequenceMeta.READ_LEN_TYPE_LONG;
+        boolean hasR2 = inputUrl2 != null && qcParams.getSequenceMeta().getReadLenType() != Constants.SequenceInput.READ_LEN_TYPE_LONG;
 
         String input2FileName = !hasR2 ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
         boolean isGz = input1FileName.endsWith(".gz");
@@ -129,7 +129,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         loadInput(loadMap);
 
         List<String> cmd = buildQcRunCmd(
-                qcParams.getSequenceMeta().getReadLenType() == SequenceMeta.READ_LEN_TYPE_SHORT ? TOOL_CODE_FASTQ
+                qcParams.getSequenceMeta().getReadLenType() == Constants.SequenceInput.READ_LEN_TYPE_SHORT ? TOOL_CODE_FASTQ
                         : TOOL_CODE_FASTQ_LONG,
                 r1Path, r2Path, trimmedR1Path, trimmedR2Path, outputQcJson, outputQcHtml);
 

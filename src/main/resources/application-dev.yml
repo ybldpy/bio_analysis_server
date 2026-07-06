@@ -52,6 +52,7 @@ analysis-pipeline:
         seroBA: ["${analysis-pipeline.conda}", "run", "-n", "seroba", "seroba"]
         vep: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
         fastplong: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
+        bbmapPath: "/home/jcy/test/bio_test/bbmap"
         
 
 

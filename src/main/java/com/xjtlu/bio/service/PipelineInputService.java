@@ -70,8 +70,9 @@ public class PipelineInputService {
     public static final int PIPELINE_INPUT_FILE_STATUS_UPLOADED = 1;
     public static final int PIPELINE_INPUT_FILE_STATUS_CANCELLED = 2;
 
-    public static final int PIPELINE_INPUT_TYPE_READ = 0;
-    public static final int PIPELINE_INPUT_TYPE_REFSEQ = 1;
+    public static final int PIPELINE_INPUT_TYPE_SEQUENCE_READ = 10;
+    public static final int PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY = 11;
+    public static final int PIPELINE_INPUT_TYPE_REFSEQ = 20;
 
     private static final int INPUT_ALLOWED = 0;
     // key format is illegal
@@ -82,7 +83,10 @@ public class PipelineInputService {
     // key already exists
     private static final int INPUT_NOT_ALLOWED_DUPLICATE_KEY = 3;
 
-    private static final Pattern SAMPLE_READ_KEY_PATTERN = Pattern.compile("^sample_\\d+/[01]$");
+    private static final int INPUT_NOT_ALLOWED_SEQUENCE_READ_NOT_SUPPORT_FASTA = 4;
+    private static final int INPUT_NOT_ALLOWED_SEQUENCE_ASSEMBLY_NOT_SUPPORT_FASTQ = 5;
+
+    private static final Pattern SAMPLE_READ_KEY_PATTERN = Pattern.compile("^sample/\\d+/[01]$");
 
     private Set<String> uploadingLockSet = ConcurrentHashMap.newKeySet();
 
@@ -155,54 +159,8 @@ public class PipelineInputService {
         return new Result<Void>(Result.INTERNAL_FAIL, null, "上传失败");
     }
 
-    // public Result<Void> recevieInput(long inputFileId, InputStream in) {
-
-    //     try {
-
-
-
-            
-    //         boolean getLockSuccess = this.uploadingLockSet.add(inputFileId);
-    //         if (!getLockSuccess) {
-    //             return new Result(Result.DUPLICATE_OPERATION, null, "文件正在上传");
-    //         }
-
-    //         BioPipelineInputFile bioPipelineInputFile = this.bioPipelineInputFileMapper.selectByPrimaryKey(inputFileId);
-
-    //         if (bioPipelineInputFile == null) {
-    //             return new Result<Void>(Result.BUSINESS_FAIL, null, "未找到目标文件，不存在的分析任务");
-    //         } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_NOT_UPLOAD) {
-    //             String path = bioPipelineInputFile.getFilePath();
-    //             if (this.storageService.exists(path)) {
-    //                 return this.handleUploaded(bioPipelineInputFile);
-    //             }
-    //         } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_UPLOADED) {
-
-    //             this.pipelineService.handleInputRecevied(bioPipelineInputFile.getPipelineId());
-    //             return new Result<Void>(Result.SUCCESS, null, null);
-    //         } else if (bioPipelineInputFile.getStatus() == PIPELINE_INPUT_FILE_STATUS_CANCELLED) {
-    //             return new Result<Void>(Result.BUSINESS_FAIL, null, "分析任务已取消");
-    //         }
-
-    //         PutResult putResult = this.storageService.putObject(bioPipelineInputFile.getFilePath(), in);
-    //         if (putResult.success()) {
-    //             return this.handleUploaded(bioPipelineInputFile);
-    //         }
-
-    //         if (putResult.e() != null) {
-    //             throw putResult.e();
-    //         }
-    //         return uploadFail();
-    //     } catch (Exception e) {
-    //         logger.error("input file id = {}. Expcetion happen when receving file", inputFileId, e);
-    //         return uploadFail();
-    //     } finally {
-    //         this.uploadingLockSet.remove(inputFileId);
-    //     }
-
-    // }
-
-    private int isInputAllowed(BioAnalysisPipeline pipeline, int inputType, String inputKey,
+    private int isInputAllowed(BioAnalysisPipeline pipeline, String sequenceFileName, int inputSequenceLevel,
+            String inputKey,
             List<BioPipelineInputFile> inputFiles) {
 
         BioPipelineInputFile inputFile = inputFiles.stream().filter(in -> in.getInputKey().equals(inputKey)).findAny()
@@ -210,21 +168,41 @@ public class PipelineInputService {
         if (inputFile != null) {
             return INPUT_NOT_ALLOWED_DUPLICATE_KEY;
         }
-        if (inputType == PIPELINE_INPUT_TYPE_READ) {
+
+        if (inputSequenceLevel == PIPELINE_INPUT_TYPE_SEQUENCE_READ
+                && Constants.SequenceInput.isFasta(sequenceFileName)) {
+
+            return INPUT_NOT_ALLOWED_SEQUENCE_READ_NOT_SUPPORT_FASTA;
+        }
+
+        if (inputSequenceLevel == PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY
+                && Constants.SequenceInput.isFastq(sequenceFileName)) {
+            return INPUT_NOT_ALLOWED_SEQUENCE_ASSEMBLY_NOT_SUPPORT_FASTQ;
+        }
+
+        if (inputSequenceLevel == PIPELINE_INPUT_TYPE_SEQUENCE_READ
+                || inputSequenceLevel == PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY) {
 
             if (!SAMPLE_READ_KEY_PATTERN.matcher(inputKey).matches()) {
                 return INPUT_NOT_ALLOWED_BAD_KEY;
             }
 
             String[] keys = inputKey.split("/");
+
             if (pipeline.getPipelineType() == Constants.PipelineType.PIPELINE_SNP_ANALYSIS) {
                 return INPUT_ALLOWED;
-
             } else {
-                String sampleId = keys[0];
-                if (!"sample_0".equals(sampleId)) {
+                String sampleId = keys[1];
+                if (!"0".equals(sampleId)) {
                     return INPUT_NOT_ALLOWED_INVALID_KEY;
                 }
+
+                String slot = keys[2];
+                if ((!"0".equals(slot) && !"1".equals(slot))
+                        || (inputSequenceLevel == PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY && !"0".equals(slot))) {
+                    return INPUT_NOT_ALLOWED_INVALID_KEY;
+                }
+
                 return INPUT_ALLOWED;
             }
         }
@@ -259,7 +237,7 @@ public class PipelineInputService {
         return oldValue == null;
     }
 
-    // first must lock down
+    // first must lock down before invoking this function
     public void unlockPipelineUploading(long pipelineId) {
         this.pipelineUploadingLocks.remove(pipelineId);
 
@@ -311,13 +289,11 @@ public class PipelineInputService {
                 return new Result(Result.BUSINESS_FAIL, -1l, "分析任务已经启动");
             }
 
-            
-
             BioPipelineInputFileExample query = new BioPipelineInputFileExample();
             query.createCriteria().andPipelineIdEqualTo(pipelineId).andFileRoleEqualTo(inputType);
             List<BioPipelineInputFile> inputs = this.bioPipelineInputFileMapper.selectByExample(query);
 
-            int inputAllowedCode = isInputAllowed(pipelines.get(0), inputType, inputKey, inputs);
+            int inputAllowedCode = isInputAllowed(pipelines.get(0), fileName, inputType, inputKey, inputs);
             if (inputAllowedCode == INPUT_NOT_ALLOWED_DUPLICATE_KEY) {
 
                 BioPipelineInputFile inputFile = inputs.stream().filter(pin -> pin.getInputKey().equals(inputKey))
@@ -330,6 +306,22 @@ public class PipelineInputService {
             }
             if (inputAllowedCode == INPUT_NOT_ALLOWED_INVALID_KEY) {
                 return new Result(RESPONSE_CODE_INVALID_KEY, -1l, "当前分析流水线不允许使用该上传key");
+            }
+            if (inputAllowedCode == INPUT_NOT_ALLOWED_SEQUENCE_ASSEMBLY_NOT_SUPPORT_FASTQ) {
+
+                return new Result(
+                        Result.BUSINESS_FAIL,
+                        -1L,
+                        "当前输入类型为已组装序列/contigs, 不支持上传 FASTQ/FQ 文件。请上传 FASTA/FA/FNA/CONTIG 格式文件，或将输入类型改为原始 reads。");
+
+            }
+            if (inputAllowedCode == INPUT_NOT_ALLOWED_SEQUENCE_READ_NOT_SUPPORT_FASTA) {
+
+                return new Result(
+                        Result.BUSINESS_FAIL,
+                        -1L,
+                        "当前输入类型为原始 reads, 不支持上传 FASTA/FA/FNA 文件。原始 reads 请上传 FASTQ/FQ/FASTQ.GZ/FQ.GZ 文件; FASTA 输入应作为已组装 contigs/assembly 使用。");
+
             }
 
             PutResult putResult = this.storageService.putObject(storageKey, in);

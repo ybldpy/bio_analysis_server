@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_AMR;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,17 @@ public class AmrStageExecutor extends AbstractPipelineStageExector<AmrStageOutpu
         // }
 
         loadInput(Map.of(inputUrl, inputSamplePath));
+
+        try {
+            inputSamplePath = uncompressIfCompressedFormat(inputSamplePath);
+        } catch (IOException e) {
+            String failReason = String.format(
+                    "Failed to uncompress contig file. source=%s, reason=%s",
+                    inputSamplePath.toAbsolutePath(),
+                    e.getMessage());
+            this.logger.error(failReason, e);
+            return this.runFail(stageContext, failReason, stageExecutionInput.workDir);
+        }
 
         
 

@@ -139,6 +139,7 @@ public class TaxonomyClassificationService {
                 String stripdLine = line.strip();
                 String[] cols = stripdLine.split("\t");
                 String referenceGenome = cols[1].substring(cols[1].lastIndexOf("/")+1);
+                referenceGenome = referenceGenome.substring(0, referenceGenome.length()-".fna".length());
                 double percentage = Double.parseDouble(cols[2]);
                 int matchedFragments = Integer.parseInt(cols[3]);
                 int totalFragments = Integer.parseInt(cols[4]);
@@ -358,6 +359,12 @@ public class TaxonomyClassificationService {
 
         } catch (Exception e) {
 
+            this.logger.error(
+                    "Failed to load FastANI metadata. fastANIDB={}, metaDataPath={}",
+                    fastANIDB,
+                    metaDataPath == null ? null : metaDataPath.toAbsolutePath(),
+                    e
+            );
         }
 
     }

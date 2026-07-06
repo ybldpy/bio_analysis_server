@@ -5,6 +5,7 @@ import java.io.StringWriter;
 import java.nio.file.Path;
 import java.util.Map;
 
+import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -44,7 +45,7 @@ public class StageRunResult<T extends StageOutput> {
     public void setStageOutput(T stageOutput) {
         this.stageOutput = stageOutput;
     }
-    private BioPipelineStage stage;
+    //private BioPipelineStage stage;
 
     private StageContext stageContext;
 
@@ -82,9 +83,7 @@ public class StageRunResult<T extends StageOutput> {
         return stageContext;
     }
 
-    public void setStage(BioPipelineStage stage) {
-        this.stage = stage;
-    }
+    
 
     // public static StageRunResult OK(Map<String,String> outputPath, StageContext stageContext){
     //     return new StageRunResult(true, null, outputPath, stageContext, null);
@@ -116,16 +115,17 @@ public class StageRunResult<T extends StageOutput> {
             stackTrace = stackTrace.substring(0, maxLen) + "\n...truncated";
         }
 
+
+
         String errorLog = String.format(
-                "PipelineId=%d, StageId=%d, StageIndex=%d, StageName=%s, StageType=%d\n" +
+                "PipelineId=%d, StageId=%d, StageName=%s, StageType=%d\n" +
                         "Message=%s\n" +
                         "Exception=%s\n" +
                         "StackTrace:\n%s",
-                stage.getPipelineId(),
-                stage.getStageId(),
-                stage.getStageIndex(),
-                stage.getStageName(),
-                stage.getStageType(),
+                stageContext.getPipelineId(),
+                stageContext.getRunStageId(),
+                Constants.StageType.STAGE_NAME_MAP.get(stageContext.getStageType()),
+                stageContext.getStageType(),
                 this.failReason,
                 e == null ? "N/A" : e.getClass().getName(),
                 stackTrace);

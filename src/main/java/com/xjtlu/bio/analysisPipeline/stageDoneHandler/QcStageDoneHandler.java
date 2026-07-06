@@ -45,9 +45,12 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
     protected Pair<Map<String, String>, QcResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<QCStageOutput> stageRunResult) {
 
-        boolean isGz = stageRunResult.getStageOutput().isGz();
-        String r1Url = this.createStoreObjectName(stageRunResult.getStage(), isGz? r1GzOutputName:r1OutputName);
-        String r2Url = stageRunResult.getStageOutput().getR2Path() == null?null:this.createStoreObjectName(stageRunResult.getStage(), isGz? r2GzOutputName:r2OutputName);
+        String r1Path = stageRunResult.getStageOutput().getR1Path();
+        String r2Path = stageRunResult.getStageOutput().getR2Path();
+
+
+        String r1Url = this.createStoreObjectName(stageRunResult.getStage(), "trimmed_r1."+r1Path.substring(r1Path.indexOf(".")+1));
+        String r2Url = stageRunResult.getStageOutput().getR2Path() == null?null:this.createStoreObjectName(stageRunResult.getStage(), "trimmed_r2."+r2Path.substring(r2Path.indexOf(".")+1));
         String jsonUrl = this.createStoreObjectName(stageRunResult.getStage(), jsonFileName);
         String htmlUrl = this.createStoreObjectName(stageRunResult.getStage(), htmlFileName);
 

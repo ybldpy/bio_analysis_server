@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.mysql.cj.protocol.x.Ok;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.Constants.TaxonomyClassification;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
@@ -56,7 +57,9 @@ public class TaxonomyStageExecutor
 
     private static final double CLASSIFICATION_COMPARISON_OFFSET = 0.00001d;
 
-    private static final double FASTANI_CONFIDENT_THRESHOLD = 80.0d;
+    private static final double FASTANI_CONFIDENT_THRESHOLD = 95.0d;
+
+    private static final double FASTANI_CONFIDENT_DELTA = 1.5d;
 
     @Override
     protected Class<TaxonomyStageInputUrls> stageInputType() {
@@ -67,112 +70,6 @@ public class TaxonomyStageExecutor
     protected Class<BaseStageParams> stageParameterType() {
         return BaseStageParams.class;
     }
-
-    // private void initFastANIMeta() {
-
-    // supportedFamilys = new HashSet<>();
-    // fastANIMetaQueryMap = new HashMap<>();
-
-    // if (fastANIDB == null || fastANIDB.isBlank()) {
-    // this.logger.error("FastANI DB path is empty. Skip loading FastANI
-    // metadata.");
-    // return;
-    // }
-
-    // Path fastANIDBPath = Path.of(fastANIDB);
-    // Path metaDirPath = fastANIDBPath.resolve("meta");
-
-    // if (!Files.exists(metaDirPath)) {
-    // this.logger.error("FastANI meta directory does not exist: {}",
-    // metaDirPath.toAbsolutePath());
-    // return;
-    // }
-
-    // if (!Files.isDirectory(metaDirPath)) {
-    // this.logger.error("FastANI meta path is not a directory: {}",
-    // metaDirPath.toAbsolutePath());
-    // return;
-    // }
-
-    // String[] refsQueryListFiles = metaDirPath.toFile().list();
-
-    // if (refsQueryListFiles == null) {
-    // this.logger.error(
-    // "Failed to list FastANI meta directory. Please check permission. path={}",
-    // metaDirPath.toAbsolutePath());
-    // return;
-    // }
-
-    // Pattern pattern = Pattern.compile("^refs_(\\d+)\\.txt$");
-
-    // for (String fname : refsQueryListFiles) {
-    // Matcher matcher = pattern.matcher(fname);
-
-    // if (!matcher.matches()) {
-    // continue;
-    // }
-
-    // int familyId = Integer.parseInt(matcher.group(1));
-    // supportedFamilys.add(familyId);
-    // }
-
-    // Path metaDataPath = metaDirPath.resolve("metaData.tsv");
-
-    // if (!Files.exists(metaDataPath)) {
-    // this.logger.error("FastANI metadata file does not exist: {}",
-    // metaDataPath.toAbsolutePath());
-    // return;
-    // }
-
-    // if (!Files.isRegularFile(metaDataPath)) {
-    // this.logger.error("FastANI metadata path is not a regular file: {}",
-    // metaDataPath.toAbsolutePath());
-    // return;
-    // }
-
-    // try (BufferedReader bufferedReader = Files.newBufferedReader(metaDataPath)) {
-    // String header = bufferedReader.readLine().strip();
-    // // Map<String, Integer> headerNameIndexMap = new HashMap<>();
-    // // String[] headerParts = header.split("\t");
-    // // for(int i = 0;i<headerParts.length;i++){
-    // // headerParts[i] = headerParts[i].strip();
-    // // }
-
-    // String line = null;
-    // while ((line = bufferedReader.readLine()) != null) {
-    // if (StringUtils.isBlank(line)) {
-    // continue;
-    // }
-
-    // String[] metaRow = line.strip().split("\t");
-    // FastANIMeta fastANIMeta = new FastANIMeta();
-    // fastANIMeta.id = metaRow[0];
-    // fastANIMeta.name = metaRow[1];
-    // fastANIMeta.taxId = Integer.parseInt(metaRow[2]);
-    // fastANIMeta.speciesName = metaRow[3];
-    // fastANIMeta.speciesTaxId = Integer.parseInt(metaRow[4]);
-    // fastANIMetaQueryMap.put(fastANIMeta.id, fastANIMeta);
-    // }
-
-    // loadFastANIDBMetaSuccess = true;
-
-    // } catch (Exception e) {
-
-    // }
-
-    // }
-
-    // @PostConstruct
-    // public void init() {
-
-    // try {
-    // initFastANIMeta();
-    // } catch (Exception e) {
-    // // TODO: print a log
-    // logger.error("Failed to initialize FastANI metadata.", e);
-
-    // }
-    // }
 
     private List<TaxonomyClassificationItem> doClassifyByFastANI(StageExecutionInput stageExecutionInput,
             Path queryPath, List<Integer> familyIds) throws IOException, ReportParseException {
@@ -206,7 +103,15 @@ public class TaxonomyStageExecutor
 
         ExecuteResult executeResult = _execute(runCmd, stageExecutionInput.workDir);
         if (!executeResult.success()) {
-            // TODO: do log here
+
+            logger.error(
+                    "FastANI execution exception, stage = {}, cmd = {}, log = {}",
+                    stageExecutionInput.stageContext.getRunStageId(),
+                    String.join(" ", runCmd),
+                    stageExecutionInput.workDir,
+                    executeResult.ex);
+
+            return Collections.emptyList();
         }
 
         List<TaxonomyClassificationItem> results = taxonomyClassificationService.parseFastANIReport(outPath);
@@ -214,18 +119,17 @@ public class TaxonomyStageExecutor
         return results;
     }
 
-    private static List<TaxonomyClassificationOutput> buildTaxonomyClassificationOutputFromClassificationItem(List<TaxonomyClassificationItem> items){
+    private static List<TaxonomyClassificationOutput> buildTaxonomyClassificationOutputFromClassificationItem(
+            List<TaxonomyClassificationItem> items) {
 
-        return items.stream().map(i->{
+        return items.stream().map(i -> {
             return new TaxonomyClassificationOutput(
-                i.getTaxid(),
-                i.getScientificName(),
-                i.getTaxid(),
-                i.getScientificName(),
-                i.getPercentage()
-            );
+                    i.getTaxid(),
+                    i.getScientificName(),
+                    i.getTaxid(),
+                    i.getScientificName(),
+                    i.getPercentage());
         }).toList();
-
 
     }
 
@@ -239,9 +143,20 @@ public class TaxonomyStageExecutor
         TaxonomyStageInputUrls taxonomyStageInputUrls = stageExecutionInput.input;
 
         String r1Url = taxonomyStageInputUrls.getR1();
-        Path r1Path = inputDirPath.resolve("r1.fastq");
+        Path r1Path = inputDirPath.resolve(r1Url.substring(r1Url.lastIndexOf("/") + 1));
 
         this.loadInput(Map.of(r1Url, r1Path));
+
+        try {
+            r1Path = uncompressIfCompressedFormat(r1Path);
+        } catch (IOException e) {
+            String failReason = String.format(
+                    "Failed to uncompress contig file. source=%s, reason=%s",
+                    r1Path.toAbsolutePath(),
+                    e.getMessage());
+            this.logger.error(failReason, e);
+            return this.runFail(stageExecutionInput.stageContext, failReason, stageExecutionInput.workDir);
+        }
 
         Path reportPath = workDirPath.resolve("taxonomny.report");
         Path outputPath = workDirPath.resolve("taxonomy.output");
@@ -296,14 +211,22 @@ public class TaxonomyStageExecutor
             }
         }
 
+        if (familyLevelList.isEmpty()) {
+            TaxonomyStageOutput taxonomyStageOutput = new TaxonomyStageOutput();
+            taxonomyStageOutput.setEvidenceResource(Constants.TaxonomyClassification.EVIDENCE_KRAKEN2);
+            taxonomyStageOutput.setStatus(Constants.TaxonomyClassification.STATUS_OUT_PANEL);
+            taxonomyStageOutput.setCandicates(Collections.emptyList());
+            return OK(taxonomyStageOutput, stageExecutionInput);
+        }
+
         speciesCandicates.sort((s1, s2) -> Double.compare(s2.getPercentage(), s1.getPercentage()));
 
         List<TaxonomyClassificationOutput> candicates = new ArrayList<>();
 
-        TaxonomyClassificationItem bestSpecies = speciesCandicates.get(0);
-        if (bestSpecies.getPercentage() >= KRAKEN2_SPECIES_CONFIDENT_DIRECT_PASS_THRESHOLD
+        TaxonomyClassificationItem kraken2BestSpecies = speciesCandicates.get(0);
+        if (kraken2BestSpecies.getPercentage() >= KRAKEN2_SPECIES_CONFIDENT_DIRECT_PASS_THRESHOLD
                 && (speciesCandicates.size() < 2
-                        || bestSpecies.getPercentage()
+                        || kraken2BestSpecies.getPercentage()
                                 / (CLASSIFICATION_COMPARISON_OFFSET + speciesCandicates.get(1).getPercentage()) >= 2)) {
 
             List<TaxonomyClassificationOutput> taxonomyClassificationOutputs = new ArrayList<>();
@@ -315,11 +238,11 @@ public class TaxonomyStageExecutor
                         candicate.getScientificName(),
                         candicate.getPercentage());
 
-                taxonomyClassificationOutputs.add(taxonomyClassificationOutput);
+                candicates.add(taxonomyClassificationOutput);
             }
 
             return OK(new TaxonomyStageOutput(candicates,
-                    candicates.stream().filter(s -> s.getTaxId() == bestSpecies.getTaxid()).findAny().orElse(null),
+                    candicates.stream().filter(s -> s.getTaxId() == kraken2BestSpecies.getTaxid()).findAny().orElse(null),
                     Constants.TaxonomyClassification.STATUS_CONFIDENT,
                     Constants.TaxonomyClassification.EVIDENCE_KRAKEN2), stageExecutionInput);
         }
@@ -339,7 +262,7 @@ public class TaxonomyStageExecutor
             int familyTaxId = bestFamily.getTaxid();
             // out panel. However, it is almost impossible since we use built db to run and
             // the result should be located the range we made in the db.
-            if (false || !taxonomyClassificationService.isSupported(familyTaxId,
+            if (!taxonomyClassificationService.isSupported(familyTaxId,
                     TaxonomyClassificationService.SUPPORT_QUERY_FAMILY_LEVEL)) {
                 for (TaxonomyClassificationItem taxonomyClassificationItem : kraken2ClassificationItemList) {
                     if (TaxonomyClassificationService.RANK_CODE_SPECIES
@@ -446,7 +369,7 @@ public class TaxonomyStageExecutor
                 return OK(taxonomyStageOutput, stageExecutionInput);
             }
 
-            if (top1 / (CLASSIFICATION_COMPARISON_OFFSET + Math.max(top2, 0)) < 2) {
+            if (top1 - top2 < FASTANI_CONFIDENT_DELTA) {
                 taxonomyStageOutput.setStatus(TaxonomyClassification.STATUS_AMBIGUOUS);
                 return OK(taxonomyStageOutput, stageExecutionInput);
             }

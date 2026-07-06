@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.ReadMeta;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageResult.ReadInspectStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
@@ -41,8 +41,10 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
 
         Path resultDir = readInspectStageOutput.getWorkDir();
 
+
+        BioPipelineStage runStage = null;
         if (readInspectStageOutput.getR1Path() == null) {
-            BioPipelineStage runStage = null;
+            
             try {
                 runStage = this.pipelineService
                         .queryStageById(stageRunResult.getStageContext().getRunStageId());
@@ -100,10 +102,28 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
 
         ReadInspectStageResult readInspectStageResult = new ReadInspectStageResult();
 
-        
-        ReadMeta readMeta = new ReadMeta();
-        readMeta.setQualityEncoding(readInspectStageOutput.getQualityEncoding() == ReadInspectStageOutput.ENCODING_64?ReadMeta.QUALITY_ENCODING_64: ReadMeta.QUALITY_ENCODING_33);
-        readMeta.setReadLenType(readInspectStageOutput.getReadLenType() == ReadInspectStageOutput.READ_LONG?ReadMeta.READ_LEN_TYPE_LONG:ReadMeta.READ_LEN_TYPE_SHORT);
+
+
+        // BaseStageParams params = null;
+        // try {
+        //     params = JsonUtil.toObject(runStage.getParameters(),BaseStageParams.class);
+        // } catch (JsonProcessingException e) {
+        //     logger.error(
+        //                 "Failed to parse Parameters, stageId={}, inputUrl={}",
+        //                 runStageId,
+        //                 runStage.getInputUrl(),
+        //                 e);
+
+        //         handleFail(
+        //                 stageRunResult.getStageContext(),
+        //                 "failed to parse Parameters, stageId=" + runStageId);
+        //         return;
+        // }
+
+
+        SequenceMeta readMeta = new SequenceMeta();
+        readMeta.setQualityEncoding(readInspectStageOutput.getQualityEncoding());
+        readMeta.setReadLenType(readInspectStageOutput.getReadLenType());
         readInspectStageResult.setReadMeta(readMeta);
 
         readInspectStageResult.setR1Url(r1Url);

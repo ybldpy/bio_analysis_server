@@ -69,7 +69,6 @@ public class CreateAnalysisPipelineRequest {
     @NotNull(message = "分析名称不能为空")
     private String analysisName;
 
-
     
     private PipelineStageParameters pipelineStageParameters;
 

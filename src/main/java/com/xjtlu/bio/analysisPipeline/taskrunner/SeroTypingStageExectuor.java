@@ -239,8 +239,8 @@ public class SeroTypingStageExectuor
 
         SeroTypingStageParameters parameters = stageExecutionInput.stageParameters;
 
-        Path contigLocalPath = inputDir.resolve("input.contig");
-        Path r1Path = inputDir.resolve(r1Url.substring(r1Url.lastIndexOf("/") + 1));
+        Path contigLocalPath = contigUrl==null ? null : inputDir.resolve(contigUrl.substring(contigUrl.lastIndexOf("/")+1));
+        Path r1Path = StringUtils.isBlank(r1Url) ? null : inputDir.resolve(r1Url.substring(r1Url.lastIndexOf("/") + 1));
         Path r2Path = StringUtils.isBlank(r2Url) ? null : inputDir.resolve(r2Url.substring(r2Url.lastIndexOf("/") + 1));
 
         Map<String, Path> loadInputMap = contigUrl != null ? Map.of(contigUrl, contigLocalPath)

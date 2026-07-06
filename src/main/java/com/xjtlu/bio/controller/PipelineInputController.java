@@ -2,6 +2,7 @@ package com.xjtlu.bio.controller;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,13 @@ public class PipelineInputController {
     @Resource
     private PipelineInputService pipelineInputService;
 
+
+    private static final Set<Integer> ALLOWED_INPUT_TYPE = Set.of(
+        PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_READ,
+        PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_ASSEMBLY,
+        PipelineInputService.PIPELINE_INPUT_TYPE_REFSEQ
+    );
+
     @PostMapping("/upload")
     public ResponseEntity sampleUpload(@RequestParam("pipelineId")long pipelineId,@RequestParam("inputKey")String inputKey, @RequestParam("fileName")String fileName, @RequestParam("fileType")int type, @RequestParam("inputFile") MultipartFile sampleFile) {
         // TODO: process POST request
@@ -67,7 +75,7 @@ public class PipelineInputController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("文件上传失败：文件内容为空");
         }
 
-        if(type!=PipelineInputService.PIPELINE_INPUT_TYPE_READ && type!=PipelineInputService.PIPELINE_INPUT_TYPE_REFSEQ){
+        if(!ALLOWED_INPUT_TYPE.contains(type)){
             Result result = new Result(Result.BUSINESS_FAIL, null, "不正确的输入文件类型");
             return ResponseEntity.ok(result);
         }

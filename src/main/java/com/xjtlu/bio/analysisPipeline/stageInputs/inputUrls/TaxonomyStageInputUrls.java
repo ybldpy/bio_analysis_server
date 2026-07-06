@@ -2,8 +2,13 @@ package com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls;
 
 public class TaxonomyStageInputUrls implements StageInputUrls{
 
+
+    //provide reads and contigs format if required. 
     private String r1;
     private String r2;
+    private String contigs;
+
+
     public TaxonomyStageInputUrls() {
     }
     public String getR1() {
@@ -17,6 +22,12 @@ public class TaxonomyStageInputUrls implements StageInputUrls{
     }
     public void setR2(String r2) {
         this.r2 = r2;
+    }
+    public String getContigs() {
+        return contigs;
+    }
+    public void setContigs(String contigs) {
+        this.contigs = contigs;
     }
     
 

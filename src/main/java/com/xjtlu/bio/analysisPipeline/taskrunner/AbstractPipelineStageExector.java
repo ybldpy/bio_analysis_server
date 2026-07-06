@@ -16,6 +16,7 @@ import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.SequenceFileUtil;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.apache.commons.io.FileUtils;
 import org.hibernate.validator.internal.util.stereotypes.Lazy;
@@ -142,6 +143,21 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     //     postExecute(stageRunResult);
 
     // }
+
+
+
+    protected Path uncompressIfCompressedFormat(Path source) throws IOException{
+
+        if (SequenceFileUtil.isCompressedFormat(source.toString())) {
+            Path uncompressedInputContigPath = source
+                    .resolveSibling(SequenceFileUtil.getUncompressedFileName(source.getFileName().toString()));
+            SequenceFileUtil.uncompress(source, uncompressedInputContigPath);
+            return uncompressedInputContigPath;
+        }
+
+        return source;
+
+    }
 
     protected static class NotGetRefSeqException extends Exception {
 

@@ -2,16 +2,7 @@ package com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common;
 
 public class SequenceMeta {
 
-    public static final int QUALITY_ENCODING_33 = 0;
-    public static final int QUALITY_ENCODING_64 = 1;
-
-    public static final int READ_LEN_TYPE_SHORT = 0;
-    public static final int READ_LEN_TYPE_LONG = 1;
-
-    public static final int SEQUENCE_LEVEL_UNKNOWN = -1;
-    public static final int SEQUENCE_LEVEL_READ = 0;
-    public static final int SEQUENCE_LEVEL_ASSEMBLY = 1;
-    public static final int SEQUENCE_LEVEL_REFERENCE = 2;
+    
 
     public SequenceMeta() {
     }
@@ -29,6 +20,10 @@ public class SequenceMeta {
     private int sequencingPlatform;
     private int sequenceLevel;
 
+    
+
+    
+    
     public int getQualityEncoding() {
         return qualityEncoding;
     }
