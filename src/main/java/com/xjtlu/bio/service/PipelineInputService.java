@@ -221,13 +221,13 @@ public class PipelineInputService {
 
     private String pipelineInputFilePath(long pipelineId, int inputType, String inputKey, String fileName) {
         String flatInputKey = inputKey.replace("/", "_");
-
+        String fname = fileName.replaceAll("\\s++", "_").replaceAll("_+", "_");
         String storageFileName = String.format(
                 "pipelineInput/p%d/%d/%s/%s",
                 pipelineId,
                 inputType,
                 flatInputKey,
-                fileName);
+                fname);
 
         return storageFileName;
     }

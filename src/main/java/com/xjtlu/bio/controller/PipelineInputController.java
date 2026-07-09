@@ -23,37 +23,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 @RequestMapping("/pipelineInput")
 public class PipelineInputController {
 
-    
-
-    // @PostMapping("/create")
-    // public ResponseEntity createSample(@RequestBody @Valid CreateSampleRequest createSampleRequest) {
-
-    //     if (createSampleRequest.isPair() && StringUtils.isBlank(createSampleRequest.getRead2OriginName())) {
-    //         return ResponseEntity.badRequest().body(
-    //                 "输入为双端时read2不能为空");
-    //     }
-
-    //     Result<BioSample> result = sampleService.createSample(
-    //             createSampleRequest.isPair(),
-    //             createSampleRequest.getSampleName(),
-    //             createSampleRequest.getProjectId(),
-    //             createSampleRequest.getSampleType(),
-    //             createSampleRequest.getRead1OriginName(),
-    //             createSampleRequest.getRead2OriginName(),
-    //             createSampleRequest.getPipelineStageParameters());
-
-    //     if (result.getStatus() == Result.INTERNAL_FAIL) {
-    //         return ResponseEntity.internalServerError().body(result.getFailMsg());
-    //     }
-
-    //     if (result.getStatus() == Result.PARAMETER_NOT_VALID) {
-    //         return ResponseEntity.badRequest().body(result.getFailMsg());
-    //     }
-
-    //     Result<Long> returnResult = new Result<Long>(result.getStatus(), result.getData()!=null?result.getData().getSid():-1, result.getFailMsg());
-    //     return ResponseEntity.ok().body(returnResult);
-    // }
-
 
     @Resource
     private PipelineInputService pipelineInputService;

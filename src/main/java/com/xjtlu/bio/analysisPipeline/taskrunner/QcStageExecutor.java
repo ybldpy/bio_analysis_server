@@ -84,7 +84,6 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
     @Override
     public StageRunResult<QCStageOutput> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException {
-        // TODO Auto-generated method stub
 
         StageContext bioPipelineStage = stageExecutionInput.stageContext;
         QcStageInputUrls qcStageInputUrls = stageExecutionInput.input;
@@ -101,7 +100,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         boolean hasR2 = inputUrl2 != null && qcParams.getSequenceMeta().getReadLenType() != Constants.SequenceInput.READ_LEN_TYPE_LONG;
 
         String input2FileName = !hasR2 ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
-        boolean isGz = input1FileName.endsWith(".gz");
+        boolean isGz = Constants.CompressedFormat.isGzip(input1FileName);
         QCStageOutput qcStageOutput = new QCStageOutput(outputDir.resolve(input1FileName).toString(),
                 !hasR2 ? null : outputDir.resolve(input2FileName).toString(),
                 outputDir.resolve("cleaned.html").toString(),

@@ -185,6 +185,7 @@ public class StageOrchestrator {
 
         BioPipelineStage amr = findStageFromStages(allStages, PIPELINE_STAGE_AMR);
         BioPipelineStage vf = findStageFromStages(allStages, PIPELINE_STAGE_VIRULENCE);
+        BioPipelineStage mlst = findStageFromStages(allStages, PIPELINE_STAGE_MLST);
 
         OrchestratePlan plan = new OrchestratePlan();
 
@@ -199,22 +200,35 @@ public class StageOrchestrator {
             plan.runStages.addAll(vfPlan.getRunStages());
             plan.updateStageCommands.addAll(vfPlan.getUpdateStageCommands());
         }
+        if(taxonomy.getStatus() == PIPELINE_STAGE_STATUS_PENDING){
+            OrchestratePlan taxonomyPlan = makePlan(allStages, taxonomy.getStageId());
+            plan.runStages.addAll(taxonomyPlan.getRunStages());
+            plan.updateStageCommands.addAll(taxonomyPlan.getUpdateStageCommands());
+        }
+
+        if(mlst.getStatus() == PIPELINE_STAGE_STATUS_PENDING){
+            OrchestratePlan mlstPlan = makePlan(allStages, mlst.getStageId());
+            plan.runStages.addAll(mlstPlan.getRunStages());
+            plan.updateStageCommands.addAll(mlstPlan.getUpdateStageCommands());
+        }
+
+
 
         // the result has been comfirmed
-        if (taxonomy.getStatus() == PIPELINE_STAGE_STATUS_FINISHED) {
+        // if (taxonomy.getStatus() == PIPELINE_STAGE_STATUS_FINISHED) {
 
-            BioPipelineStage mlst = findStageFromStages(allStages, PIPELINE_STAGE_MLST);
-            BioPipelineStage serotypeStage = findStageFromStages(allStages, PIPELINE_STAGE_SEROTYPE);
+        //     BioPipelineStage mlst = findStageFromStages(allStages, PIPELINE_STAGE_MLST);
+        //     BioPipelineStage serotypeStage = findStageFromStages(allStages, PIPELINE_STAGE_SEROTYPE);
 
-            OrchestratePlan mlstPlan = makePlan(allStages, mlst.getStageId());
-            OrchestratePlan seroTypePlan = makePlan(allStages, serotypeStage.getStageId());
+        //     OrchestratePlan mlstPlan = makePlan(allStages, mlst.getStageId());
+        //     OrchestratePlan seroTypePlan = makePlan(allStages, serotypeStage.getStageId());
 
-            plan.runStages.addAll(mlstPlan.runStages);
-            plan.runStages.addAll(seroTypePlan.runStages);
+        //     plan.runStages.addAll(mlstPlan.runStages);
+        //     plan.runStages.addAll(seroTypePlan.runStages);
 
-            plan.updateStageCommands.addAll(mlstPlan.updateStageCommands);
-            plan.updateStageCommands.addAll(seroTypePlan.updateStageCommands);
-        }
+        //     plan.updateStageCommands.addAll(mlstPlan.updateStageCommands);
+        //     plan.updateStageCommands.addAll(seroTypePlan.updateStageCommands);
+        // }
 
         return plan;
 
@@ -556,7 +570,15 @@ public class StageOrchestrator {
     private OrchestratePlan planDownstreamTaxonomy(List<BioPipelineStage> stages, BioPipelineStage taxonomyStage)
             throws JsonMappingException, JsonProcessingException, MissingUpstreamException {
 
-        return planBacteriaPathogenAnalysis(stages);
+        // return planBacteriaPathogenAnalysis(stages);
+
+        BioPipelineStage serotypeStage = findStageFromStages(stages, PIPELINE_STAGE_SEROTYPE);
+        if(serotypeStage.getStatus() == PIPELINE_STAGE_STATUS_PENDING){
+            return makePlan(stages, serotypeStage.getStageId());
+        }
+
+        return new OrchestratePlan();
+
     }
 
     private OrchestratePlan planForSeroType(List<BioPipelineStage> stages, BioPipelineStage seroTypeStage)

@@ -13,10 +13,15 @@ import org.apache.tomcat.util.bcel.classfile.Constant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializable.Base;
 import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SeroTypeStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
@@ -230,6 +235,27 @@ public class AnalysisPipelineStagesBuilder {
         
         String serializedPamras = JsonUtil.toJson(baseStageParams);
 
+        if(pipelineInput.sequenceLevel == Constants.SequenceInput.SEQUENCE_LEVEL_ASSEMBLY){
+            TaxonomyStageInputUrls taxonomyStageInputUrls = new TaxonomyStageInputUrls();
+            taxonomyStageInputUrls.setContigs(pipelineInput.getR1());
+            taxonomyStageInputUrls.setR1(pipelineInput.getR1());
+            taxonomy.setInputUrl(JsonUtil.toJson(taxonomyStageInputUrls));
+
+            AMRInputUrls amrInputUrls = new AMRInputUrls();
+            amrInputUrls.setContigsUrl(pipelineInput.getR1());
+            amr.setInputUrl(JsonUtil.toJson(amrInputUrls));
+
+            MLSTStageInputUrls mlstStageInputUrls = new MLSTStageInputUrls();
+            mlstStageInputUrls.setContigUrl(pipelineInput.getR1());
+            mlst.setInputUrl(JsonUtil.toJson(mlstStageInputUrls));
+
+            VFStageInputUrls vfStageInputUrls = new VFStageInputUrls();
+            vfStageInputUrls.setContigsUrl(pipelineInput.getR1());
+            vf.setInputUrl(JsonUtil.toJson(vfStageInputUrls));
+
+
+        }
+
         for (BioPipelineStage stage : stages) {
             if(!entryStages.contains(stage.getStageType())){
                 stage.setStageIndex(-1);
@@ -355,7 +381,7 @@ public class AnalysisPipelineStagesBuilder {
 
         buildReadInspectAndQcStages(stages, pipelineInput, pipelineConfigurations);
 
-        startStage = stages.stream().filter(s -> s.getStageIndex() == 0).findAny().orElse(null);
+        startStage = stages.stream().filter(s -> s.getStageType() == PIPELINE_STAGE_READ_INSPECT).findAny().orElse(null);
 
         BioPipelineStage mapping = new BioPipelineStage();
         mapping.setStageType(PIPELINE_STAGE_MAPPING);
