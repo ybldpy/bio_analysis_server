@@ -39,9 +39,9 @@ public class AnalysisPipelineStagesBuilder {
         private List<String> refseqAccessions;
 
         private boolean requireSNPAnnotation;
-        private boolean requireCoverageDepth;
 
         private String refseqObjName;
+        private String gff3ObjName;
 
         public PipelineConfigurations() {
             this.refId = -1;
@@ -60,13 +60,6 @@ public class AnalysisPipelineStagesBuilder {
             this.requireSNPAnnotation = requireSNPAnnotation;
         }
 
-        public boolean isRequireCoverageDepth() {
-            return requireCoverageDepth;
-        }
-
-        public void setRequireCoverageDepth(boolean requireCoverageDepth) {
-            this.requireCoverageDepth = requireCoverageDepth;
-        }
 
         public void setRefId(long refId) {
             this.refId = refId;
@@ -86,6 +79,14 @@ public class AnalysisPipelineStagesBuilder {
 
         public void setRefseqObjName(String refseqObjName) {
             this.refseqObjName = refseqObjName;
+        }
+
+        public String getGff3ObjName() {
+            return gff3ObjName;
+        }
+
+        public void setGff3ObjName(String gff3ObjName) {
+            this.gff3ObjName = gff3ObjName;
         }
 
     }
@@ -153,7 +154,7 @@ public class AnalysisPipelineStagesBuilder {
         return null;
     }
 
-    public static void initializeParameters(BaseStageParams baseStageParams, int sequenceLevel, int analysisTargetType, boolean isInnerRefseq, String refseqObjectName){
+    public static void initializeParameters(BaseStageParams baseStageParams, int sequenceLevel, int analysisTargetType, boolean isInnerRefseq, String refseqObjectName, String gff3Url){
 
         baseStageParams.setAnalysisTargetType(analysisTargetType);
         SequenceMeta sequenceMeta = new SequenceMeta();
@@ -165,6 +166,7 @@ public class AnalysisPipelineStagesBuilder {
         RefSeqConfig refSeqConfig = new RefSeqConfig();
         refSeqConfig.setInnerRefSeq(isInnerRefseq);
         refSeqConfig.setRefseqObjectName(refseqObjectName);
+        refSeqConfig.setGff3Url(gff3Url);
         baseStageParams.setRefSeqConfig(refSeqConfig);
         
     }
@@ -231,7 +233,7 @@ public class AnalysisPipelineStagesBuilder {
 
         BaseStageParams baseStageParams = new BaseStageParams();
 
-        initializeParameters(baseStageParams, pipelineInput.getSequenceLevel(), BaseStageParams.ANALYSIS_TARGET_TYPE_BACTERIA, false, null);
+        initializeParameters(baseStageParams, pipelineInput.getSequenceLevel(), BaseStageParams.ANALYSIS_TARGET_TYPE_BACTERIA, false, null, null);
         
         String serializedPamras = JsonUtil.toJson(baseStageParams);
 
@@ -346,10 +348,8 @@ public class AnalysisPipelineStagesBuilder {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
 
-        RefSeqConfig refSeqConfig = new RefSeqConfig();
-        refSeqConfig.setRefseqObjectName(pipelineConfigurations.getRefseqObjName());
         BaseStageParams baseStageParams = new BaseStageParams();
-        initializeParameters(baseStageParams, pipelineInput.sequenceLevel, BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS, false ,pipelineConfigurations.getRefseqObjName());
+        initializeParameters(baseStageParams, pipelineInput.sequenceLevel, BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS, false ,pipelineConfigurations.getRefseqObjName(), pipelineConfigurations.getGff3ObjName());
 
         BioPipelineStage startStage = null;
 
@@ -359,7 +359,7 @@ public class AnalysisPipelineStagesBuilder {
             referenceComparison.setStageIndex(0);
 
             ReferenceComparisonStageParameters referenceComparisonStageParameters = new ReferenceComparisonStageParameters();
-            referenceComparisonStageParameters.setRefSeqConfig(refSeqConfig);
+            referenceComparisonStageParameters.setRefSeqConfig(baseStageParams.getRefSeqConfig());
 
             ReferenceComparisonStageInputUrls referenceComparisonStageInputUrls = new ReferenceComparisonStageInputUrls();
             referenceComparisonStageInputUrls.setFastaUrl(pipelineInput.getR1());
@@ -373,6 +373,7 @@ public class AnalysisPipelineStagesBuilder {
                     .setStageName(STAGE_NAME_MAP.get(Constants.StageType.PIPELINE_STAGE_REFERENCE_COMPARISON));
             referenceComparison.setInputUrl(serializedInput);
             referenceComparison.setParameters(serializedParameters);
+            referenceComparison.setStageName(PIPELINE_STAGE_NAME_REFERENCE_COMPARISON);
 
             stages.add(referenceComparison);
 
@@ -397,14 +398,9 @@ public class AnalysisPipelineStagesBuilder {
 
         if (pipelineConfigurations.isRequireSNPAnnotation()) {
             BioPipelineStage snp = new BioPipelineStage();
+            
             snp.setStageType(PIPELINE_STAGE_SNP_ANNOTATION);
             stages.add(snp);
-        }
-
-        if (pipelineConfigurations.isRequireCoverageDepth()) {
-            BioPipelineStage depth = new BioPipelineStage();
-            depth.setStageType(PIPELINE_STAGE_DEPTH_COVERAGE);
-            stages.add(depth);
         }
 
         String serializedParams = JsonUtil.toJson(baseStageParams);

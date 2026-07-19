@@ -170,10 +170,76 @@ public class AnalysisPipelineToolsConfig {
         this.fastplong = fastplong;
     }
 
+    
+
+
+    private List<String> dada2;
+
     private List<String> fastplong;
 
     private List<String> samtools;
+    public List<String> getDada2Taxonomy() {
+        return dada2Taxonomy;
+    }
+
+
+    public void setDada2Taxonomy(List<String> dada2Taxonomy) {
+        this.dada2Taxonomy = dada2Taxonomy;
+    }
+
     private List<String> minimap2;
     private List<String> bcftools;
+
+    private List<String> dada2Taxonomy;
+
+    private List<String> amplicon16sSummary;
+
+    private List<String> bowtie2;
+
+    private List<String> bracken;
+    
+    
+    
+    
+
+
+    public List<String> getDada2() {
+        return dada2;
+    }
+
+
+    public void setDada2(List<String> dada2) {
+        this.dada2 = dada2;
+    }
+
+
+    public List<String> getAmplicon16sSummary() {
+        return amplicon16sSummary;
+    }
+
+
+    public void setAmplicon16sSummary(List<String> amplicon16sSummary) {
+        this.amplicon16sSummary = amplicon16sSummary;
+    }
+
+
+    public List<String> getBowtie2() {
+        return bowtie2;
+    }
+
+
+    public void setBowtie2(List<String> bowtie2) {
+        this.bowtie2 = bowtie2;
+    }
+
+
+    public List<String> getBracken() {
+        return bracken;
+    }
+
+
+    public void setBracken(List<String> bracken) {
+        this.bracken = bracken;
+    }
 
 }

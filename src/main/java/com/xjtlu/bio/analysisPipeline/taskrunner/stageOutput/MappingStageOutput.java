@@ -8,29 +8,41 @@ public class MappingStageOutput implements StageOutput{
     public static final String BAM = "aln.sorted.bam";
     public static final String BAM_INDEX = "aln.sorted.bam.bai";
 
-    private String bamPath;
-    private String bamIndexPath;
-    public String getBamPath() {
+    public static final String COVERAGE_DEPTH = "depth.tsv";
+
+    private Path bamPath;
+    private Path bamIndexPath;
+    private Path coverageDepthPath;
+
+
+    public Path getCoverageDepthPath() {
+        return coverageDepthPath;
+    }
+    public void setCoverageDepthPath(Path coverageDepthPath) {
+        this.coverageDepthPath = coverageDepthPath;
+    }
+    public Path getBamPath() {
         return bamPath;
     }
-    public void setBamPath(String bamPath) {
+    public void setBamPath(Path bamPath) {
         this.bamPath = bamPath;
     }
-    public MappingStageOutput(String bamPath, String bamIndexPath) {
+    public MappingStageOutput(Path bamPath, Path bamIndexPath, Path coverageDepthPath) {
         this.bamPath = bamPath;
         this.bamIndexPath = bamIndexPath;
+        this.coverageDepthPath = coverageDepthPath;
     }
-    public String getBamIndexPath() {
+    public Path getBamIndexPath() {
         return bamIndexPath;
     }
-    public void setBamIndexPath(String bamIndexPath) {
+    public void setBamIndexPath(Path bamIndexPath) {
         this.bamIndexPath = bamIndexPath;
     }
 
     @Override
     public Path getParentPath() {
         // TODO Auto-generated method stub
-        return Path.of(bamPath).getParent();
+        return bamIndexPath.toAbsolutePath().getParent();
     }
     
 

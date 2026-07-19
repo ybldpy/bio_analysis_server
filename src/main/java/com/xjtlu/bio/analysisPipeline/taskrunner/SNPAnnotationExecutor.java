@@ -2,11 +2,12 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_SNP_ANNOTATION;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -16,24 +17,25 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SNPAnnotationStageP
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SNPAnnotationStageOutput;
 
-public class SNPAnnotationExecutor extends AbstractPipelineStageExector<SNPAnnotationStageOutput, SNPAnnotationInputs, SNPAnnotationStageParameters> implements PipelineStageExecutor<SNPAnnotationStageOutput>{
+@Component
+public class SNPAnnotationExecutor extends
+        AbstractPipelineStageExector<SNPAnnotationStageOutput, SNPAnnotationInputs, SNPAnnotationStageParameters>
+        implements PipelineStageExecutor<SNPAnnotationStageOutput> {
 
-
-    private String getGFFObjectName(String gff){
-        return "GFF"+gff;
+    private String getGFFObjectName(String gff) {
+        return "GFF" + gff;
     }
-
 
     @Override
     protected Class<SNPAnnotationInputs> stageInputType() {
         return SNPAnnotationInputs.class;
     }
 
-
     @Override
     protected Class<SNPAnnotationStageParameters> stageParameterType() {
         return SNPAnnotationStageParameters.class;
     }
+
     @Override
     protected StageRunResult<SNPAnnotationStageOutput> _execute(StageExecutionInput stageExecutionInput)
             throws JsonMappingException, JsonProcessingException, LoadFailException, NotGetRefSeqException {
@@ -44,46 +46,59 @@ public class SNPAnnotationExecutor extends AbstractPipelineStageExector<SNPAnnot
         SNPAnnotationStageParameters snpAnnotationStageParameters = stageExecutionInput.stageParameters;
 
         RefSeqConfig refSeqConfig = snpAnnotationStageParameters.getRefSeqConfig();
-        List<String> accessions = refSeqConfig.getAccessions();
 
-        long refseqId = refSeqConfig.getRefseqId();
-        File refseq = refSeqService.getRefSeqIndex(refseqId);
-        if (refseq == null) {
-            throw new NotGetRefSeqException(String.valueOf(refseqId), "Not found RefSeq = "+refseqId);  
-        }
+        HashMap<String, Path> loadMap = new HashMap<>();
 
-        HashMap<String,Path> loadMap = new HashMap<>();
-        List<Path> accessionGFFPaths = new ArrayList<>();
-        for(String accession:accessions){
-            String accessionAnnotationFileName = accession + ".gff3";
-            Path gffLocalPath = stageExecutionInput.inputDir.resolve(accessionAnnotationFileName);
-            accessionGFFPaths.add(gffLocalPath);
-            loadMap.put(getGFFObjectName(accessionAnnotationFileName), gffLocalPath);
-        }
-
-        Path vcfInputPath =  stageExecutionInput.inputDir.resolve(snpAnnotationInputs.getVcfUrl().substring(snpAnnotationInputs.getVcfUrl().lastIndexOf("/")+1));
+        Path vcfInputPath = stageExecutionInput.inputDir.resolve(
+                snpAnnotationInputs.getVcfUrl().substring(snpAnnotationInputs.getVcfUrl().lastIndexOf("/") + 1));
+        Path refseqPath = stageExecutionInput.inputDir.resolve(
+                refSeqConfig.getRefseqObjectName().substring(refSeqConfig.getRefseqObjectName().lastIndexOf("/") + 1));
+        Path gffPath = stageExecutionInput.inputDir
+                .resolve(refSeqConfig.getGff3Url().substring(refSeqConfig.getGff3Url().lastIndexOf("/") + 1));
 
         loadMap.put(snpAnnotationInputs.getVcfUrl(), vcfInputPath);
+        loadMap.put(refSeqConfig.getRefseqObjectName(), refseqPath);
+        loadMap.put(refSeqConfig.getGff3Url(), gffPath);
+
         loadInput(loadMap);
 
-        Path gffPath = accessionGFFPaths.get(0);
-
         Path outputPath = stageExecutionInput.workDir.resolve("annotated.vcf");
-        List<String> cmd = this.analysisPipelineToolsConfig.getVep();
-        cmd.add("-i");
-        cmd.add(vcfInputPath.toString());
-        cmd.add("-o");
-        cmd.add(outputPath.toString());
-        cmd.add("--vcf");
-        cmd.add("--gff");
-        cmd.add(gffPath.toString());
-        cmd.add("--fasta");
-        cmd.add(refseq.toPath().toString());
-        cmd.add("--offline");
-        cmd.add("--force_overwrite");
+        List<String> cmd = new ArrayList<>();
+        if (false) {
+            cmd.addAll(this.analysisPipelineToolsConfig.getVep());
+            cmd.add("-i");
+            cmd.add(vcfInputPath.toString());
+            cmd.add("-o");
+            cmd.add(outputPath.toString());
+            cmd.add("--vcf");
+            cmd.add("--gff");
+            cmd.add(gffPath.toString());
+            cmd.add("--fasta");
+            cmd.add(refseqPath.toString());
+            // cmd.add("--offline");
+            cmd.add("--force_overwrite");
+        } else {
+            cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
+
+            cmd.add("csq");
+
+            cmd.add("-f");
+            cmd.add(refseqPath.toString());
+
+            cmd.add("-g");
+            cmd.add(gffPath.toString());
+
+            // 输出普通 VCF，和你现在 outputPath = annotated.vcf 对应
+            cmd.add("-Ov");
+
+            cmd.add("-o");
+            cmd.add(outputPath.toString());
+
+            cmd.add(vcfInputPath.toString());
+        }
 
         boolean res = _execute(cmd, null, stageExecutionInput, outputPath);
-        if(!res){
+        if (!res) {
             return this.runFail(bioPipelineStage, "run failed", stageExecutionInput.workDir);
         }
         return OK(new SNPAnnotationStageOutput(outputPath), stageExecutionInput);
@@ -95,8 +110,5 @@ public class SNPAnnotationExecutor extends AbstractPipelineStageExector<SNPAnnot
         // TODO Auto-generated method stub
         return PIPELINE_STAGE_SNP_ANNOTATION;
     }
-
-
-
 
 }

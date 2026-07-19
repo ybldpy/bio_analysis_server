@@ -23,15 +23,17 @@ refSeqService:
 
 
 
+
+
+scriptsDir: "/home/jcy/bio_analysis_server/scripts"
+humanBowtie2IndexDir: "/home/jcy/bioData/human_grch38_bowtie2_index"
+kraken2Standard8Dir: "/home/jcy/bioData/kraken2_standard_8"
+
 analysis-pipeline:
 
 
     conda: "/usr/conda/condabin/conda"
-
-
-
-
-
+    covid19-gff3: "gff/NC_045512.2.sorted.gff3.gz"
 
 
     tools:
@@ -53,8 +55,11 @@ analysis-pipeline:
         vep: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
         fastplong: ["${analysis-pipeline.conda}", "run", "-n", "fastplong", "fastplong"]
         bbmapPath: "/home/jcy/test/bio_test/bbmap"
-        
-
+        dada2: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/dada2Script.R"]
+        dada2Taxonomy: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/dada2Taxonomy.R"]
+        amplicon16SSummary: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/amplicon16s_summary.R"]
+        bowtie2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "bowtie2"]
+        bracken: ["${analysis-pipeline.conda}", "run", "-n", "bio-taxonomy", "bracken"]
 
 
     covid2RefSeq:
@@ -96,6 +101,9 @@ analysis-pipeline:
         taxonomy:
             kraken2DB: "/home/jcy/refereceTmp/kraken2_db/k2_panel"
             fastANIDB: "/home/jcy/refereceTmp/taxonomySpecDB/db/refs"
+
+        amlicon16s:
+            silvaTrainset: /home/jcy/bioData/silva_nr99_v138.2_toGenus_trainset.fa.gz
 
         
 

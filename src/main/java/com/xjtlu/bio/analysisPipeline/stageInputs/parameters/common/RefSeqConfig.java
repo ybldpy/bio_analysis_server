@@ -39,15 +39,23 @@ public class RefSeqConfig {
     private String refseqObjectName;
     private long refseqId;
     
-
-    //for locate gff file
-    private List<String> accessions;
+    private String gff3Url;
     public List<String> getAccessions() {
-        return accessions;
+        return null;
     }
     public void setAccessions(List<String> accessions) {
-        this.accessions = accessions;
+        
     }
+    public String getGff3Url() {
+        return gff3Url;
+    }
+    public void setGff3Url(String gff3Url) {
+        this.gff3Url = gff3Url;
+    }
+
+    
+
+
 
     
 }

@@ -379,6 +379,10 @@ public class Constants {
 
         public static final int PIPELINE_STAGE_READ_INSPECT = 80;
 
+        public static final int PIPELINE_STAGE_METAGENOMICS_AMPLICON16S = 90;
+        public static final int PIPELINE_STAGE_METAGENOMICS_SHORTGUN = 91;
+
+
         // 物种鉴定
         public static final String PIPELINE_STAGE_NAME_TAXONOMY = "物种鉴定 (Taxonomy)";
 
@@ -400,6 +404,7 @@ public class Constants {
         // SNP / 溯源
         public static final String PIPELINE_STAGE_NAME_SNP_SINGLE = "单样本 SNP 分析";
         public static final String PIPELINE_STAGE_NAME_SNP_CORE = "核心 SNP 分析 / 建树";
+        public static final String PIPELINE_STAGE_NAME_SNP_ANNOTATION = "SNP功能注释";
 
         public static final String PIPELINE_STAGE_NAME_QC = "质控 (QC)";
         public static final String PIPELINE_STAGE_NAME_ASSEMBLY = "组装 (Assembly)";
@@ -407,6 +412,8 @@ public class Constants {
         public static final String PIPELINE_STAGE_NAME_VARIANT = "变异检测 (Variant calling)";
 
         public static final String PIPELINE_STAGE_NAME_READ_INSPECT = "预处理";
+
+        public static final String PIPELINE_STAGE_NAME_REFERENCE_COMPARISON = "参考基因组比对";
 
         public static final Map<Integer, String> STAGE_NAME_MAP = Map.ofEntries(
                 Map.entry(PIPELINE_STAGE_QC, PIPELINE_STAGE_NAME_QC),
@@ -419,7 +426,10 @@ public class Constants {
                 Map.entry(PIPELINE_STAGE_AMR, PIPELINE_STAGE_NAME_AMR),
                 Map.entry(PIPELINE_STAGE_SEROTYPE, PIPELINE_STAGE_NAME_SEROTYPE),
                 Map.entry(PIPELINE_STAGE_VIRULENCE, PIPELINE_STAGE_NAME_VIRULENCE),
-                Map.entry(PIPELINE_STAGE_READ_INSPECT, PIPELINE_STAGE_NAME_READ_INSPECT));
+                Map.entry(PIPELINE_STAGE_READ_INSPECT, PIPELINE_STAGE_NAME_READ_INSPECT),
+                Map.entry(PIPELINE_STAGE_SNP_ANNOTATION, PIPELINE_STAGE_NAME_SNP_ANNOTATION),
+                Map.entry(PIPELINE_STAGE_DEPTH_COVERAGE, PIPELINE_STAGE_NAME_DEPTH_COVERAGE)
+            );
     }
 
     private Constants() {

@@ -187,9 +187,36 @@ public class MappingStageExecutor
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
         }
 
-        StageRunResult<MappingStageOutput> stageRunResult = OK(new MappingStageOutput(bamSortedTmp.toString(), bamIndexTmp.toString()), stageExecutionInput);
 
-        return stageRunResult;
+
+        Path coverageDepthPath = stageExecutionInput.workDir.resolve("coverage_depth.tsv");
+        cmd.clear();
+        cmd.addAll(analysisPipelineToolsConfig.getSamtools());
+        cmd.addAll(List.of(
+            "depth",
+            "-aa",
+            bamSortedTmp.toAbsolutePath().toString()
+        ));
+
+        executeResult = _execute(cmd, workDir, coverageDepthPath, null);
+        if (!executeResult.success()) {
+            logger.error("stage id = {}, 生成coverage depth失败. exit code = {}, exception = ", bioPipelineStage,
+                    executeResult.runCode, executeResult.ex);
+            return this.runFail(bioPipelineStage, "生成coverage depth失败", executeResult.ex, workDir);
+        }
+
+        errorOutput = validateOutputFiles(coverageDepthPath);
+        if (!errorOutput.isEmpty()) {
+            StageOutputValidationResult error = errorOutput.get(0);
+            logger.error("stage id = {}, 未生成coverage depth文件. ", bioPipelineStage, error.ioException);
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
+        }
+
+        return OK(
+            new MappingStageOutput(bamSortedTmp, bamIndexTmp, coverageDepthPath),
+            stageExecutionInput
+        );
+
     }
 
     private String buildMappingPipelineCmd(File refSeq, Path r1, Path r2, Path bamSortedOut) {

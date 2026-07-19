@@ -23,6 +23,8 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
     @Value("${analysis-pipeline.stage.mapping.bamIndexFileName}")
     private String bamIndexFileName;
 
+    private static final String COVERAGE_DEPTH_FILE_NAME = "coverage_depth.tsv";
+
     @Override
     public int getType() {
         return PIPELINE_STAGE_MAPPING;
@@ -48,10 +50,18 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
 
         String bamUrl = this.createStoreObjectName(stageRunResult.getStage(),bamFileName);
         String bamIndexUrl = this.createStoreObjectName(stageRunResult.getStage(), bamIndexFileName);
+        String coverageDepthUrl = this.createStoreObjectName(stageRunResult.getStage(), COVERAGE_DEPTH_FILE_NAME);
+        
 
         return Pair.of(
-            Map.of(stageRunResult.getStageOutput().getBamPath(), bamUrl, stageRunResult.getStageOutput().getBamIndexPath(), bamIndexUrl),
-            new MappingResult(bamUrl, bamIndexUrl)
+            Map.of(
+                stageRunResult.getStageOutput().getBamPath().toAbsolutePath().toString(), 
+                bamUrl, 
+                stageRunResult.getStageOutput().getBamIndexPath().toAbsolutePath().toString(), 
+                bamIndexUrl,
+                stageRunResult.getStageOutput().getCoverageDepthPath().toAbsolutePath().toString(),
+                coverageDepthUrl),
+            new MappingResult(bamUrl, bamIndexUrl, coverageDepthUrl)
         );
     }
 

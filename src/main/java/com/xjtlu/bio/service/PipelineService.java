@@ -147,6 +147,16 @@ public class PipelineService {
     private static final int SCHEDULE_UPSTREAM_NOT_READY = 300;
     private static final int SCHEDULE_PIPELINE_COMPELETE = 400;
 
+    private static final int COVID_19_TAX_ID = 2697049;
+
+
+    @Value("${analysis-pipeline.covid19-gff3}")
+    private String covid19Gff3Path;
+
+
+
+
+
 
     @Transactional
     public Result<Long> createPipeline(CreateAnalysisPipelineRequest createAnalysisPipelineRequest) {
@@ -489,6 +499,11 @@ public class PipelineService {
         Integer taxId = pipelineStageParameters.getTaxId();
 
         BioRefseq bioRefSeq = null;
+
+
+        if(bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID){
+            taxId = COVID_19_TAX_ID;
+        }
         if (taxId != null) {
 
             BioRefseqExample bioRefseqExample = new BioRefseqExample();
@@ -740,6 +755,11 @@ public class PipelineService {
 
         if (refseq != null) {
             pipelineConfigurations.setRefseqObjName(this.refSeqService.getVirusRefSeqObjectName(refseq));
+        }
+
+        if(pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID){
+            pipelineConfigurations.setRequireSNPAnnotation(true);
+            pipelineConfigurations.setGff3ObjName(covid19Gff3Path);
         }
 
         if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS
