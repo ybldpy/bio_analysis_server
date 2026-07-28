@@ -18,6 +18,8 @@ public class AnalysisPipelineToolsConfig {
     private List<String> amrfinder;
     private List<String> virulenceFactor;
 
+    private List<String> checkm2;
+
 
     private List getCopy(List tool){
         return new ArrayList<>(tool);
@@ -197,9 +199,78 @@ public class AnalysisPipelineToolsConfig {
     private List<String> bowtie2;
 
     private List<String> bracken;
+
+    public List<String> getMegahit() {
+        return megahit;
+    }
+
+
+    public void setMegahit(List<String> megahit) {
+        this.megahit = megahit;
+    }
+
+    private List<String> megahit;
     
     
     
+    private List<String> bowtie2Build;
+
+    public List<String> getSeqkit() {
+        return seqkit;
+    }
+
+
+    public void setSeqkit(List<String> seqkit) {
+        this.seqkit = seqkit;
+    }
+
+
+    public List<String> getProdigal() {
+        return prodigal;
+    }
+
+
+    public void setProdigal(List<String> prodigal) {
+        this.prodigal = prodigal;
+    }
+
+
+    public List<String> getEggnogMapper() {
+        return eggnogMapper;
+    }
+
+
+    public void setEggnogMapper(List<String> eggnogMapper) {
+        this.eggnogMapper = eggnogMapper;
+    }
+
+
+    public List<String> getJgiSummarizeBamContigDepths() {
+        return jgiSummarizeBamContigDepths;
+    }
+
+
+    public void setJgiSummarizeBamContigDepths(List<String> jgiSummarizeBamContigDepths) {
+        this.jgiSummarizeBamContigDepths = jgiSummarizeBamContigDepths;
+    }
+
+
+    public List<String> getMetabat2() {
+        return metabat2;
+    }
+
+
+    public void setMetabat2(List<String> metabat2) {
+        this.metabat2 = metabat2;
+    }
+
+    private List<String> seqkit;
+    private List<String> prodigal;
+    private List<String> eggnogMapper;
+    private List<String> jgiSummarizeBamContigDepths;
+    private List<String> metabat2;
+    
+     
     
 
 
@@ -240,6 +311,26 @@ public class AnalysisPipelineToolsConfig {
 
     public void setBracken(List<String> bracken) {
         this.bracken = bracken;
+    }
+
+
+    public List<String> getBowtie2Build() {
+        return bowtie2Build;
+    }
+
+
+    public void setBowtie2Build(List<String> bowtie2Build) {
+        this.bowtie2Build = bowtie2Build;
+    }
+
+
+    public List<String> getCheckm2() {
+        return checkm2;
+    }
+
+
+    public void setCheckm2(List<String> checkm2) {
+        this.checkm2 = checkm2;
     }
 
 }

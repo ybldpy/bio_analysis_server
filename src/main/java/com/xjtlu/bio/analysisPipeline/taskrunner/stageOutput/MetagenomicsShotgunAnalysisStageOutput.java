@@ -5,10 +5,6 @@ import java.nio.file.Path;
 public class MetagenomicsShotgunAnalysisStageOutput implements StageOutput {
 
 
-    //  /**
-    //  * 质量控制汇总结果。
-    //  */
-    // private final Path qualityControlSummaryPath;
 
     /**
      * Kraken2 生成的分类汇总报告。

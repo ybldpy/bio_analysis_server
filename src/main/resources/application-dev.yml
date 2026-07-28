@@ -28,6 +28,9 @@ refSeqService:
 scriptsDir: "/home/jcy/bio_analysis_server/scripts"
 humanBowtie2IndexDir: "/home/jcy/bioData/human_grch38_bowtie2_index"
 kraken2Standard8Dir: "/home/jcy/bioData/kraken2_standard_8"
+eggnogDBDir: "/home/jcy/bioData/eggnog_data"
+checkM2DB: "/home/jcy/bioData/checkm2_database/uniref100.KO.1.dmnd"
+
 
 analysis-pipeline:
 
@@ -60,7 +63,14 @@ analysis-pipeline:
         amplicon16SSummary: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/amplicon16s_summary.R"]
         bowtie2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "bowtie2"]
         bracken: ["${analysis-pipeline.conda}", "run", "-n", "bio-taxonomy", "bracken"]
-
+        megahit: ["${analysis-pipeline.conda}", "run", "-n", "bio-megahit", "megahit"]
+        bowtie2Build: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "bowtie2-build"]
+        seqkit: ["${analysis-pipeline.conda}", "run", "-n", "bio-shotgun", "seqkit"]
+        prodigal: ["${analysis-pipeline.conda}", "run", "-n", "bio-shotgun", "prodigal"]
+        eggnogMapper: ["${analysis-pipeline.conda}", "run", "-n", "bio-eggnog", "emapper.py"]
+        jgiSummarizeBamContigDepths: ["${analysis-pipeline.conda}", "run", "-n", "bio-shotgun", "jgi_summarize_bam_contig_depths"]
+        metabat2: ["${analysis-pipeline.conda}", "run", "-n", "bio-shotgun", "metabat2"]
+        checkm2: ["${analysis-pipeline.conda}", "run", "-n", "bio-checkm2", "python", "/home/jcy/bio_analysis_server/scripts/checkm2_cpu.py"]
 
     covid2RefSeq:
         accession: "NC_045512.2"

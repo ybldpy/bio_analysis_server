@@ -28,65 +28,68 @@ public class ProjectService {
     @Resource
     private BioUserMapper bioUserMapper;
 
-    public Result<BioProject> createProject(String projectName){
+    public Result<Long> createProject(String projectName, String projectDescription){
 
         BioProject project = new BioProject();
         project.setProjectName(projectName);
+        project.setDescription(projectDescription);
         
         try{
             int success = projectMapper.insertSelective(project);
             if(success < 0){
-                return new Result<>(Result.INTERNAL_FAIL,null , "创建项目失败");
+                return new Result<>(Result.INTERNAL_FAIL,-1l , "创建项目失败");
             }
-            return new Result<>(Result.SUCCESS, project,null);
+            return new Result<>(Result.SUCCESS, project.getPid(),null);
         }catch(DuplicateKeyException e){
             return new Result<>(Result.BUSINESS_FAIL, null , "项目名已存在");
         }
     }
 
 
+    public List<BioProject> queryProjects(BioProjectExample query){
+        return this.projectMapper.selectByExample(query);
+    }
     
-    public Result<List<BioProjectDTO>> getAllProjects(){
+    public Result<List<BioProject>> getAllProjects(){
         BioProjectExample bioProjectExample = new BioProjectExample();
         List<BioProject> projects = projectMapper.selectByExample(bioProjectExample);
         HashMap<Long, ArrayList<BioProject>> creatorIdMap = new HashMap<>();
 
         if(projects.isEmpty()){
-            return new Result<List<BioProjectDTO>>(Result.SUCCESS, new ArrayList<>(), null);
+            return new Result<List<BioProject>>(Result.SUCCESS, new ArrayList<>(), null);
         }
 
-        for(BioProject p: projects){
-            creatorIdMap.putIfAbsent(p.getCreatedBy(), new ArrayList<>());
-            creatorIdMap.get(p.getCreatedBy()).add(p);
-        }
+        // for(BioProject p: projects){
+        //     creatorIdMap.putIfAbsent(p.getCreatedBy(), new ArrayList<>());
+        //     creatorIdMap.get(p.getCreatedBy()).add(p);
+        // }
 
-        List<Long> creatorIdList = creatorIdMap.keySet().stream().toList();
+        // List<Long> creatorIdList = creatorIdMap.keySet().stream().toList();
 
-        BioUserExample bioUserExample = new BioUserExample();
-        bioUserExample.createCriteria().andUidIn(creatorIdList);
+        // BioUserExample bioUserExample = new BioUserExample();
+        // bioUserExample.createCriteria().andUidIn(creatorIdList);
 
-        List<BioUser> users = bioUserMapper.selectByExample(bioUserExample);
+        // List<BioUser> users = bioUserMapper.selectByExample(bioUserExample);
 
-        ArrayList<BioProjectDTO> projectDTOs = new ArrayList<>(projects.size());
+        // ArrayList<BioProjectDTO> projectDTOs = new ArrayList<>(projects.size());
 
-        for(BioProject p: projects){
-            BioUser creator = null;
-            for(BioUser user: users){
-                if(user.getUid().equals(p.getCreatedBy())){
-                    creator = user;
-                    break;
-                }
-            }
+        // for(BioProject p: projects){
+        //     BioUser creator = null;
+        //     for(BioUser user: users){
+        //         if(user.getUid().equals(p.getCreatedBy())){
+        //             creator = user;
+        //             break;
+        //         }
+        //     }
         
-            BioProjectDTO bioProjectDTO = new BioProjectDTO(p.getPid(), p.getProjectName(), null, null);
-            if(creator!=null){
-                bioProjectDTO.setCreatorId(creator.getUid());
-                bioProjectDTO.setCreatorName(creator.getName());
-            }
-            projectDTOs.add(bioProjectDTO);
-        }
-
-        return new Result<>(Result.SUCCESS, projectDTOs, null);
+        //     BioProjectDTO bioProjectDTO = new BioProjectDTO(p.getPid(), p.getProjectName(), null, null);
+        //     if(creator!=null){
+        //         bioProjectDTO.setCreatorId(creator.getUid());
+        //         bioProjectDTO.setCreatorName(creator.getName());
+        //     }
+        //     projectDTOs.add(bioProjectDTO);
+        // }
+        return new Result<>(Result.SUCCESS, projects, null);
         
     }
 }

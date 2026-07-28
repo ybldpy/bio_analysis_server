@@ -43,6 +43,9 @@ public class Constants {
         public static final int PIPELINE_SNP_SUB_ANALYSIS = 301;
         public static final int PIPELINE_SNP_ANALYSIS_MERGE = 302;
 
+        public static final int PIPELINE_METAGENOME_AMPLICON16S = 400;
+        public static final int PIPELINE_METAGENOME_SHOTGUN = 401;
+
     }
 
     public static final class CompressedFormat {

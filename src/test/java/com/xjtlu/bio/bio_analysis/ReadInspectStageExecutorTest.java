@@ -149,7 +149,7 @@ class ReadInspectStageExecutorBlackBoxTest {
         inputUrls.setRead2Url(read2Url);
 
         BaseStageParams params = new BaseStageParams();
-        AnalysisPipelineStagesBuilder.initializeParameters(params, Constants.SequenceInput.SEQUENCE_LEVEL_READ, BaseStageParams.ANALYSIS_TARGET_TYPE_BACTERIA, false, null);
+        //AnalysisPipelineStagesBuilder.initializeParameters(params, Constants.SequenceInput.SEQUENCE_LEVEL_READ, BaseStageParams.ANALYSIS_TARGET_TYPE_BACTERIA, false, null);
         
         BioPipelineStage stage = new BioPipelineStage();
 

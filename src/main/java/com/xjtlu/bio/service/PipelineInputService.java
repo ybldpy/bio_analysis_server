@@ -2,21 +2,15 @@ package com.xjtlu.bio.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.StringUtils;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.common.Result;
@@ -44,6 +38,10 @@ public class PipelineInputService {
     public static final int RESPONSE_CODE_FILE_EXIST = 100;
     public static final int RESPONSE_CODE_INVALID_KEY = 110;
     public static final int RESPONSE_CODE_BAD_KEY = 120;
+
+    public static final int RESPONSE_CODE_PIPELINE_NOT_EXIST = 200;
+    public static final int RESPONSE_CODE_PIPELINE_ALREADY_START = 201;
+
 
     @Resource
     private BioPipelineInputFileMapper bioPipelineInputFileMapper;
@@ -268,7 +266,7 @@ public class PipelineInputService {
             });
 
             if (pipelineUploadingCnt == -1) {
-                return new Result<Long>(Result.BUSINESS_FAIL, -1l, "分析任务正在启动");
+                return new Result<Long>(RESPONSE_CODE_PIPELINE_ALREADY_START, -1l, "分析任务正在启动");
             }
 
             BioAnalysisPipelineExample bioAnalysisPipelineExample = new BioAnalysisPipelineExample();
@@ -281,12 +279,12 @@ public class PipelineInputService {
 
             List<BioAnalysisPipeline> pipelines = pipelinesResult.getData();
             if (pipelines == null || pipelines.isEmpty()) {
-                return new Result(Result.BUSINESS_FAIL, -1l, "分析任务不存在");
+                return new Result(RESPONSE_CODE_PIPELINE_NOT_EXIST, -1l, "分析任务不存在");
             }
 
             BioAnalysisPipeline pipeline = pipelines.get(0);
             if (pipeline.getStatus() != PipelineService.PIPELINE_STATUS_PENDING) {
-                return new Result(Result.BUSINESS_FAIL, -1l, "分析任务已经启动");
+                return new Result(RESPONSE_CODE_PIPELINE_ALREADY_START, -1l, "分析任务已经启动");
             }
 
             BioPipelineInputFileExample query = new BioPipelineInputFileExample();

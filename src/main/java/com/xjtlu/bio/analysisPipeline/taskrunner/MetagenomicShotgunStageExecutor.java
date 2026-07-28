@@ -16,6 +16,7 @@ import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -25,6 +26,9 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MetagenomicsShotgunAnalysisStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.SequenceFileUtil;
 
+
+
+@Component
 public class MetagenomicShotgunStageExecutor extends
         AbstractPipelineStageExector<MetagenomicsShotgunAnalysisStageOutput, MetagenomicsAnalysisStageInputUrls, BaseStageParams>
         implements PipelineStageExecutor<MetagenomicsShotgunAnalysisStageOutput> {
@@ -34,6 +38,12 @@ public class MetagenomicShotgunStageExecutor extends
 
     @Value("${kraken2Standard8Dir}")
     private String kraken2DBDir;
+
+    @Value("${eggnogDBDir}")
+    private String eggnogDBDir;
+
+    @Value("${checkM2DB}")
+    private String checkM2DBPath;
 
     @Override
     protected Class<MetagenomicsAnalysisStageInputUrls> stageInputType() {
@@ -60,7 +70,7 @@ public class MetagenomicShotgunStageExecutor extends
         Path bowtie2LogPath = workDir.resolve("bowtie2.log");
         cmd.addAll(List.of(
                 "--very-sensitive-local",
-                "-x", this.humanBowtie2IndexDir));
+                "-x", Path.of(this.humanBowtie2IndexDir, "grch38").toString()));
 
         boolean isPaired = r2 != null;
 
@@ -346,6 +356,260 @@ public class MetagenomicShotgunStageExecutor extends
         }
     }
 
+    private ExecuteResult doMegahit(
+            Path workDir,
+            Path r1Path,
+            Path r2Path,
+            Path outputDir,
+            int threads) {
+
+        List<String> cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getMegahit());
+
+        if (r2Path != null) {
+            cmd.addAll(List.of(
+                    "-1", r1Path.toString(),
+                    "-2", r2Path.toString()));
+        } else {
+            cmd.addAll(List.of(
+                    "-r", r1Path.toString()));
+        }
+
+        cmd.addAll(List.of(
+                "-o", outputDir.toString(),
+                "-t", String.valueOf(threads)));
+
+        return _execute(cmd, workDir);
+    }
+
+    private ExecuteResult doAssemblySummary(
+            Path workDir,
+            Path contigsPath,
+            Path summaryPath) {
+
+        List<String> cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getSeqkit());
+
+        cmd.addAll(List.of(
+                "stats",
+                "--all",
+                "--tabular",
+                "-o", summaryPath.toString(),
+                contigsPath.toString()));
+
+        return _execute(cmd, workDir);
+    }
+
+    private ExecuteResult doProdigal(
+            Path workDir,
+            Path contigsPath,
+            Path predictedGenesPath,
+            Path predictedProteinsPath,
+            Path predictedGenesGffPath) {
+
+        List<String> cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getProdigal());
+
+        cmd.addAll(List.of(
+                "-i", contigsPath.toString(),
+                "-p", "meta",
+                "-d", predictedGenesPath.toString(),
+                "-a", predictedProteinsPath.toString(),
+                "-o", predictedGenesGffPath.toString(),
+                "-f", "gff"));
+
+        return _execute(cmd, workDir);
+    }
+
+    private ExecuteResult doEggnogMapper(
+            Path workDir,
+            Path predictedProteinsPath,
+            Path outputDir,
+            String outputPrefix,
+            int threads) {
+
+        List<String> cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getEggnogMapper());
+
+        cmd.addAll(List.of(
+                "-m", "diamond",
+                "-i", predictedProteinsPath.toString(),
+                "--itype", "proteins",
+                "--data_dir", this.eggnogDBDir,
+                "-o", outputPrefix,
+                "--output_dir", outputDir.toString(),
+                "--cpu", String.valueOf(threads)));
+
+        return _execute(cmd, workDir);
+    }
+
+    private ExecuteResult doBinning(
+            Path workDir,
+            Path contigsPath,
+            Path r1Path,
+            Path r2Path,
+            Path binsDir,
+            int threads) {
+
+        Path contigsIndexPrefix = workDir.resolve("contigs_index");
+        Path alignmentSamPath = workDir.resolve("reads_to_contigs.sam");
+        Path sortedBamPath = workDir.resolve("reads_to_contigs.sorted.bam");
+        Path contigDepthPath = workDir.resolve("contig_depth.txt");
+        Path binPrefix = binsDir.resolve("bin");
+
+        /*
+         * 1. 为 MEGAHIT contigs 构建 Bowtie2 索引
+         */
+        List<String> buildIndexCmd = new ArrayList<>();
+        buildIndexCmd.addAll(
+                this.analysisPipelineToolsConfig.getBowtie2Build());
+
+        buildIndexCmd.addAll(List.of(
+                contigsPath.toString(),
+                contigsIndexPrefix.toString()));
+
+        ExecuteResult buildIndexResult = _execute(
+                buildIndexCmd,
+                workDir);
+
+        if (!buildIndexResult.success()) {
+            return buildIndexResult;
+        }
+
+        /*
+         * 2. 将去宿主后的 reads 回贴到 contigs
+         */
+        List<String> mappingCmd = new ArrayList<>();
+        mappingCmd.addAll(
+                this.analysisPipelineToolsConfig.getBowtie2());
+
+        mappingCmd.addAll(List.of(
+                "--very-sensitive",
+                "-x", contigsIndexPrefix.toString(),
+                "-p", String.valueOf(threads)));
+
+        if (r2Path != null) {
+            mappingCmd.addAll(List.of(
+                    "-1", r1Path.toString(),
+                    "-2", r2Path.toString()));
+        } else {
+            mappingCmd.addAll(List.of(
+                    "-U", r1Path.toString()));
+        }
+
+        mappingCmd.addAll(List.of(
+                "-S", alignmentSamPath.toString()));
+
+        ExecuteResult mappingResult = _execute(
+                mappingCmd,
+                workDir);
+
+        if (!mappingResult.success()) {
+            return mappingResult;
+        }
+
+        /*
+         * 3. 将 SAM 转成按照坐标排序的 BAM
+         */
+        List<String> sortCmd = new ArrayList<>();
+        sortCmd.addAll(
+                this.analysisPipelineToolsConfig.getSamtools());
+
+        sortCmd.addAll(List.of(
+                "sort",
+                "-@", String.valueOf(threads),
+                "-o", sortedBamPath.toString(),
+                alignmentSamPath.toString()));
+
+        ExecuteResult sortResult = _execute(
+                sortCmd,
+                workDir);
+
+        if (!sortResult.success()) {
+            return sortResult;
+        }
+
+        /*
+         * 4. 根据 BAM 计算每条 contig 的覆盖深度
+         */
+        List<String> depthCmd = new ArrayList<>();
+        depthCmd.addAll(
+                this.analysisPipelineToolsConfig
+                        .getJgiSummarizeBamContigDepths());
+
+        depthCmd.addAll(List.of(
+                "--outputDepth", contigDepthPath.toString(),
+                sortedBamPath.toString()));
+
+        ExecuteResult depthResult = _execute(
+                depthCmd,
+                workDir);
+
+        if (!depthResult.success()) {
+            return depthResult;
+        }
+
+        /*
+         * 5. MetaBAT2 分箱
+         */
+        List<String> metabatCmd = new ArrayList<>();
+        metabatCmd.addAll(
+                this.analysisPipelineToolsConfig.getMetabat2());
+
+        metabatCmd.addAll(List.of(
+                "-i", contigsPath.toString(),
+                "-a", contigDepthPath.toString(),
+                "-o", binPrefix.toString(),
+                "-t", String.valueOf(threads)));
+
+        return _execute(
+                metabatCmd,
+                workDir);
+    }
+
+    private ExecuteResult doCheckM2(
+            Path workDir,
+            Path binsDir,
+            Path outputDir,
+            int threads) {
+
+        List<String> cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getCheckm2());
+
+        cmd.addAll(List.of(
+                "predict",
+                "--input", binsDir.toString(),
+                "--output-directory", outputDir.toString(),
+                "--threads", String.valueOf(threads),
+                "--database_path", this.checkM2DBPath,
+                "-x", "fa"));
+
+        // Map<String, String> runningEnv = Map.of("CUDA_VISIBLE_DEVICES", "-1");
+
+
+        return _execute(cmd, workDir);
+        // ProcessBuilder pb = new ProcessBuilder(cmd);
+        // pb.directory(workDir.toFile());
+
+        // // 不需要日志：直接丢弃 stdout/stderr
+        // pb.redirectErrorStream(true);
+        // pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+
+        // try {
+        //     Process process = pb.start();
+        //     int code = process.waitFor();
+        //     return new ExecuteResult(code, null);
+        // } catch (InterruptedException e) {
+        //     Thread.currentThread().interrupt();
+        //     return new ExecuteResult(-1, e);
+        // } catch (IOException e) {
+        //     return new ExecuteResult(-1, e);
+        // }
+
+
+
+    }
+
     @Override
     protected StageRunResult<MetagenomicsShotgunAnalysisStageOutput> _execute(
             StageExecutionInput stageExecutionInput)
@@ -358,6 +622,8 @@ public class MetagenomicShotgunStageExecutor extends
                 .resolve(inputUrls.getR1Url().substring(inputUrls.getR1Url().lastIndexOf("/") + 1));
         loadMap.put(inputUrls.getR1Url(), r1LocalPath);
         Path r2LocalPath = null;
+
+
         if (!StringUtils.isBlank(inputUrls.getR2Url())) {
             r2LocalPath = stageExecutionInput.inputDir
                     .resolve(inputUrls.getR2Url().substring(inputUrls.getR2Url().lastIndexOf("/") + 1));
@@ -368,7 +634,7 @@ public class MetagenomicShotgunStageExecutor extends
 
         Path hostRemovalDir = stageExecutionInput.workDir.resolve("hostRemoval");
         try {
-            Files.createDirectory(hostRemovalDir, null);
+            Files.createDirectory(hostRemovalDir);
         } catch (IOException e) {
             String errorMsg = "Failed to create host removal directory: "
                     + hostRemovalDir;
@@ -498,10 +764,217 @@ public class MetagenomicShotgunStageExecutor extends
                     stageExecutionInput.workDir);
         }
 
+        Path megahitOutputDir = stageExecutionInput.workDir.resolve("megahit");
 
-        
+        ExecuteResult megahitResult = doMegahit(
+                stageExecutionInput.workDir,
+                removedHostR1Path,
+                removedHostR2Path,
+                megahitOutputDir,
+                2);
 
-        return null;
+        if (!megahitResult.success()) {
+            String errorMsg = "MEGAHIT metagenome assembly failed";
+
+            logger.error(errorMsg, megahitResult.ex);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        Path contigsPath = megahitOutputDir.resolve("final.contigs.fa");
+
+        Path assemblySummaryPath = stageExecutionInput.workDir.resolve("assembly_summary.tsv");
+
+        ExecuteResult assemblySummaryResult = doAssemblySummary(
+                stageExecutionInput.workDir,
+                contigsPath,
+                assemblySummaryPath);
+
+        if (!assemblySummaryResult.success()) {
+            String errorMsg = "Metagenome assembly summary failed";
+            logger.error(errorMsg, assemblySummaryResult.ex);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        Path prodigalDir = stageExecutionInput.workDir.resolve("prodigal");
+        try {
+            Files.createDirectories(prodigalDir);
+        } catch (IOException e) {
+        }
+
+        Path predictedGenesPath = prodigalDir.resolve("predicted_genes.fna");
+
+        Path predictedProteinsPath = prodigalDir.resolve("predicted_proteins.faa");
+
+        Path predictedGenesGffPath = prodigalDir.resolve("predicted_genes.gff");
+
+        ExecuteResult prodigalResult = doProdigal(
+                stageExecutionInput.workDir,
+                contigsPath,
+                predictedGenesPath,
+                predictedProteinsPath,
+                predictedGenesGffPath);
+
+        if (!prodigalResult.success()) {
+            String errorMsg = "Prodigal metagenome gene prediction failed";
+
+            logger.error(errorMsg, prodigalResult.ex);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        Path eggnogOutputDir = stageExecutionInput.workDir.resolve("../eggnog");
+
+        try {
+            Files.createDirectories(eggnogOutputDir);
+        } catch (IOException e) {
+            String errorMsg = "Failed to create Prodigal output directory: "
+                    + prodigalDir;
+
+            logErr(errorMsg, e);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        String eggnogOutputPrefix = "functional_annotation";
+
+        if(false){ExecuteResult eggnogResult = doEggnogMapper(
+                stageExecutionInput.workDir,
+                predictedProteinsPath,
+                eggnogOutputDir,
+                eggnogOutputPrefix,
+                10);
+
+        if (!eggnogResult.success()) {
+            String errorMsg = "eggNOG functional annotation failed";
+
+            logger.error(errorMsg, eggnogResult.ex);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }}
+
+        Path functionalAnnotationPath = eggnogOutputDir.resolve(
+                eggnogOutputPrefix + ".emapper.annotations");
+
+        Path binningDir = stageExecutionInput.workDir.resolve("binning");
+
+        Path binsDir = binningDir.resolve("bins");
+
+        try {
+            Files.createDirectories(binningDir);
+            Files.createDirectories(binsDir);
+        } catch (IOException e) {
+
+            String errorMsg = "Failed to create functional annotation output directories";
+
+            logger.error(errorMsg, e);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+
+        }
+
+        ExecuteResult binningResult = doBinning(
+                binningDir,
+                contigsPath,
+                removedHostR1Path,
+                removedHostR2Path,
+                binsDir,
+                2);
+
+        if (!binningResult.success()) {
+            String errorMsg = "Metagenome binning failed";
+
+            logger.error(errorMsg, binningResult.ex);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        Path checkM2OutputDir = stageExecutionInput.workDir.resolve("checkm2");
+
+        try {
+            Files.createDirectories(checkM2OutputDir);
+        } catch (IOException e) {
+            String errorMsg = "Failed to create CheckM2 output directory: "
+                    + checkM2OutputDir;
+
+            logger.error(errorMsg, e);
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        ExecuteResult checkM2Result = doCheckM2(
+                stageExecutionInput.workDir,
+                binsDir,
+                checkM2OutputDir,
+                2);
+
+        if (!checkM2Result.success()) {
+            Exception ex = checkM2Result.ex;
+
+            String errorMsg;
+            if (ex != null) {
+                String message = ex.getMessage();
+
+                if (StringUtils.isBlank(message)) {
+                    message = ex.getClass().getSimpleName();
+                }
+
+                errorMsg = "CheckM2 bin quality assessment failed: " + message;
+                logger.error(errorMsg, ex);
+            } else {
+                errorMsg = "CheckM2 bin quality assessment failed, exit code: "
+                        + checkM2Result.runCode;
+
+                logger.error(errorMsg);
+            }
+
+            return runFail(
+                    stageExecutionInput.stageContext,
+                    errorMsg,
+                    stageExecutionInput.workDir);
+        }
+
+        MetagenomicsShotgunAnalysisStageOutput metagenomicsShotgunAnalysisStageOutput = 
+                new MetagenomicsShotgunAnalysisStageOutput(
+                    krakenReportPath,
+                    brackenSpeciesPath, 
+                    alphaDiversityPath, 
+                    contigsPath,
+                    assemblySummaryPath,
+                    predictedGenesPath,
+                    predictedProteinsPath,
+                    functionalAnnotationPath,
+                    null,
+                    binsDir,
+                    checkM2OutputDir.resolve("quality_report.tsv")
+                );
+
+        return OK(metagenomicsShotgunAnalysisStageOutput, stageExecutionInput);
 
     }
 
