@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -16,6 +17,8 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MetagenomicsAnalysis
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.Amplicon16SAnalysisStageOutput;
 
+
+@Component
 public class Amplicon16SAnalysisStageExecutor extends
         AbstractPipelineStageExector<Amplicon16SAnalysisStageOutput, MetagenomicsAnalysisStageInputUrls, BaseStageParams>
         implements PipelineStageExecutor<Amplicon16SAnalysisStageOutput> {

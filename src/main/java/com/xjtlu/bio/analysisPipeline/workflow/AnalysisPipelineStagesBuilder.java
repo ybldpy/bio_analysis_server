@@ -8,10 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.tomcat.util.bcel.classfile.Constant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonSerializable.Base;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
@@ -19,7 +17,6 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
-import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SeroTypeStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
@@ -414,8 +411,19 @@ public class AnalysisPipelineStagesBuilder {
             stage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
             stage.setParameters(serializedParams);
         }
-
         return stages;
+    }
 
+    public static List<BioPipelineStage> buildMetagenomeAnalysisPipeline(PipelineSampleInput pipelineSampleInput, int specificType){
+        
+        BioPipelineStage bioPipelineStage = new BioPipelineStage();
+        bioPipelineStage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
+        bioPipelineStage.setStageType(specificType);
+        bioPipelineStage.setStageName(STAGE_NAME_MAP.get(bioPipelineStage.getStageType()));
+        if(specificType == Constants.StageType.PIPELINE_STAGE_METAGENOMICS_SHORTGUN){
+        }else {
+
+        }
+        return null;
     }
 }

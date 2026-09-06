@@ -89,16 +89,16 @@ public class PipelineStagePoller {
         }
 
         for (Map.Entry<Long, List<BioPipelineStage>> pipelineAndStage : pipelineStagesMap.entrySet()) {
-            Long pipelineId = pipelineAndStage.getKey();
+            long pipelineId = pipelineAndStage.getKey();
             List<BioPipelineStage> currentPipelineStages = pipelineAndStage.getValue();
 
             for (BioPipelineStage stage : currentPipelineStages) {
                 if (stage.getStatus() == StageStatus.PIPELINE_STAGE_STATUS_PENDING) {
-                    Long stageId = stage.getStageId();
+                    long stageId = stage.getStageId();
                     logger.info("发现待处理任务 [PipelineId: {}, StageId: {}]，正在评估调度策略...", pipelineId, stageId);
 
                     try {
-                        OrchestratePlan plan = stageOrchestrator.makePlan(stages, stageId);
+                        OrchestratePlan plan = stageOrchestrator.makePlan(currentPipelineStages, stageId);
                         int res = pipelineService.updateStageFromVersion(plan.getUpdateStageCommands().get(0));
 
                         if (res == 1) {

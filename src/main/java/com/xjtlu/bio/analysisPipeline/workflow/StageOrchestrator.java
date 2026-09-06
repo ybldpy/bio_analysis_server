@@ -611,6 +611,9 @@ public class StageOrchestrator {
         boolean canDoSeroType = SeroTypingStageExectuor.canDoSeroType(taxonomyContext);
 
         BioPipelineStage patch = new BioPipelineStage();
+
+
+
         if (!canDoSeroType) {
             patch.setStatus(PIPELINE_STAGE_STATUS_NOT_APPLICABLE);
             OrchestratePlan plan = new OrchestratePlan();
@@ -618,23 +621,38 @@ public class StageOrchestrator {
                     .add(new UpdateStageCommand(patch, seroTypeStage.getStageId(), seroTypeStage.getVersion()));
             return plan;
         }
-
-        SeroTypeStageInputUrls seroTypeStageInputUrls = new SeroTypeStageInputUrls();
-
         int inputType = SeroTypingStageExectuor.inputType(taxonomyContext);
-
-        if (inputType == SeroTypingStageExectuor.INPUT_TYPE_CONTIGS) {
-            BioPipelineStage assembly = findStageFromStages(stages, PIPELINE_STAGE_ASSEMBLY);
-            AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
-            seroTypeStageInputUrls.setContigsUrl(assemblyResult.getContigsUrl());
-        } else {
+        if(inputType == SeroTypingStageExectuor.INPUT_TYPE_READS){
             BioPipelineStage qc = findStageFromStages(stages, PIPELINE_STAGE_QC);
-            QcResult qcResult = JsonUtil.toObject(qc.getOutputUrl(), QcResult.class);
-            seroTypeStageInputUrls.setR1Url(qcResult.getCleanedR1());
-            seroTypeStageInputUrls
-                    .setR2Url(StringUtils.isBlank(qcResult.getCleanedR2()) ? null : qcResult.getCleanedR2());
+
+            if(qc == null){
+                OrchestratePlan plan = new OrchestratePlan();
+                patch.setStatus(PIPELINE_STAGE_STATUS_NOT_APPLICABLE);
+                plan.updateStageCommands.add(new UpdateStageCommand(patch, seroTypeStage.getStageId(), seroTypeStage.getVersion()));
+            }
         }
 
+        SeroTypeStageInputUrls seroTypeStageInputUrls = new SeroTypeStageInputUrls();
+        TaxonomyStageInputUrls taxonomyStageInputUrls = JsonUtil.toObject(taxonomy.getInputUrl(), TaxonomyStageInputUrls.class);
+
+
+        seroTypeStageInputUrls.setR1Url(taxonomyStageInputUrls.getR1());
+        seroTypeStageInputUrls.setR2Url(taxonomyStageInputUrls.getR2());
+        seroTypeStageInputUrls.setContigsUrl(taxonomyStageInputUrls.getContigs());
+        // if (inputType == SeroTypingStageExectuor.INPUT_TYPE_CONTIGS) {
+        //     BioPipelineStage assembly = findStageFromStages(stages, PIPELINE_STAGE_ASSEMBLY);
+        //     AssemblyResult assemblyResult = JsonUtil.toObject(assembly.getOutputUrl(), AssemblyResult.class);
+        //     seroTypeStageInputUrls.setContigsUrl(assemblyResult.getContigsUrl());
+        // } else {
+        //     BioPipelineStage qc = findStageFromStages(stages, PIPELINE_STAGE_QC);
+        //     QcResult qcResult = JsonUtil.toObject(qc.getOutputUrl(), QcResult.class);
+        //     seroTypeStageInputUrls.setR1Url(qcResult.getCleanedR1());
+        //     seroTypeStageInputUrls
+        //             .setR2Url(StringUtils.isBlank(qcResult.getCleanedR2()) ? null : qcResult.getCleanedR2());
+        // }
+
+
+        
         String serializedInput = JsonUtil.toJson(seroTypeStageInputUrls);
 
         SeroTypingStageParameters seroTypingStageParameters = JsonUtil.toObject(seroTypeStage.getParameters(),
@@ -755,7 +773,7 @@ public class StageOrchestrator {
                 new SNPAnnotationStageParameters());
         snpAnnotationStageParameters.setRefSeqConfig(baseStageParams.getRefSeqConfig());
 
-        String serializedSnpAnnotationParameters = JsonUtil.toJson(snpAnnotationStageParameters);
+        // String serializedSnpAnnotationParameters = JsonUtil.toJson(snpAnnotationStageParameters);
         SNPAnnotationInputs snpAnnotationInputs = new SNPAnnotationInputs();
         snpAnnotationInputs.setVcfUrl(varientCallStageResult.getVcfGzUrl());
 

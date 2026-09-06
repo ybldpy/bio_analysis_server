@@ -90,6 +90,13 @@
 
 
 		<dependency>
+    <groupId>com.github.pagehelper</groupId>
+    <artifactId>pagehelper-spring-boot-starter</artifactId>
+    <version>2.1.0</version> <!-- 你可以根据项目 Spring Boot 版本调整版本号 -->
+</dependency>
+
+
+		<dependency>
 			<groupId>io.minio</groupId>
 			<artifactId>minio</artifactId>
 			<version>8.6.0</version>

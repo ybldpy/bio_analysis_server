@@ -43,6 +43,11 @@ public class LocalStorageService implements StorageService {
         return reentrantReadWriteLockPool[lockIndex];
     }
 
+
+    public Path getObject(String url){
+        return Path.of(base).resolve(url);
+    }
+
     @Override
     public PutResult putObject(String key, InputStream data) {
 

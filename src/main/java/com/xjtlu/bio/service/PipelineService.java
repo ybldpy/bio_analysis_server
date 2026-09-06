@@ -59,7 +59,10 @@ import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
 import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
+import com.xjtlu.bio.requestParameters.AnalysisPipelineParameters;
+import com.xjtlu.bio.requestParameters.BatchCreateAnalysisPipelineRequest;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
+import com.xjtlu.bio.requestParameters.BatchCreateAnalysisPipelineRequest.AnalysisPipeline;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -155,6 +158,11 @@ public class PipelineService {
 
     private static final int COVID_19_TAX_ID = 2697049;
 
+
+    public static final int PIPELINE_START_RESPONSE_CODE_NOT_EXIST = 404;
+    public static final int PIPELINE_START_RESPONSE_CODE_ALREADY_RUN = 200;
+    
+
     @Value("${analysis-pipeline.covid19-gff3}")
     private String covid19Gff3Path;
 
@@ -192,6 +200,80 @@ public class PipelineService {
 
         return new Result<BioAnalysisPipeline>(Result.SUCCESS, bioPipeline, null);
 
+    }
+
+    public Result<List<Long>> batchCreateAnalysisPipelines(BatchCreateAnalysisPipelineRequest batchCreateAnalysisPipelineRequest){
+        long projectId = batchCreateAnalysisPipelineRequest.getProjectId();        
+        BioProjectExample projectQuery = new BioProjectExample();
+        projectQuery.createCriteria().andPidEqualTo(projectId);
+        List<BioProject> bioProjects = this.projectService.queryProjects(projectQuery);
+        if(bioProjects == null || bioProjects.isEmpty()){
+            return new Result<List<Long>>(Result.BUSINESS_FAIL, null, "未找到对应项目");
+        }
+
+        List<BioAnalysisPipeline> bioAnalysisPipelines = new ArrayList<>(batchCreateAnalysisPipelineRequest.getPipelines().size());
+        Date createTime = new Date();
+        for(AnalysisPipeline analysisPipeline:batchCreateAnalysisPipelineRequest.getPipelines()){
+
+            BioAnalysisPipeline bioAnalysisPipeline = new BioAnalysisPipeline();
+            bioAnalysisPipeline.setAnalysisPipelineName(analysisPipeline.getPipelineName());
+            bioAnalysisPipeline.setStatus(PIPELINE_STATUS_PENDING);
+            bioAnalysisPipeline.setPipelineType(batchCreateAnalysisPipelineRequest.getPipelineType());
+            bioAnalysisPipeline.setProjectId(batchCreateAnalysisPipelineRequest.getProjectId());
+            bioAnalysisPipeline.setCreateTime(createTime);
+
+            Map<String,Object> analysisPipelineParameters = analysisPipeline.getPipelineParameters();
+            String serializedParameters = null;
+
+            try{
+                serializedParameters = JsonUtil.toJson(analysisPipelineParameters);
+            }catch(JsonProcessingException e){
+                logger.error("基因分析流水线参数 JSON 序列化失败。参数对象内容: {}", analysisPipelineParameters, e);
+                return new Result<List<Long>>(Result.INTERNAL_FAIL, null, "创建流水线失败");
+            }
+            bioAnalysisPipeline.setPipelineParameters(serializedParameters);
+            bioAnalysisPipelines.add(bioAnalysisPipeline);
+        }
+
+
+
+        List<Long> createdPipelineIds = new ArrayList<>(bioAnalysisPipelines.size());
+        
+        final int duplicateNameCode = -2;
+        final int ok = 0;
+        final int insertFail = -1;
+
+        int insertResult = rcTransactionTemplate.execute((status) -> {
+
+
+            for(BioAnalysisPipeline pipeline:bioAnalysisPipelines){
+                try{int res = this.analysisPipelineMapper.insertSelective(pipeline);
+                if(res < 1){
+
+                    logger.error("流水线插入失败，数据库未返回受影响行数，触发事务回滚。流水线数据: {}", pipeline);
+                    status.setRollbackOnly();
+                    return insertFail;
+                }else {
+                    createdPipelineIds.add(pipeline.getPipelineId());
+                }
+            } catch(DuplicateKeyException e){
+                    logger.warn("检测到流水线名称或唯一键冲突，触发事务回滚。冲突的流水线名称: {}", pipeline.getAnalysisPipelineName());
+                    status.setRollbackOnly();
+                    return duplicateNameCode;
+                }
+            }
+
+            return ok;
+        });
+        if(insertResult == ok){
+            return new Result<List<Long>>(Result.SUCCESS, createdPipelineIds, null);
+        }
+        if(insertResult == insertFail){
+            return new Result<List<Long>>(Result.INTERNAL_FAIL, null, "内部错误");
+        }
+        else {
+            return new Result<List<Long>>(Result.BUSINESS_FAIL, null, "名称重复无法创建");
+        }
     }
 
     @Transactional
@@ -608,23 +690,32 @@ public class PipelineService {
         return new Result(Result.SUCCESS, null, null);
     }
 
+
+    private Result startMetagenomeAnalysis(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineInputFile> inputs){
+        return null;
+    }
+
     private Result startRegularPipeline(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineInputFile> inputs)
             throws JsonMappingException, JsonProcessingException {
 
         List<PipelineSampleInput> pipelineSampleInputs = paritionSubPipelineSampleInputFiles(inputs);
 
-        PipelineStageParameters pipelineStageParameters = JsonUtil.toObject(bioAnalysisPipeline.getPipelineParameters(),
-                PipelineStageParameters.class);
+        AnalysisPipelineParameters pipelineParameters = JsonUtil.toObject(bioAnalysisPipeline.getPipelineParameters(),
+                AnalysisPipelineParameters.class);
 
-        Integer taxId = pipelineStageParameters.getTaxId();
+
+
+        if(bioAnalysisPipeline.getPipelineType() == PIPELINE_METAGENOME_SHOTGUN || bioAnalysisPipeline.getPipelineType() == PIPELINE_METAGENOME_AMPLicon16s){
+
+
+        }
+
+        Long refId = pipelineParameters.getReferenceId();
 
         BioRefseq bioRefSeq = null;
 
         if (bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID) {
-            taxId = COVID_19_TAX_ID;
-        }
-        if (taxId != null) {
-
+            int taxId = COVID_19_TAX_ID;
             BioRefseqExample bioRefseqExample = new BioRefseqExample();
             bioRefseqExample.createCriteria().andTaxIdEqualTo(taxId);
             List<BioRefseq> refseqLists = this.bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqExample);
@@ -634,10 +725,19 @@ public class PipelineService {
             }
 
             bioRefSeq = getBestCandicateRefSeqs(refseqLists);
-        }
+        }else if(refId != null){
 
+            BioRefseqExample bioRefseqExample = new BioRefseqExample();
+            bioRefseqExample.createCriteria().andRefIdEqualTo(refId);
+            List<BioRefseq> refseqLists = this.bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqExample);
+            if(refseqLists == null || refseqLists.isEmpty()){
+                return new Result(Result.INTERNAL_FAIL, null, "创建失败: 未找到参考基因组");
+            }
+            bioRefSeq = refseqLists.get(0);
+        }
         List<BioPipelineStage> stages = this.buildRegularPipelineStages(bioAnalysisPipeline.getPipelineId(),
-                bioAnalysisPipeline.getPipelineType(), pipelineStageParameters, bioRefSeq, pipelineSampleInputs.get(0));
+                bioAnalysisPipeline.getPipelineType(), pipelineParameters, bioRefSeq, pipelineSampleInputs.get(0));
+
 
         try {
             int execRes = rcTransactionTemplate.execute((status) -> {
@@ -688,7 +788,7 @@ public class PipelineService {
     }
 
     public List<BioPipelineStage> queryStages(BioPipelineStageExample stageExample) {
-        return this.bioPipelineStageMapper.selectByExample(stageExample);
+        return this.bioPipelineStageMapper.selectByExampleWithBLOBs(stageExample);
     }
 
     // public List<BioAnalysisPipeline> queryPipelines(BioAnalysisPipelineExample
@@ -707,16 +807,16 @@ public class PipelineService {
         boolean lockSuccess = this.pipelineInputService.lockDownPipelineUploading(pipelineId);
         if (!lockSuccess) {
             this.pipelineOperationLock.remove(pipelineId);
-            return new Result(Result.BUSINESS_FAIL, null, "分析任务数据正在上传，请稍后重试");
+            return new Result(Result.DUPLICATE_OPERATION, null, "分析任务数据正在上传，请稍后重试");
         }
 
         try {
 
             BioAnalysisPipeline bioAnalysisPipeline = this.analysisPipelineMapper.selectByPrimaryKey(pipelineId);
             if (bioAnalysisPipeline == null) {
-                return new Result(Result.BUSINESS_FAIL, null, "分析任务不存在");
+                return new Result(PIPELINE_START_RESPONSE_CODE_NOT_EXIST, null, "分析任务不存在");
             } else if (bioAnalysisPipeline.getStatus() != PIPELINE_STATUS_PENDING) {
-                return new Result(Result.DUPLICATE_OPERATION, null, "分析任务已经启动");
+                return new Result(PIPELINE_START_RESPONSE_CODE_ALREADY_RUN, null, "分析任务已经启动");
             }
 
             BioPipelineInputFileExample queryCondition = new BioPipelineInputFileExample();
@@ -870,7 +970,7 @@ public class PipelineService {
     }
 
     private List<BioPipelineStage> buildRegularPipelineStages(long pipelineId, int pipelineType,
-            PipelineStageParameters pipelineStageParameters, BioRefseq refseq, PipelineSampleInput pipelineSampleInput)
+            AnalysisPipelineParameters pipelineStageParameters, BioRefseq refseq, PipelineSampleInput pipelineSampleInput)
             throws JsonMappingException, JsonProcessingException {
 
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();

@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,13 +33,19 @@ public class SeroTypingStageExectuor
     private static final int TAX_ID_KLEBSIELLA_PNEUMONIAE = 573;
     private static final int TAX_ID_STREPTOCOCCUS_PNEUMONIAE = 1313;
 
-    public static final int INPUT_TYPE_READS = 0;
-    public static final int INPUT_TYPE_CONTIGS = 1;
+    public static final int INPUT_TYPE_READS = 1 << 0;
+    public static final int INPUT_TYPE_CONTIGS = 1 << 1;
+
+
+    @Value("${seroBADatabase}")
+    private String seroBADatabase;
+
+    @Value("${pFasterDir}")
+    private String pFasterDir;
 
     private static class SeqSero2TMode {
 
         public static final String SINGLE = "3";
-        public static final String INTERLEAVED = "1";
         public static final String ASSEMBLY = "4";
         public static final String PAIRED = "2";
 
@@ -60,9 +67,9 @@ public class SeroTypingStageExectuor
 
     public static boolean canDoSeroType(TaxonomyContext ctx) {
         // 2. 必须至少到 species
-        if (!isSpeciesOrBelow(ctx.getRank())) {
-            return false;
-        }
+        // if (!isSpeciesOrBelow(ctx.getRank())) {
+        //     return false;
+        // }
 
         // 3. taxid 在支持列表
         Integer taxid = ctx.getTaxid();
@@ -75,17 +82,20 @@ public class SeroTypingStageExectuor
 
     public static int inputType(TaxonomyContext ctx) {
 
+        
+
         int taxid = ctx.getTaxid();
 
         switch (taxid) {
 
-            case TAX_ID_SALMONELLA: // SeqSero2 推荐 reads
+             // SeqSero2 推荐 reads
             case TAX_ID_STREPTOCOCCUS_PNEUMONIAE:
                 return INPUT_TYPE_READS; // seroBA 必须 reads
 
+            case TAX_ID_SALMONELLA:
             case TAX_ID_ESCHERICHIA_COLI:
             case TAX_ID_KLEBSIELLA_PNEUMONIAE:
-                return INPUT_TYPE_CONTIGS; // contig 工具
+                return INPUT_TYPE_CONTIGS | INPUT_TYPE_READS; // contig 工具
             default:
                 return INPUT_TYPE_CONTIGS;
         }
@@ -104,34 +114,35 @@ public class SeroTypingStageExectuor
     private StageRunResult<SeroTypingStageOutput> executeSalmonellaType(StageExecutionInput stageExecutionInput,
             Path r1Path, Path r2Path) {
 
-
         // // seqSerio2 will only recognize file in working dir path
-        // Path r1WorKDirPath = stageExecutionInput.workDir.resolve(r1Path.getFileName());
-        // Path r2WorkDirPath = r2Path == null? null:stageExecutionInput.workDir.resolve(r2Path.getFileName());
+        // Path r1WorKDirPath =
+        // stageExecutionInput.workDir.resolve(r1Path.getFileName());
+        // Path r2WorkDirPath = r2Path == null?
+        // null:stageExecutionInput.workDir.resolve(r2Path.getFileName());
 
         // try {
-        //     Files.move(r1Path, r1WorKDirPath, StandardCopyOption.REPLACE_EXISTING);
-        //     if(r2WorkDirPath != null){
-        //         Files.move(r2Path, r2WorkDirPath, StandardCopyOption.REPLACE_EXISTING);
-        //     }
-
-        // } catch (IOException | UnsupportedOperationException | SecurityException e) {
-        //     // TODO Auto-generated catch block
-        //     String errorMsg = String.format(
-        //             "Failed to create soft links for SeqSero2 input files. workDir=%s, r1Path=%s, r2Path=%s",
-        //             stageExecutionInput.workDir,
-        //             r1Path,
-        //             r2Path);
-
-        //     logger.error(errorMsg, e);
-
-        //     return this.runFail(
-        //             stageExecutionInput.stageContext,
-        //             stageExecutionInput.workDir,
-        //             errorMsg,
-        //             e);
+        // Files.move(r1Path, r1WorKDirPath, StandardCopyOption.REPLACE_EXISTING);
+        // if(r2WorkDirPath != null){
+        // Files.move(r2Path, r2WorkDirPath, StandardCopyOption.REPLACE_EXISTING);
         // }
 
+        // } catch (IOException | UnsupportedOperationException | SecurityException e) {
+        // // TODO Auto-generated catch block
+        // String errorMsg = String.format(
+        // "Failed to create soft links for SeqSero2 input files. workDir=%s, r1Path=%s,
+        // r2Path=%s",
+        // stageExecutionInput.workDir,
+        // r1Path,
+        // r2Path);
+
+        // logger.error(errorMsg, e);
+
+        // return this.runFail(
+        // stageExecutionInput.stageContext,
+        // stageExecutionInput.workDir,
+        // errorMsg,
+        // e);
+        // }
 
         List<String> cmd = new ArrayList<>();
 
@@ -153,7 +164,7 @@ public class SeroTypingStageExectuor
         cmd.add("-t");
         cmd.add(mode);
         cmd.add("-d");
-        cmd.add(stageExecutionInput.workDir.toString());
+        cmd.add(stageExecutionInput.workDir.toAbsolutePath().toString());
 
         Path resultPath = stageExecutionInput.workDir.resolve("SeqSero_result.txt");
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
@@ -170,9 +181,9 @@ public class SeroTypingStageExectuor
         cmd.addAll(this.analysisPipelineToolsConfig.getEctyper());
 
         cmd.add("-i");
-        cmd.add(contigPath.toString());
+        cmd.add(contigPath.toAbsolutePath().toString());
         cmd.add("-o");
-        cmd.add(stageExecutionInput.workDir.toString());
+        cmd.add(stageExecutionInput.workDir.toAbsolutePath().toString());
 
         Path resultPath = stageExecutionInput.workDir.resolve("Ectyper_result.txt");
         boolean res = _execute(cmd, null, stageExecutionInput, resultPath);
@@ -191,9 +202,9 @@ public class SeroTypingStageExectuor
         cmd.addAll(this.analysisPipelineToolsConfig.getKaptive());
 
         cmd.add("-a");
-        cmd.add(contigPath.toString());
+        cmd.add(contigPath.toAbsolutePath().toString());
         cmd.add("-o");
-        cmd.add(stageExecutionInput.workDir.toString());
+        cmd.add(stageExecutionInput.workDir.toAbsolutePath().toString());
 
         Path resultPath = stageExecutionInput.workDir.resolve("kaptive_results.tsv");
 
@@ -205,23 +216,106 @@ public class SeroTypingStageExectuor
     }
 
     private StageRunResult<SeroTypingStageOutput> executeStreptococcusType(StageExecutionInput stageExecutionInput,
-            Path r1Path, Path r2Path) {
-        List<String> cmd = new ArrayList<>();
-        cmd.addAll(this.analysisPipelineToolsConfig.getSeroBA());
+            Path r1Path, Path r2Path, Path contigPath) {
 
-        cmd.add(r1Path.toString());
-        if (r2Path != null) {
-            cmd.add(r2Path.toString());
+        // 0: SeroBA
+        // 双端短读长：R1 + R2 直接分型
+        //
+        // 1: PfaSTer
+        // 单端 FASTQ：先组装成 contig，再分型
+        // contig/assembly FASTA：直接分型
+        int mode = 0;
+
+        boolean hasR1 = r1Path != null;
+        boolean hasR2 = r2Path != null;
+        // boolean hasAssembly = contigPath != null;
+
+        if (hasR1 && !hasR2) {
+            mode = 1;
         }
-        cmd.add(stageExecutionInput.workDir.toString());
 
-        Path resultFile = stageExecutionInput.workDir.resolve("pred.tsv");
+        List<String> cmd = new ArrayList<>();
 
-        return _execute(cmd, null, stageExecutionInput, resultFile)
-                ? this.runFail(stageExecutionInput.stageContext, "未执行成功", stageExecutionInput.workDir)
-                : OK(new SeroTypingStageOutput(resultFile), stageExecutionInput);
+        Path resultFile = null;
+        Path useWorkDir = stageExecutionInput.workDir;
+        if (mode == 0) {
+            // SeroBA
+            resultFile = stageExecutionInput.workDir.resolve("pred.tsv");
+
+            cmd.addAll(this.analysisPipelineToolsConfig.getSeroBA());
+            cmd.add("runSerotyping");
+            cmd.add(Path.of(seroBADatabase).toAbsolutePath().toString());
+            cmd.add(r1Path.toAbsolutePath().toString());
+            cmd.add(r2Path.toAbsolutePath().toString());
+            cmd.add(stageExecutionInput.workDir.toAbsolutePath().toString());
+
+        } else {
+            // PfaSTer
+            resultFile = stageExecutionInput.workDir.resolve("prediction.txt");
+            cmd.addAll(this.analysisPipelineToolsConfig.getpFaster());
+            cmd.add("-f");
+            cmd.add(contigPath.toAbsolutePath().toString());
+            cmd.add("-o");
+            cmd.add(stageExecutionInput.workDir.toAbsolutePath().toString());
+            useWorkDir = Path.of(pFasterDir);
+        }
+
+        return _execute(cmd, null, useWorkDir.toAbsolutePath(), stageExecutionInput, resultFile)
+                ? OK(new SeroTypingStageOutput(resultFile), stageExecutionInput)
+                : this.runFail(stageExecutionInput.stageContext, "未执行成功", stageExecutionInput.workDir);
 
     }
+
+    // private StageRunResult<SeroTypingStageOutput> executeStreptococcusType(
+    // StageExecutionInput stageExecutionInput,
+    // Path r1Path,
+    // Path r2Path,
+    // Path contigPath) {
+
+    // boolean hasR1 = r1Path != null;
+    // boolean hasR2 = r2Path != null;
+    // boolean hasContig = contigPath != null;
+
+    // // 双端短读长：优先使用 SeroBA
+    // if (hasR1 && hasR2) {
+    // return executeSeroBA(
+    // stageExecutionInput,
+    // r1Path,
+    // r2Path
+    // );
+    // }
+
+    // // 只有 R1：说明是单端数据
+    // // SeroBA 不能直接使用单端数据，需要使用上游组装出的 contig
+    // if (hasR1) {
+    // if (!hasContig) {
+    // return this.runFail(
+    // stageExecutionInput.stageContext,
+    // "当前为单端测序数据，SeroBA 不支持单端输入，且缺少组装结果 contig",
+    // stageExecutionInput.workDir
+    // );
+    // }
+
+    // return executeContigBasedSerotyping(
+    // stageExecutionInput,
+    // contigPath
+    // );
+    // }
+
+    // // R1、R2 都为空：直接处理用户上传或上游产生的 contig
+    // if (hasContig) {
+    // return executeContigBasedSerotyping(
+    // stageExecutionInput,
+    // contigPath
+    // );
+    // }
+
+    // return this.runFail(
+    // stageExecutionInput.stageContext,
+    // "缺少可用于肺炎链球菌血清分型的 FASTQ 或 contig 文件",
+    // stageExecutionInput.workDir
+    // );
+    // }
 
     @Override
     protected StageRunResult<SeroTypingStageOutput> _execute(StageExecutionInput stageExecutionInput)
@@ -239,7 +333,8 @@ public class SeroTypingStageExectuor
 
         SeroTypingStageParameters parameters = stageExecutionInput.stageParameters;
 
-        Path contigLocalPath = contigUrl==null ? null : inputDir.resolve(contigUrl.substring(contigUrl.lastIndexOf("/")+1));
+        Path contigLocalPath = contigUrl == null ? null
+                : inputDir.resolve(contigUrl.substring(contigUrl.lastIndexOf("/") + 1));
         Path r1Path = StringUtils.isBlank(r1Url) ? null : inputDir.resolve(r1Url.substring(r1Url.lastIndexOf("/") + 1));
         Path r2Path = StringUtils.isBlank(r2Url) ? null : inputDir.resolve(r2Url.substring(r2Url.lastIndexOf("/") + 1));
 
@@ -261,7 +356,8 @@ public class SeroTypingStageExectuor
             case TAX_ID_KLEBSIELLA_PNEUMONIAE:
                 return executeKlebsiellaType(stageExecutionInput, contigLocalPath);
             case TAX_ID_STREPTOCOCCUS_PNEUMONIAE:
-                return executeStreptococcusType(stageExecutionInput, r1Path, r2Url == null ? null : r2Path);
+                return executeStreptococcusType(stageExecutionInput, r1Path, r2Url == null ? null : r2Path,
+                        contigLocalPath);
             default:
                 logger.warn(
                         "No suitable serotyping tool matched. stageId={}, taxId={}, species={}, rank={}, status={}",

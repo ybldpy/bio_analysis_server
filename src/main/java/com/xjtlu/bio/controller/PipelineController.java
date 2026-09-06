@@ -6,6 +6,7 @@ import com.xjtlu.bio.dto.PipelineState;
 import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
+import com.xjtlu.bio.requestParameters.BatchCreateAnalysisPipelineRequest;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
 import com.xjtlu.bio.service.PipelineService;
 import jakarta.annotation.Resource;
@@ -75,6 +76,14 @@ public class PipelineController {
 
 
 
+    @PostMapping("/batchCreatePipelines")
+    public ResponseEntity batchCreatePipelines(@RequestBody BatchCreateAnalysisPipelineRequest batchCreateAnalysisPipelineRequest){
+        if(batchCreateAnalysisPipelineRequest.getPipelines().size() < 1){
+            return ResponseEntity.ok(new Result(Result.BUSINESS_FAIL, null, "创建的流水线不能为空"));
+        }
+        Result<List<Long>> createResult = this.pipelineService.batchCreateAnalysisPipelines(batchCreateAnalysisPipelineRequest);
+        return ResponseEntity.ok(createResult);
+    }
 
     @PostMapping("/checkPipelineNamePrefixAvailable")
     public ResponseEntity checkIfPipelineNamePrefixAvailale(@RequestBody Map<String,Object> request){

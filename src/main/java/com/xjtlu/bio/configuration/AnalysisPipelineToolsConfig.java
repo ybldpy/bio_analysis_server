@@ -333,4 +333,17 @@ public class AnalysisPipelineToolsConfig {
         this.checkm2 = checkm2;
     }
 
+    private List<String> pFaster;
+
+
+    public List<String> getpFaster() {
+        return pFaster;
+    }
+
+
+    public void setpFaster(List<String> pFaster) {
+        this.pFaster = pFaster;
+    }
+    
+
 }

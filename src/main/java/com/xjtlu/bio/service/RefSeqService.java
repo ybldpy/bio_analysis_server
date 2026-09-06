@@ -12,6 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.xjtlu.bio.common.Result;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 
 import org.apache.commons.io.FileUtils;
@@ -25,6 +28,8 @@ import com.xjtlu.bio.entity.BioRefseqExample;
 import com.xjtlu.bio.entity.BioRefseqMeta;
 import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioRefseqMetaMapper;
+import com.xjtlu.bio.requestParameters.ReferenceGenomeQuery;
+import com.xjtlu.bio.response.ReferenceGenomeQueryResponse;
 import com.xjtlu.bio.service.StorageService.GetObjectResult;
 
 import jakarta.annotation.PostConstruct;
@@ -39,10 +44,7 @@ public class RefSeqService {
     public final static int VIRUS_TYPE = 1;
     public final static int BACTERIA_TYPE = 2;
 
-    
-
-
-    public String getVirusRefSeqObjectName(BioRefseq bioRefseq){
+    public String getVirusRefSeqObjectName(BioRefseq bioRefseq) {
         return PREFIX_VIRUS_REFSEQ_OBJECT_NAME + bioRefseq.getRefseqPath();
     }
 
@@ -52,7 +54,6 @@ public class RefSeqService {
     private BioRefseqMetaMapper refseqMetaMapper;
     @Resource
     private BioRefseqMapper bioRefseqMapper;
-
 
     @Value("${refSeqService.nonInnerRefSeqDir}")
     private String nonInnerRefseqDir;
@@ -67,15 +68,36 @@ public class RefSeqService {
 
     private static final String PREFIX_VIRUS_REFSEQ_OBJECT_NAME = "refseq/virus/refseqs/";
 
+    public Result<ReferenceGenomeQueryResponse> queryReferenceGenomes(ReferenceGenomeQuery referenceGenomeQuery) {
+
+        String query = referenceGenomeQuery.getQuery();
 
 
 
+        BioRefseqExample bioRefseqQuery = new BioRefseqExample();
+        // 1. 防御性编程：判空
+        
+        if (query == null || query.trim().isEmpty()) {
+            // 根据业务需求处理，例如抛出异常或返回空结果
+        }else if(query.matches("\\d+")){
+            Integer taxid = Integer.parseInt(query);
+            bioRefseqQuery.createCriteria().andTaxIdEqualTo(taxid);
+        }else {
+            return new Result(Result.BUSINESS_FAIL, null, "非Tax ID 查询暂不支持");
+        }
+
+        PageHelper.offsetPage(referenceGenomeQuery.getStart(), referenceGenomeQuery.getPageSize());
+        List<BioRefseq> bioReferences = this.bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqQuery);
+        // 2. 用 PageInfo 包装查询出来的 List！它会自动计算出总条数(Total)
+        PageInfo<BioRefseq> pageInfo = new PageInfo<>(bioReferences);
+        return new Result<ReferenceGenomeQueryResponse>(Result.SUCCESS, new ReferenceGenomeQueryResponse(pageInfo.getTotal(), pageInfo.getList()), null);    
+    }
 
     @PostConstruct
-    public void init(){
+    public void init() {
 
         Path tmpParentDir = Path.of(this.refSeqServiceTmpPath);
-        if(!Files.exists(tmpParentDir)){
+        if (!Files.exists(tmpParentDir)) {
             try {
                 Files.createDirectories(tmpParentDir);
             } catch (IOException e) {
@@ -84,7 +106,7 @@ public class RefSeqService {
             }
         }
         Path nonInnerRefseqDir = Path.of(this.nonInnerRefseqDir);
-        if(!Files.exists(nonInnerRefseqDir)){
+        if (!Files.exists(nonInnerRefseqDir)) {
             try {
                 Files.createDirectories(nonInnerRefseqDir);
             } catch (IOException e) {
@@ -94,7 +116,7 @@ public class RefSeqService {
         }
 
         Path refSeqIndexDir = Path.of(this.refSeqIndexDir);
-        if(!Files.exists(refSeqIndexDir)){
+        if (!Files.exists(refSeqIndexDir)) {
             try {
                 Files.createDirectories(refSeqIndexDir);
             } catch (IOException e) {
@@ -125,7 +147,7 @@ public class RefSeqService {
         // 组装命令：samtools faidx <ref.fa>
         Path tmpDir = null;
         try {
-            
+
             tmpDir = Files.createTempDirectory(Path.of(this.refSeqServiceTmpPath), "indexTemp");
         } catch (IOException e) {
             // TODO Auto-generated catch block
@@ -265,7 +287,7 @@ public class RefSeqService {
         // bioRefseqMeta = this.refseqMetaMapper.selectByPrimaryKey(refId);
 
         // if (bioRefseqMeta == null) {
-        //     return null;
+        // return null;
         // }
 
         // String refPath = bioRefseqMeta.getPath();
@@ -277,7 +299,7 @@ public class RefSeqService {
         String path = bioRefseq.getRefseqPath();
         Path refseqPath = Path.of(this.virusRefseqsDir, path);
         File refseqFile = refseqPath.toFile();
-        return refseqFile.exists()?refseqFile:null;
+        return refseqFile.exists() ? refseqFile : null;
     }
 
     public File getRefseq(String refseqObjName) {

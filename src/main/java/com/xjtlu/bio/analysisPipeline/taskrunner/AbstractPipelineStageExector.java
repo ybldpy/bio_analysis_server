@@ -140,13 +140,11 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
 
     // protected void asyncRunFinished(StageRunResult<T> stageRunResult) {
 
-    //     postExecute(stageRunResult);
+    // postExecute(stageRunResult);
 
     // }
 
-
-
-    protected Path uncompressIfCompressedFormat(Path source) throws IOException{
+    protected Path uncompressIfCompressedFormat(Path source) throws IOException {
 
         if (SequenceFileUtil.isCompressedFormat(source.toString())) {
             Path uncompressedInputContigPath = source
@@ -217,16 +215,15 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         Path inputDir = stageExecutionInput.inputDir;
         FileUtils.deleteQuietly(inputDir.toFile());
         // if (!stageRunResult.isSuccess()) {
-        //     FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStageContext()).toFile());
+        // FileUtils.deleteQuietly(this.workDirPath(stageRunResult.getStageContext()).toFile());
         // }
     }
 
-    protected boolean _execute(List<String> runCmd, Path redirectOutputStream, StageExecutionInput stageExecutionInput,
+    protected boolean _execute(List<String> runCmd, Path redirectOutputStream, Path workDir, StageExecutionInput stageExecutionInput,
             Path... toValidateFiles) {
-
-        ExecuteResult executeResult = redirectOutputStream == null ? _execute(runCmd, stageExecutionInput.workDir)
+        Path useWorkDir = workDir == null ? stageExecutionInput.workDir: workDir;
+        ExecuteResult executeResult = redirectOutputStream == null ? _execute(runCmd, useWorkDir)
                 : _execute(runCmd, stageExecutionInput.workDir, redirectOutputStream, null);
-
         if (!executeResult.success()) {
             logExecutionFailed(executeResult, stageExecutionInput.stageContext.getRunStageId());
             return false;
@@ -238,6 +235,26 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
             return false;
         }
         return true;
+
+    }
+
+    protected boolean _execute(List<String> runCmd, Path redirectOutputStream, StageExecutionInput stageExecutionInput,
+            Path... toValidateFiles) {
+        return _execute(runCmd, redirectOutputStream, null, stageExecutionInput, toValidateFiles);
+        // ExecuteResult executeResult = redirectOutputStream == null ? _execute(runCmd, stageExecutionInput.workDir)
+        //         : _execute(runCmd, stageExecutionInput.workDir, redirectOutputStream, null);
+
+        // if (!executeResult.success()) {
+        //     logExecutionFailed(executeResult, stageExecutionInput.stageContext.getRunStageId());
+        //     return false;
+        // }
+
+        // List<StageOutputValidationResult> stageOutputValidationResults = validateOutputFiles(toValidateFiles);
+        // if (!stageOutputValidationResults.isEmpty()) {
+        //     logNoOutput(stageOutputValidationResults, stageExecutionInput.stageContext.getRunStageId());
+        //     return false;
+        // }
+        // return true;
     }
 
     @Override
@@ -248,8 +265,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         stageContext.setVersion(bioPipelineStage.getVersion());
         stageContext.setStageType(bioPipelineStage.getStageType());
 
-
-
         Path workDir = this.workDirPath(stageContext);
         Path inputDir = this.stageInputPath(stageContext);
 
@@ -258,17 +273,14 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         stageExecutionInput.inputDir = inputDir;
         stageExecutionInput.workDir = workDir;
 
-
         try {
             preExecute(stageContext);
         } catch (Exception e) {
             logger.error("{} exception happens at preExecute", bioPipelineStage, e);
-            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", workDir, stageContext,e);
+            StageRunResult<T> stageRunResult = StageRunResult.fail("异常发生", workDir, stageContext, e);
             postExecute(stageExecutionInput);
             return stageRunResult;
         }
-
-        
 
         StageRunResult<T> stageRunResult = null;
         try {
@@ -319,9 +331,9 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
         return runFail(bioPipelineStage, workDir, msg, (Exception) null);
     }
 
-
-    protected StageRunResult<T> OK(T stageOutput, StageExecutionInput stageExecutionInput){
-        StageRunResult stageRunResult = StageRunResult.OK(stageOutput, stageExecutionInput.stageContext, stageExecutionInput.workDir); 
+    protected StageRunResult<T> OK(T stageOutput, StageExecutionInput stageExecutionInput) {
+        StageRunResult stageRunResult = StageRunResult.OK(stageOutput, stageExecutionInput.stageContext,
+                stageExecutionInput.workDir);
         return stageRunResult;
     }
 
@@ -434,8 +446,6 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     protected StageRunResult<T> runFail(StageContext stageContext, String errorMessge, Exception e,
             Path workDir) {
 
-
-        
         return this.runFail(stageContext, workDir, errorMessge, e);
     }
 
@@ -701,7 +711,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
             // TODO Auto-generated catch block
             Thread.currentThread().interrupt();
             runEx = e;
-            
+
             logger.error("Command execution interrupted. workDir={}, cmd={}",
                     workDir,
                     String.join(" ", cmd),

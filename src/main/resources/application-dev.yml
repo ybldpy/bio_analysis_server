@@ -30,7 +30,8 @@ humanBowtie2IndexDir: "/home/jcy/bioData/human_grch38_bowtie2_index"
 kraken2Standard8Dir: "/home/jcy/bioData/kraken2_standard_8"
 eggnogDBDir: "/home/jcy/bioData/eggnog_data"
 checkM2DB: "/home/jcy/bioData/checkm2_database/uniref100.KO.1.dmnd"
-
+seroBADatabase: "/home/jcy/bioData/seroba-database"
+pFasterDir: "/home/jcy/bioTools/pfaster"
 
 analysis-pipeline:
 
@@ -58,9 +59,9 @@ analysis-pipeline:
         vep: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
         fastplong: ["${analysis-pipeline.conda}", "run", "-n", "fastplong", "fastplong"]
         bbmapPath: "/home/jcy/test/bio_test/bbmap"
-        dada2: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/dada2Script.R"]
-        dada2Taxonomy: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/dada2Taxonomy.R"]
-        amplicon16SSummary: ["${analysis-pipeline.conda}", "run", "-n", "Rscript", "${scriptsDir}/amplicon16s_summary.R"]
+        dada2: ["${analysis-pipeline.conda}", "run", "-n", "amplicon16s-dada2","Rscript", "${scriptsDir}/dada2Script.R"]
+        dada2Taxonomy: ["${analysis-pipeline.conda}", "run", "-n", "amplicon16s-dada2","Rscript", "${scriptsDir}/dada2Taxonomy.R"]
+        amplicon16SSummary: ["${analysis-pipeline.conda}", "run", "-n", "amplicon16s-dada2","Rscript", "${scriptsDir}/amplicon16s_summary.R"]
         bowtie2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "bowtie2"]
         bracken: ["${analysis-pipeline.conda}", "run", "-n", "bio-taxonomy", "bracken"]
         megahit: ["${analysis-pipeline.conda}", "run", "-n", "bio-megahit", "megahit"]
@@ -71,6 +72,7 @@ analysis-pipeline:
         jgiSummarizeBamContigDepths: ["${analysis-pipeline.conda}", "run", "-n", "bio-shotgun", "jgi_summarize_bam_contig_depths"]
         metabat2: ["${analysis-pipeline.conda}", "run", "-n", "bio-shotgun", "metabat2"]
         checkm2: ["${analysis-pipeline.conda}", "run", "-n", "bio-checkm2", "python", "/home/jcy/bio_analysis_server/scripts/checkm2_cpu.py"]
+        pFaster: ["${analysis-pipeline.conda}", "run", "-n", "serotyper", "python", "${pFasterDir}/pfaster.py"]
 
     covid2RefSeq:
         accession: "NC_045512.2"
