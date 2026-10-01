@@ -11,9 +11,9 @@ import java.util.Map;
 
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
 import org.springframework.stereotype.Component;
@@ -52,15 +52,7 @@ public class MappingStageExecutor
         MappingInputUrls mappingInputUrls = stageExecutionInput.input;
         MappingParameters parameters = stageExecutionInput.stageParameters;
 
-        RefSeqConfig refSeqConfig = parameters.getRefSeqConfig();
-
-        if (refSeqConfig == null) {
-            return StageRunResult.fail("未能加载参考基因", stageExecutionInput.workDir, bioPipelineStage, null);
-        }
-
-        
-
-        String refseqUrl = refSeqConfig.getRefseqObjectName();
+        ReferenceGenome referenceGenome = parameters.getReferenceGenome();
         String inputR1Url = mappingInputUrls.getR1Url();
         String inputR2Url = mappingInputUrls.getR2Url();
 
@@ -71,12 +63,10 @@ public class MappingStageExecutor
         Path r2TmpPath = inputR2Url == null ? null
                 : inputTmpPath.resolve(inputR2Url.substring(inputR2Url.lastIndexOf("/") + 1));
 
-        Path refseqLocalPath = inputTmpPath.resolve(refseqUrl.substring(refseqUrl.lastIndexOf("/")+1));
-
+        Path refseqLocalPath = materializeReferenceGenome(referenceGenome, inputTmpPath);
 
         Map<String, Path> loadMap = new HashMap<>();
         loadMap.put(inputR1Url, r1TmpPath);
-        loadMap.put(refseqUrl, refseqLocalPath);
         if (r2TmpPath != null) {
             loadMap.put(inputR2Url, r2TmpPath);
         }

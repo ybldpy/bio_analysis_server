@@ -14,9 +14,9 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ConsensusStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder.FaiBuildException;
@@ -59,11 +59,7 @@ public class ConsensusExecutor
         ConsensusStageInputUrls consensusStageInputUrls = stageExecutionInput.input;
         ConsensusStageParameters consensusStageParameters = stageExecutionInput.stageParameters;
 
-        RefSeqConfig refSeqConfig = consensusStageParameters.getRefSeqConfig();
-
-        if (refSeqConfig == null) {
-            return this.runFail(bioPipelineStage, "未找到参考基因文件", stageExecutionInput.workDir);
-        }
+        ReferenceGenome referenceGenome = consensusStageParameters.getReferenceGenome();
 
         Path inputTmpDir = stageExecutionInput.inputDir;
         Path resultDir = stageExecutionInput.workDir;
@@ -74,11 +70,9 @@ public class ConsensusExecutor
         Path vcfGzTmpPath = inputTmpDir.resolve(vcfFileName);
         Path vcfTbiTmpPath = inputTmpDir.resolve(vcfTbiFileName);
 
-        String referenceObjName = refSeqConfig.getRefseqObjectName();
-        String referenceFileName = referenceObjName.substring(referenceObjName.lastIndexOf("/") + 1);
-        Path refseqLocalPath = inputTmpDir.resolve(referenceFileName);
+        Path refseqLocalPath = materializeReferenceGenome(referenceGenome, inputTmpDir);
 
-        loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath, referenceObjName, refseqLocalPath));
+        loadInput(Map.of(vcfGzUrl, vcfGzTmpPath, vcfTbiUrl, vcfTbiTmpPath));
 
         try {
             faiBuilder.build(refseqLocalPath);

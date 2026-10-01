@@ -33,6 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
 import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.SegmentOrdinalResolver;
 import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator;
 import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator.MissingUpstreamException;
 import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator.OrchestratePlan;
@@ -51,12 +53,15 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioProject;
 import com.xjtlu.bio.entity.BioProjectExample;
+import com.xjtlu.bio.entity.BioReferenceSequence;
+import com.xjtlu.bio.entity.BioReferenceSequenceExample;
 import com.xjtlu.bio.entity.BioRefseq;
 import com.xjtlu.bio.entity.BioRefseqExample;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapperExtension;
 import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
+import com.xjtlu.bio.mapper.BioReferenceSequenceMapper;
 import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.requestParameters.AnalysisPipelineParameters;
@@ -110,6 +115,9 @@ public class PipelineService {
 
     @Resource
     private StorageService storageService;
+
+    @Resource
+    private BioReferenceSequenceMapper bioReferenceSequenceMapper;
 
     @Resource
     @Lazy
@@ -535,12 +543,7 @@ public class PipelineService {
             throws JsonProcessingException {
 
         List<PipelineSampleInput> pipelineSampleInputs = paritionSubPipelineSampleInputFiles(inputs);
-        BioPipelineInputFile refseqFile = inputs.stream().filter(in -> {
-            return in.getFileRole() == PipelineInputService.PIPELINE_INPUT_TYPE_REFSEQ;
-        }).findAny().orElse(null);
-
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
-        pipelineConfigurations.setRefseqObjName(refseqFile.getFilePath());
 
         List<List<BioPipelineStage>> subPipelineStagesList = new ArrayList<>();
 
@@ -710,33 +713,33 @@ public class PipelineService {
 
         }
 
-        Long refId = pipelineParameters.getReferenceId();
+        List<BioReferenceSequence> refseqList = Collections.emptyList();
 
-        BioRefseq bioRefSeq = null;
+        Integer taxId = pipelineParameters.getTaxId();
 
         if (bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID) {
-            int taxId = COVID_19_TAX_ID;
-            BioRefseqExample bioRefseqExample = new BioRefseqExample();
-            bioRefseqExample.createCriteria().andTaxIdEqualTo(taxId);
-            List<BioRefseq> refseqLists = this.bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqExample);
-
-            if (refseqLists.isEmpty()) {
-                return new Result(Result.INTERNAL_FAIL, null, "创建失败: 未找到参考基因组");
-            }
-
-            bioRefSeq = getBestCandicateRefSeqs(refseqLists);
-        }else if(refId != null){
-
-            BioRefseqExample bioRefseqExample = new BioRefseqExample();
-            bioRefseqExample.createCriteria().andRefIdEqualTo(refId);
-            List<BioRefseq> refseqLists = this.bioRefseqMapper.selectByExampleWithBLOBs(bioRefseqExample);
-            if(refseqLists == null || refseqLists.isEmpty()){
-                return new Result(Result.INTERNAL_FAIL, null, "创建失败: 未找到参考基因组");
-            }
-            bioRefSeq = refseqLists.get(0);
+            taxId = COVID_19_TAX_ID;
         }
+
+        if (taxId != null) {
+            BioReferenceSequenceExample bioRefseqExample = new BioReferenceSequenceExample();
+            bioRefseqExample.createCriteria().andTaxIdEqualTo(taxId);
+            refseqList = this.bioReferenceSequenceMapper.selectByExampleWithBLOBs(bioRefseqExample);
+        }
+
+        boolean requiresReferenceSelection = bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS
+                || bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID;
+        if (requiresReferenceSelection && (refseqList == null || refseqList.isEmpty())) {
+            return new Result(Result.BUSINESS_FAIL, null, "创建失败： 未找到参考基因组");
+        }
+
+
+
+
+
+
         List<BioPipelineStage> stages = this.buildRegularPipelineStages(bioAnalysisPipeline.getPipelineId(),
-                bioAnalysisPipeline.getPipelineType(), pipelineParameters, bioRefSeq, pipelineSampleInputs.get(0));
+                bioAnalysisPipeline.getPipelineType(), refseqList, pipelineParameters, pipelineSampleInputs.get(0));
 
 
         try {
@@ -969,24 +972,44 @@ public class PipelineService {
 
     }
 
+    private static ReferenceSequence toReferenceSequence(BioReferenceSequence source) {
+        return new ReferenceSequence(
+                source.getReferenceId(),
+                source.getAccession(),
+                source.getSourceDb(),
+                source.getTaxId(),
+                source.getOrganismName(),
+                source.getGenomeLength(),
+                source.getCompleteness(),
+                source.getIsAnnotated(),
+                source.getGeneCount(),
+                source.getProteinCount(),
+                source.getSegment(),
+                source.getBioproject(),
+                source.getReleaseDate(),
+                source.getUpdateDate(),
+                source.getOrgType(),
+                source.getPath(),
+                source.getAnnotationFile(),
+                source.getRawMetadata());
+    }
+
     private List<BioPipelineStage> buildRegularPipelineStages(long pipelineId, int pipelineType,
-            AnalysisPipelineParameters pipelineStageParameters, BioRefseq refseq, PipelineSampleInput pipelineSampleInput)
+            List<BioReferenceSequence> refseqList,
+            AnalysisPipelineParameters pipelineStageParameters, PipelineSampleInput pipelineSampleInput)
             throws JsonMappingException, JsonProcessingException {
 
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
         List<BioPipelineStage> stages = Collections.emptyList();
 
-        if (refseq != null) {
-            pipelineConfigurations.setRefseqObjName(this.refSeqService.getVirusRefSeqObjectName(refseq));
-        }
-
-        if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID) {
-            pipelineConfigurations.setRequireSNPAnnotation(true);
-            pipelineConfigurations.setGff3ObjName(covid19Gff3Path);
-        }
-
         if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS
                 || pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID) {
+
+            List<ReferenceSequence> candidateReferences = refseqList.stream()
+                    .map(PipelineService::toReferenceSequence)
+                    .toList();
+            SegmentOrdinalResolver.assignKnownOrdinals(candidateReferences);
+            pipelineConfigurations.setCandidateReferenceSequences(candidateReferences);
 
             stages = AnalysisPipelineStagesBuilder.buildVirusStages(
                     pipelineSampleInput, pipelineConfigurations);
@@ -1197,22 +1220,6 @@ public class PipelineService {
             return SCHEDULE_UPSTREAM_NOT_READY;
         }
 
-        if (plan.isNoNextStage()) {
-
-            boolean finished = true;
-            for (BioPipelineStage bioPipelineStage : allStages) {
-                if (bioPipelineStage.getStatus() != PIPELINE_STAGE_STATUS_FINISHED
-                        && bioPipelineStage.getStatus() != PIPELINE_STAGE_STATUS_NOT_APPLICABLE) {
-                    finished = false;
-                    break;
-                }
-            }
-
-            if (finished) {
-                return SCHEDULE_PIPELINE_COMPELETE;
-            }
-        }
-
         List<UpdateStageCommand> updateStageCommands = plan.getUpdateStageCommands();
         List<BioPipelineStage> pushToWaittingStages = plan.getRunStages();
 
@@ -1222,6 +1229,27 @@ public class PipelineService {
             for (BioPipelineStage stage : pushToWaittingStages) {
                 this.pipelineStageTaskDispatcher.addTask(stage);
             }
+
+            if (pushToWaittingStages.isEmpty()) {
+                List<BioPipelineStage> refreshedStages = this.bioAnalysisStageMapperExtension
+                        .selectAllPipelineStagesByStageId(finishedStageId);
+
+                boolean finished = refreshedStages != null && !refreshedStages.isEmpty();
+                if (finished) {
+                    for (BioPipelineStage stage : refreshedStages) {
+                        if (stage.getStatus() != PIPELINE_STAGE_STATUS_FINISHED
+                                && stage.getStatus() != PIPELINE_STAGE_STATUS_NOT_APPLICABLE) {
+                            finished = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (finished) {
+                    return SCHEDULE_PIPELINE_COMPELETE;
+                }
+            }
+
             return OK;
         }
 

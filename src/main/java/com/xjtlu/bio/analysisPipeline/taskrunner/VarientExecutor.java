@@ -15,9 +15,9 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VarientCallInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder.FaiBuildException;
@@ -52,13 +52,7 @@ public class VarientExecutor
         VarientCallInputUrls varientCallInputUrls = stageExecutionInput.input;
         VarientCallParameters varientCallParameters = stageExecutionInput.stageParameters;
 
-        RefSeqConfig refSeqConfig = varientCallParameters.getRefSeqConfig();
-        if (refSeqConfig == null) {
-            logger.error("stage id = {}, params = {}, unable to load refseq config", bioPipelineStage);
-            return runFail(bioPipelineStage,"未能加载参考基因文件", stageExecutionInput.workDir);
-        }
-
-
+        ReferenceGenome referenceGenome = varientCallParameters.getReferenceGenome();
 
         String bamUrl = varientCallInputUrls.getBamUrl();
         String bamIndexUrl = varientCallInputUrls.getBamIndexUrl();
@@ -74,11 +68,8 @@ public class VarientExecutor
 
         // 先用 samtools 生成参考索引
 
-        String refseqUrl = varientCallParameters.getRefSeqConfig().getRefseqObjectName();
-
-
-        Path refseqLocalPath = inputTempDir.resolve(refseqUrl.substring(refseqUrl.lastIndexOf("/")+1));
-        loadInput(Map.of(bamUrl, bam, bamIndexUrl, bai, refseqUrl, refseqLocalPath));
+        Path refseqLocalPath = materializeReferenceGenome(referenceGenome, inputTempDir);
+        loadInput(Map.of(bamUrl, bam, bamIndexUrl, bai));
 
 
         try {

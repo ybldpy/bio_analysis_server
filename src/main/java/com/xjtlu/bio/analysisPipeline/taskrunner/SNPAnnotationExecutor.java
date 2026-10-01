@@ -12,9 +12,10 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.SNPAnnotationInputs;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.SNPAnnotationStageParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.SNPAnnotationStageOutput;
 
 @Component
@@ -45,20 +46,34 @@ public class SNPAnnotationExecutor extends
         SNPAnnotationInputs snpAnnotationInputs = stageExecutionInput.input;
         SNPAnnotationStageParameters snpAnnotationStageParameters = stageExecutionInput.stageParameters;
 
-        RefSeqConfig refSeqConfig = snpAnnotationStageParameters.getRefSeqConfig();
+        ReferenceGenome referenceGenome = snpAnnotationStageParameters.getReferenceGenome();
+        if (referenceGenome == null || referenceGenome.getSequences() == null
+                || referenceGenome.getSequences().size() != 1) {
+            return runFail(bioPipelineStage,
+                    "SNP annotation requires exactly one reference sequence",
+                    stageExecutionInput.workDir);
+        }
+
+        ReferenceSequence referenceSequence = referenceGenome.getSequences().get(0);
+        if (referenceSequence == null
+                || referenceSequence.getAnnotationFile() == null
+                || referenceSequence.getAnnotationFile().isBlank()) {
+            return runFail(bioPipelineStage, "未找到参考基因或注释文件", stageExecutionInput.workDir);
+        }
+
+        String annotationUrl = referenceSequence.getAnnotationFile();
 
         HashMap<String, Path> loadMap = new HashMap<>();
 
         Path vcfInputPath = stageExecutionInput.inputDir.resolve(
                 snpAnnotationInputs.getVcfUrl().substring(snpAnnotationInputs.getVcfUrl().lastIndexOf("/") + 1));
-        Path refseqPath = stageExecutionInput.inputDir.resolve(
-                refSeqConfig.getRefseqObjectName().substring(refSeqConfig.getRefseqObjectName().lastIndexOf("/") + 1));
+        Path refseqPath = materializeReferenceGenome(referenceGenome, stageExecutionInput.inputDir);
         Path gffPath = stageExecutionInput.inputDir
-                .resolve(refSeqConfig.getGff3Url().substring(refSeqConfig.getGff3Url().lastIndexOf("/") + 1));
+                .resolve("reference_annotation_"
+                        + annotationUrl.substring(annotationUrl.lastIndexOf("/") + 1));
 
         loadMap.put(snpAnnotationInputs.getVcfUrl(), vcfInputPath);
-        loadMap.put(refSeqConfig.getRefseqObjectName(), refseqPath);
-        loadMap.put(refSeqConfig.getGff3Url(), gffPath);
+        loadMap.put(annotationUrl, gffPath);
 
         loadInput(loadMap);
 

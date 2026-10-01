@@ -366,6 +366,7 @@ public class Constants {
         // 病毒 FASTA sequence-based 分析
         public static final int PIPELINE_STAGE_REFERENCE_COMPARISON = 43; // input FASTA vs reference FASTA，输出 PAF +
                                                                           // difference TSV
+        public static final int PIPELINE_STAGE_REFERENCE_SELECTION = 44; // 从同一物种的候选参考中选出最佳参考
 
         // SNP & 溯源
         public static final int PIPELINE_STAGE_SNP_SINGLE = 70; // 单样本对近邻参考的SNP
@@ -417,6 +418,7 @@ public class Constants {
         public static final String PIPELINE_STAGE_NAME_READ_INSPECT = "预处理";
 
         public static final String PIPELINE_STAGE_NAME_REFERENCE_COMPARISON = "参考基因组比对";
+        public static final String PIPELINE_STAGE_NAME_REFERENCE_SELECTION = "参考基因组选择";
 
         public static final Map<Integer, String> STAGE_NAME_MAP = Map.ofEntries(
                 Map.entry(PIPELINE_STAGE_QC, PIPELINE_STAGE_NAME_QC),
@@ -430,6 +432,7 @@ public class Constants {
                 Map.entry(PIPELINE_STAGE_SEROTYPE, PIPELINE_STAGE_NAME_SEROTYPE),
                 Map.entry(PIPELINE_STAGE_VIRULENCE, PIPELINE_STAGE_NAME_VIRULENCE),
                 Map.entry(PIPELINE_STAGE_READ_INSPECT, PIPELINE_STAGE_NAME_READ_INSPECT),
+                Map.entry(PIPELINE_STAGE_REFERENCE_SELECTION, PIPELINE_STAGE_NAME_REFERENCE_SELECTION),
                 Map.entry(PIPELINE_STAGE_SNP_ANNOTATION, PIPELINE_STAGE_NAME_SNP_ANNOTATION),
                 Map.entry(PIPELINE_STAGE_DEPTH_COVERAGE, PIPELINE_STAGE_NAME_DEPTH_COVERAGE)
             );

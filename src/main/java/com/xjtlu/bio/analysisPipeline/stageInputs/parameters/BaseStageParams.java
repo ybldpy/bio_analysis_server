@@ -2,14 +2,14 @@ package com.xjtlu.bio.analysisPipeline.stageInputs.parameters;
 
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.context.domain.TaxonomyContext;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 
 public class BaseStageParams {
 
     private SequenceMeta readMeta;
-
-    private RefSeqConfig refSeqConfig;
     private TaxonomyContext taxonomyContext;
+    private ReferenceGenome referenceGenome;
+
 
     private int analysisTargetType;
 
@@ -17,8 +17,15 @@ public class BaseStageParams {
     public static final int ANALYSIS_TARGET_TYPE_BACTERIA = 20;
 
 
-
     
+
+    public ReferenceGenome getReferenceGenome() {
+        return referenceGenome;
+    }
+
+    public void setReferenceGenome(ReferenceGenome referenceGenome) {
+        this.referenceGenome = referenceGenome;
+    }
 
     public SequenceMeta getReadMeta() {
         return readMeta;
@@ -32,22 +39,19 @@ public class BaseStageParams {
         this.analysisTargetType = analysisTargetType;
     }
 
-    public BaseStageParams(int analysisTargetType, RefSeqConfig refSeqConfig, TaxonomyContext taxonomyContext, SequenceMeta readMeta) {
-        this.refSeqConfig = refSeqConfig;
+    public BaseStageParams(int analysisTargetType, TaxonomyContext taxonomyContext, SequenceMeta readMeta) {
         this.taxonomyContext = taxonomyContext;
         this.readMeta = readMeta;
         this.analysisTargetType = analysisTargetType;
     }
 
-    public BaseStageParams(int pipelineType, RefSeqConfig refSeqConfig, TaxonomyContext taxonomyContext){
-        this(pipelineType, refSeqConfig, taxonomyContext, null);
+    public BaseStageParams(int pipelineType, TaxonomyContext taxonomyContext) {
+        this(pipelineType, taxonomyContext, null);
     }
 
 
-    public BaseStageParams(){
-    }
-    public RefSeqConfig getRefSeqConfig() {
-        return refSeqConfig;
+    public BaseStageParams() {
+
     }
     public SequenceMeta getSequenceMeta() {
         return readMeta;
@@ -60,12 +64,6 @@ public class BaseStageParams {
         this.readMeta = readMeta;
     }
 
-
-
-
-    public void setRefSeqConfig(RefSeqConfig refSeqConfig) {
-        this.refSeqConfig = refSeqConfig;
-    }
     public TaxonomyContext getTaxonomyContext() {
         return taxonomyContext;
     }

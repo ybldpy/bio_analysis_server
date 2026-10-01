@@ -15,9 +15,9 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.RefSeqConfig;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReferenceComparisonStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.PafParser;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.PafParser.PafParseResult;
@@ -46,15 +46,14 @@ public class ReferenceComparsionStageExecutor extends
         Path workDir = stageExecutionInput.workDir;
         HashMap<String, Path> loadMap = new HashMap<>();
 
-        RefSeqConfig refSeqConfig = referenceComparisonStageParameters.getRefSeqConfig();
-        Path refseqLocalPath = inputDir.resolve(
-                refSeqConfig.getRefseqObjectName().substring(refSeqConfig.getRefseqObjectName().lastIndexOf("/") + 1));
-        loadMap.put(refSeqConfig.getRefseqObjectName(), refseqLocalPath);
+        ReferenceGenome referenceGenome = referenceComparisonStageParameters.getReferenceGenome();
+        Path refseqLocalPath = materializeReferenceGenome(referenceGenome, inputDir);
 
         ReferenceComparisonStageInputUrls inputUrls = stageExecutionInput.input;
+        String queryFastaUrl = inputUrls.getFastaUrl();
         Path inputLocalPath = inputDir
-                .resolve(inputUrls.getFastaUrl().substring(inputUrls.getFastaUrl().lastIndexOf("/") + 1));
-        loadMap.put(inputUrls.getFastaUrl(), inputLocalPath);
+                .resolve("query_" + queryFastaUrl.substring(queryFastaUrl.lastIndexOf("/") + 1));
+        loadMap.put(queryFastaUrl, inputLocalPath);
 
         this.loadInput(loadMap);
 

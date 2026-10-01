@@ -7,8 +7,13 @@ public class AnalysisPipelineParameters {
 
     private Long referenceId;
 
+    private Integer taxId;
+    
+
     public AnalysisPipelineParameters() {
     }
+
+    
 
     private Map<String,Object> extraParameters;
 
@@ -28,9 +33,19 @@ public class AnalysisPipelineParameters {
         this.extraParameters = extraParameters;
     }
 
+
+
     public AnalysisPipelineParameters(Long referenceId, Map<String, Object> extraParameters) {
         this.referenceId = referenceId;
         this.extraParameters = extraParameters;
+    }
+
+    public Integer getTaxId() {
+        return taxId;
+    }
+
+    public void setTaxId(Integer taxId) {
+        this.taxId = taxId;
     }
 
     

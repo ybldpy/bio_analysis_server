@@ -6,16 +6,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.StageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.ReferenceGenomeFastaBuilder;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.SequenceFileUtil;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import org.apache.commons.io.FileUtils;
@@ -530,6 +536,112 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
                 throw new LoadFailException(getObjectResult.e());
             }
         }
+    }
+
+    /**
+     * Downloads every sequence represented by a reference genome and combines
+     * them into the FASTA consumed by an analysis stage.
+     *
+     * <p>The aggregate is deliberately rebuilt from the sequence snapshots. A
+     * stage therefore does not depend on a separately persisted aggregate
+     * FASTA URL.</p>
+     */
+    protected Path materializeReferenceGenome(ReferenceGenome referenceGenome, Path inputDir)
+            throws LoadFailException {
+        if (referenceGenome == null) {
+            throw materializeReferenceFailure("Reference genome must not be null", null);
+        }
+        if (inputDir == null) {
+            throw materializeReferenceFailure("Reference genome input directory must not be null", null);
+        }
+
+        List<ReferenceSequence> sequences = referenceGenome.getSequences();
+        if (sequences == null || sequences.isEmpty()) {
+            throw materializeReferenceFailure(
+                    "Reference genome must contain at least one reference sequence", null);
+        }
+
+        Path sequenceDir = inputDir.resolve("reference_sequences");
+        try {
+            Files.createDirectories(sequenceDir);
+        } catch (IOException e) {
+            throw materializeReferenceFailure(
+                    "Failed to create reference sequence input directory", e);
+        }
+
+        Map<String, Path> downloadPathsByObjectName = new LinkedHashMap<>();
+        Map<String, Path> localPathsByAccession = new LinkedHashMap<>();
+        Set<String> accessions = new HashSet<>();
+        Set<String> objectNames = new HashSet<>();
+
+        for (int i = 0; i < sequences.size(); i++) {
+            ReferenceSequence sequence = sequences.get(i);
+            if (sequence == null) {
+                throw materializeReferenceFailure(
+                        "Reference genome contains a null sequence at index " + i, null);
+            }
+
+            String accession = sequence.getAccession();
+            if (accession == null || accession.isBlank()) {
+                throw materializeReferenceFailure(
+                        "Reference sequence accession must not be blank at index " + i, null);
+            }
+            if (!accessions.add(accession)) {
+                throw materializeReferenceFailure(
+                        "Reference genome contains duplicate accession: " + accession, null);
+            }
+
+            String objectName = sequence.getPath();
+            if (objectName == null || objectName.isBlank()) {
+                throw materializeReferenceFailure(
+                        "Reference sequence path must not be blank: " + accession, null);
+            }
+            if (!objectNames.add(objectName)) {
+                throw materializeReferenceFailure(
+                        "Reference genome contains duplicate sequence path: " + objectName, null);
+            }
+
+            String localFileName = String.format(
+                    "%04d_%s_%s",
+                    i,
+                    safeReferenceFileComponent(accession, "accession"),
+                    safeReferenceFileComponent(objectName, "reference.fasta"));
+            Path localPath = sequenceDir.resolve(localFileName);
+            downloadPathsByObjectName.put(objectName, localPath);
+            localPathsByAccession.put(accession, localPath);
+        }
+
+        loadInput(downloadPathsByObjectName);
+
+        Map<String, Path> uncompressedPathsByAccession = new LinkedHashMap<>();
+        try {
+            for (ReferenceSequence sequence : sequences) {
+                Path downloadedPath = localPathsByAccession.get(sequence.getAccession());
+                Path usablePath = uncompressIfCompressedFormat(downloadedPath);
+                uncompressedPathsByAccession.put(sequence.getAccession(), usablePath);
+            }
+
+            Path materializedFasta = inputDir.resolve("reference_genome.fasta");
+            ReferenceGenomeFastaBuilder.write(
+                    materializedFasta,
+                    sequences,
+                    uncompressedPathsByAccession);
+            return materializedFasta;
+        } catch (IOException e) {
+            throw materializeReferenceFailure("Failed to materialize reference genome FASTA", e);
+        }
+    }
+
+    private static LoadFailException materializeReferenceFailure(String message, Exception cause) {
+        Exception failureCause = cause == null ? new IllegalArgumentException(message) : cause;
+        return new LoadFailException(message, failureCause);
+    }
+
+    private static String safeReferenceFileComponent(String value, String fallback) {
+        int slashIndex = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'));
+        String fileName = slashIndex >= 0 ? value.substring(slashIndex + 1) : value;
+        String safeName = fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        return safeName.isBlank() ? fallback : safeName;
     }
 
     protected String findFailedLoadingObject(Map<String, GetObjectResult> getResultMap) {
