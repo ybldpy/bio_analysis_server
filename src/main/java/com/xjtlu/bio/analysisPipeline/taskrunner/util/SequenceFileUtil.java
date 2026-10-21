@@ -31,6 +31,30 @@ public class SequenceFileUtil {
         return Constants.CompressedFormat.isGzip(fileName);
     }
 
+    public static boolean isZip(String fileName) {
+        return fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".zip");
+    }
+
+    /**
+     * Prepare a single sequence file from a ZIP input slot. Other inputs keep
+     * their original paths so tools can continue reading gzip directly.
+     * The input contract supplies one file per archive; use its first file entry.
+     */
+    public static Path unpackZipIfNeeded(Path source, String defaultSuffix) throws IOException {
+        if (!isZip(source.getFileName().toString())) {
+            return source;
+        }
+        String name = getUncompressedFileName(source.getFileName().toString());
+        String lower = name.toLowerCase(Locale.ROOT);
+        if (!lower.endsWith(".fastq") && !lower.endsWith(".fq")
+                && !lower.endsWith(".fasta") && !lower.endsWith(".fna") && !lower.endsWith(".fa")) {
+            name += defaultSuffix;
+        }
+        Path target = source.resolveSibling(name);
+        uncompress(source, target);
+        return target;
+    }
+
     public static String getUncompressedFileName(String fname) {
         if (fname == null || fname.isBlank()) {
             throw new IllegalArgumentException("File name must not be blank");
@@ -67,7 +91,7 @@ public class SequenceFileUtil {
         }
 
         Path parent = to.toAbsolutePath().getParent();
-        if (parent == null) {
+        if (parent != null) {
             Files.createDirectories(parent);
         }
 

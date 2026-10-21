@@ -17,12 +17,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.CovidWastewaterStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MLSTStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceSelectionStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls.SequenceInputMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.VFStageInputUrls;
@@ -30,6 +32,8 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.AMRParamters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.AssemblyStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.CovidWastewaterStageParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.EvidenceQualityStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
@@ -43,6 +47,10 @@ import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
 public class AnalysisPipelineStagesBuilder {
+
+    public static final String EXTRA_PARAM_STAGE_PARAMS = "stageParams";
+    public static final String EXTRA_PARAM_EVIDENCE_QUALITY = "evidenceQuality";
+    public static final String EXTRA_PARAM_SEQUENCE_INPUT_META = "sequenceInputMeta";
 
     private static BioPipelineStage createStage(int stageType)
             throws JsonProcessingException {
@@ -61,6 +69,7 @@ public class AnalysisPipelineStagesBuilder {
             Map.entry(PIPELINE_STAGE_REFERENCE_COMPARISON, ReferenceComparisonStageParameters::new),
             Map.entry(PIPELINE_STAGE_VARIANT_CALL, VarientCallParameters::new),
             Map.entry(PIPELINE_STAGE_CONSENSUS, ConsensusStageParameters::new),
+            Map.entry(PIPELINE_STAGE_COVID_WASTEWATER, CovidWastewaterStageParameters::new),
             Map.entry(PIPELINE_STAGE_SNP_ANNOTATION, SNPAnnotationStageParameters::new),
             Map.entry(PIPELINE_STAGE_AMR, AMRParamters::new),
             Map.entry(PIPELINE_STAGE_VIRULENCE, VFParameters::new),
@@ -72,9 +81,143 @@ public class AnalysisPipelineStagesBuilder {
                 .get();
     }
 
+    private static BaseStageParams stageParams(
+            int stageType,
+            PipelineConfigurations pipelineConfigurations)
+            throws JsonProcessingException {
+        BaseStageParams defaultParameters = stageParams(stageType);
+        // QC filters are an internal parameter snapshot, not a request-level override yet.
+        if (stageType == PIPELINE_STAGE_QC) {
+            return defaultParameters;
+        }
+        if (pipelineConfigurations == null
+                || pipelineConfigurations.getExtraParams() == null) {
+            return defaultParameters;
+        }
+
+        Object configuredStageParams = pipelineConfigurations.getExtraParams()
+                .get(EXTRA_PARAM_STAGE_PARAMS);
+        if (configuredStageParams == null) {
+            return defaultParameters;
+        }
+        if (!(configuredStageParams instanceof Map<?, ?> stageParamsByType)) {
+            throw new IllegalArgumentException(
+                    "extraParams.stageParams must be an object");
+        }
+
+        Object configuredParameters = stageParamsByType.get(
+                Integer.toString(stageType));
+        if (configuredParameters == null) {
+            return defaultParameters;
+        }
+        if (!(configuredParameters instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException(
+                    "extraParams.stageParams." + stageType
+                            + " must be an object");
+        }
+
+        return JsonUtil.toObject(
+                JsonUtil.toJson(configuredParameters),
+                defaultParameters.getClass());
+    }
+
+    private static void synchronizeEvidenceQuality(
+            PipelineConfigurations pipelineConfigurations,
+            MappingParameters mappingParameters,
+            VarientCallParameters variantCallParameters)
+            throws JsonProcessingException {
+        EvidenceQualityOverrides overrides = evidenceQualityOverrides(
+                pipelineConfigurations);
+
+        int minimumMappingQuality = overrides.getMinimumMappingQuality() == null
+                ? variantCallParameters.getMinimumMappingQuality()
+                : overrides.getMinimumMappingQuality();
+        int minimumBaseQuality = overrides.getMinimumBaseQuality() == null
+                ? variantCallParameters.getMinimumBaseQuality()
+                : overrides.getMinimumBaseQuality();
+
+        validateEvidenceQuality(
+                minimumMappingQuality,
+                minimumBaseQuality);
+        applyEvidenceQuality(
+                mappingParameters,
+                minimumMappingQuality,
+                minimumBaseQuality);
+        applyEvidenceQuality(
+                variantCallParameters,
+                minimumMappingQuality,
+                minimumBaseQuality);
+    }
+
+    private static EvidenceQualityOverrides evidenceQualityOverrides(
+            PipelineConfigurations pipelineConfigurations)
+            throws JsonProcessingException {
+        if (pipelineConfigurations == null
+                || pipelineConfigurations.getExtraParams() == null) {
+            return new EvidenceQualityOverrides();
+        }
+
+        Object configuredQuality = pipelineConfigurations.getExtraParams()
+                .get(EXTRA_PARAM_EVIDENCE_QUALITY);
+        if (configuredQuality == null) {
+            return new EvidenceQualityOverrides();
+        }
+        if (!(configuredQuality instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException(
+                    "extraParams.evidenceQuality must be an object");
+        }
+
+        return JsonUtil.toObject(
+                JsonUtil.toJson(configuredQuality),
+                EvidenceQualityOverrides.class);
+    }
+
+    private static void validateEvidenceQuality(
+            int minimumMappingQuality,
+            int minimumBaseQuality) {
+        if (minimumMappingQuality < 0) {
+            throw new IllegalArgumentException(
+                    "minimumMappingQuality must be at least 0");
+        }
+        if (minimumBaseQuality < 0) {
+            throw new IllegalArgumentException(
+                    "minimumBaseQuality must be at least 0");
+        }
+    }
+
+    private static void applyEvidenceQuality(
+            EvidenceQualityStageParameters parameters,
+            int minimumMappingQuality,
+            int minimumBaseQuality) {
+        parameters.setMinimumMappingQuality(minimumMappingQuality);
+        parameters.setMinimumBaseQuality(minimumBaseQuality);
+    }
+
+    private static final class EvidenceQualityOverrides {
+        private Integer minimumMappingQuality;
+        private Integer minimumBaseQuality;
+
+        public Integer getMinimumMappingQuality() {
+            return minimumMappingQuality;
+        }
+
+        public void setMinimumMappingQuality(Integer minimumMappingQuality) {
+            this.minimumMappingQuality = minimumMappingQuality;
+        }
+
+        public Integer getMinimumBaseQuality() {
+            return minimumBaseQuality;
+        }
+
+        public void setMinimumBaseQuality(Integer minimumBaseQuality) {
+            this.minimumBaseQuality = minimumBaseQuality;
+        }
+    }
+
     public static class PipelineConfigurations {
 
         private List<ReferenceSequence> candidateReferenceSequences;
+        private Map<String, Object> extraParams;
 
         public List<ReferenceSequence> getCandidateReferenceSequences() {
             return candidateReferenceSequences;
@@ -84,20 +227,28 @@ public class AnalysisPipelineStagesBuilder {
             this.candidateReferenceSequences = candidateReferenceSequences;
         }
 
+        public Map<String, Object> getExtraParams() {
+            return extraParams;
+        }
+
+        public void setExtraParams(Map<String, Object> extraParams) {
+            this.extraParams = extraParams;
+        }
+
     }
 
     public static class PipelineSampleInput {
 
         private String r1;
         private String r2;
-        private int sequencePlatform;
+        private Integer sequencePlatform;
         private int sequenceLevel;
 
-        public int getSequencePlatform() {
+        public Integer getSequencePlatform() {
             return sequencePlatform;
         }
 
-        public void setSequencePlatform(int sequencePlatform) {
+        public void setSequencePlatform(Integer sequencePlatform) {
             this.sequencePlatform = sequencePlatform;
         }
 
@@ -151,12 +302,48 @@ public class AnalysisPipelineStagesBuilder {
             int analysisTargetType) {
 
         baseStageParams.setAnalysisTargetType(analysisTargetType);
+        if (sequenceLevel == Constants.SequenceInput.SEQUENCE_LEVEL_READ) {
+            // ReadInspect is the source of resolved metadata for every reads stage.
+            baseStageParams.setReadMeta(null);
+            return;
+        }
         SequenceMeta sequenceMeta = new SequenceMeta();
         sequenceMeta.setSequenceLevel(sequenceLevel);
-        sequenceMeta.setQualityEncoding(Constants.SequenceInput.QUALITY_ENCODING_33);
-        sequenceMeta.setReadLenType(Constants.SequenceInput.READ_LEN_TYPE_SHORT);
-
         baseStageParams.setReadMeta(sequenceMeta);
+    }
+
+    private static void initializeStageParameters(BioPipelineStage stage,
+            PipelineSampleInput pipelineInput, PipelineConfigurations pipelineConfigurations,
+            int analysisTargetType) throws JsonProcessingException {
+        BaseStageParams parameters = StringUtils.isBlank(stage.getParameters())
+                ? stageParams(stage.getStageType(), pipelineConfigurations)
+                : JsonUtil.toObject(stage.getParameters(), stageParams(stage.getStageType()).getClass());
+        initializeParameters(parameters, pipelineInput.getSequenceLevel(), analysisTargetType);
+        stage.setParameters(JsonUtil.toJson(parameters));
+    }
+
+    private static SequenceInputMeta sequenceInputMeta(PipelineSampleInput pipelineInput,
+            PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
+        SequenceInputMeta inputMeta = null;
+        if (pipelineConfigurations != null && pipelineConfigurations.getExtraParams() != null) {
+            Object configuredMeta = pipelineConfigurations.getExtraParams()
+                    .get(EXTRA_PARAM_SEQUENCE_INPUT_META);
+            if (configuredMeta != null) {
+                if (!(configuredMeta instanceof Map<?, ?>)) {
+                    throw new IllegalArgumentException("extraParams.sequenceInputMeta must be an object");
+                }
+                inputMeta = JsonUtil.toObject(JsonUtil.toJson(configuredMeta), SequenceInputMeta.class);
+            }
+        }
+        // A specified sample platform takes precedence; null and UNKNOWN both inherit the default.
+        if (pipelineInput.getSequencePlatform() != null
+                && pipelineInput.getSequencePlatform() != Constants.SequencingPlatform.UNKNOWN) {
+            if (inputMeta == null) {
+                inputMeta = new SequenceInputMeta();
+            }
+            inputMeta.setSequencingPlatform(pipelineInput.getSequencePlatform());
+        }
+        return inputMeta;
     }
 
     private static void buildReadInspectAndQcStages(List<BioPipelineStage> stages, PipelineSampleInput pipelineInput,
@@ -165,6 +352,7 @@ public class AnalysisPipelineStagesBuilder {
         BioPipelineStage readInspectStage = createStage(PIPELINE_STAGE_READ_INSPECT);
         ReadInspectStageInputUrls readInspectStageInputUrls = new ReadInspectStageInputUrls(pipelineInput.getR1(),
                 pipelineInput.getR2());
+        readInspectStageInputUrls.setSequenceInputMeta(sequenceInputMeta(pipelineInput, pipelineConfigurations));
         String serializedInputUrls = JsonUtil.toJson(readInspectStageInputUrls);
         readInspectStage.setInputUrl(serializedInputUrls);
         stages.add(readInspectStage);
@@ -233,12 +421,9 @@ public class AnalysisPipelineStagesBuilder {
             } else {
                 stage.setStageIndex(0);
             }
-            BaseStageParams parameters = stageParams(stage.getStageType());
-            initializeParameters(
-                    parameters,
-                    pipelineInput.getSequenceLevel(),
+            initializeStageParameters(
+                    stage, pipelineInput, pipelineConfigurations,
                     BaseStageParams.ANALYSIS_TARGET_TYPE_BACTERIA);
-            stage.setParameters(JsonUtil.toJson(parameters));
         }
 
         return stages;
@@ -254,65 +439,41 @@ public class AnalysisPipelineStagesBuilder {
     public static List<BioPipelineStage> buildSNPAnalysisStages(PipelineSampleInput pipelineInput,
             PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
 
-        // List<BioPipelineStage> stages = new ArrayList<>();
-        // String refseqObject = pipelineConfigurations.getRefseqObjName();
-
-        // RefSeqConfig refSeqConfig = new RefSeqConfig();
-        // refSeqConfig.setInnerRefSeq(false);
-        // refSeqConfig.setRefseqObjectName(refseqObject);
-
-        // BioPipelineStage firstStage = null;
-
-        // if (false) {
-        //     BioPipelineStage qc = new BioPipelineStage();
-        //     qc.setStageType(PIPELINE_STAGE_QC);
-        //     QcStageInputUrls qcStageInputUrls = new QcStageInputUrls();
-        //     qcStageInputUrls.setRead1(pipelineInput.getR1());
-        //     qcStageInputUrls.setRead2(pipelineInput.getR2());
-        //     qc.setInputUrl(JsonUtil.toJson(qcStageInputUrls));
-        //     QcParameters qcParameters = new QcParameters();
-        //     qcParameters.setRefSeqConfig(refSeqConfig);
-        //     qc.setParameters(JsonUtil.toJson(qcParameters));
-        //     qc.setStageName(STAGE_NAME_MAP.get(PIPELINE_STAGE_QC));
-        //     firstStage = qc;
-        // } else {
-        //     BioPipelineStage mapping = new BioPipelineStage();
-        //     mapping.setStageType(PIPELINE_STAGE_MAPPING);
-        //     mapping.setStageName(STAGE_NAME_MAP.get(PIPELINE_STAGE_MAPPING));
-
-        //     MappingInputUrls mappingInputUrls = new MappingInputUrls();
-        //     mappingInputUrls.setR1Url(pipelineInput.getR1());
-        //     mappingInputUrls.setR2Url(pipelineInput.getR2());
-
-        //     MappingParameters mappingParameters = new MappingParameters();
-        //     mappingParameters.setRefSeqConfig(refSeqConfig);
-
-        //     mapping.setInputUrl(JsonUtil.toJson(mappingInputUrls));
-        //     mapping.setParameters(JsonUtil.toJson(mappingParameters));
-
-        //     firstStage = mapping;
-
-        // }
-
-        // firstStage.setStageIndex(0);
-        // firstStage.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-
-        // stages.add(firstStage);
-
-        // BioPipelineStage varientCall = new BioPipelineStage();
-        // varientCall.setStageType(PIPELINE_STAGE_VARIANT_CALL);
-        // varientCall.setStageName(STAGE_NAME_MAP.get(PIPELINE_STAGE_VARIANT_CALL));
-        // VarientCallParameters varientCallParameters = new VarientCallParameters();
-        // varientCallParameters.setRefSeqConfig(refSeqConfig);
-
-        // varientCall.setParameters(JsonUtil.toJson(varientCallParameters));
-        // varientCall.setStageIndex(-1);
-        // varientCall.setStatus(PIPELINE_STAGE_STATUS_PENDING);
-
-        // stages.add(varientCall);
-
         return Collections.emptyList();
 
+    }
+
+    /**
+     * Independent single-stage entry for declared SARS-CoV-2 amplicon FASTQ inputs.
+     * This boundary validates the input contract, not the laboratory preparation type.
+     */
+    public static List<BioPipelineStage> buildCovidWastewaterStages(PipelineSampleInput pipelineInput,
+            PipelineConfigurations pipelineConfigurations) throws JsonProcessingException {
+        if (pipelineInput == null
+                || pipelineInput.getSequenceLevel() != Constants.SequenceInput.SEQUENCE_LEVEL_READ) {
+            throw new IllegalArgumentException("新冠污水分析仅支持 READ 输入，请上传新冠扩增子 FASTQ");
+        }
+        if (StringUtils.isBlank(pipelineInput.getR1())) {
+            throw new IllegalArgumentException("新冠污水分析缺少 R1，请上传新冠扩增子 FASTQ");
+        }
+
+        CovidWastewaterStageParameters parameters = (CovidWastewaterStageParameters) stageParams(
+                PIPELINE_STAGE_COVID_WASTEWATER, pipelineConfigurations);
+        parameters.validate();
+        initializeParameters(parameters, pipelineInput.getSequenceLevel(),
+                BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS);
+
+        CovidWastewaterStageInputUrls input = new CovidWastewaterStageInputUrls();
+        input.setR1Url(pipelineInput.getR1());
+        input.setR2Url(pipelineInput.getR2());
+        // Preserve the user's declaration; no ReadInspect-derived metadata is fabricated.
+        input.setSequencingPlatform(pipelineInput.getSequencePlatform());
+
+        BioPipelineStage stage = createStage(PIPELINE_STAGE_COVID_WASTEWATER);
+        stage.setStageIndex(0);
+        stage.setInputUrl(JsonUtil.toJson(input));
+        stage.setParameters(JsonUtil.toJson(parameters));
+        return List.of(stage);
     }
 
     public static List<BioPipelineStage> buildVirusStages(PipelineSampleInput pipelineInput,
@@ -320,11 +481,6 @@ public class AnalysisPipelineStagesBuilder {
 
         ArrayList<BioPipelineStage> stages = new ArrayList<>(16);
 
-        // BaseStageParams baseStageParams = new BaseStageParams();
-        // initializeParameters(baseStageParams, pipelineInput.sequenceLevel,
-        // BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS, false
-        // ,pipelineConfigurations.getRefseqObjName(),
-        // pipelineConfigurations.getGff3ObjName());
 
         boolean isInputRead = pipelineInput.getSequenceLevel() == Constants.SequenceInput.SEQUENCE_LEVEL_READ;
         BioPipelineStage startStage = null;
@@ -342,7 +498,8 @@ public class AnalysisPipelineStagesBuilder {
             ReferenceComparisonStageInputUrls comparisonInputUrls = new ReferenceComparisonStageInputUrls();
             comparisonInputUrls.setFastaUrl(pipelineInput.getR1());
 
-            ReferenceSelectionStageParameters selectionParameters = new ReferenceSelectionStageParameters();
+            ReferenceSelectionStageParameters selectionParameters = (ReferenceSelectionStageParameters) stageParams(
+                    PIPELINE_STAGE_REFERENCE_SELECTION, pipelineConfigurations);
 
             List<ReferenceSequence> candidates = pipelineConfigurations.getCandidateReferenceSequences();
 
@@ -362,6 +519,10 @@ public class AnalysisPipelineStagesBuilder {
 
             stages.add(referenceSelectionStage);
             stages.add(referenceComparisonStage);
+            for (BioPipelineStage stage : stages) {
+                initializeStageParameters(stage, pipelineInput, pipelineConfigurations,
+                        BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS);
+            }
 
             return stages;
         }
@@ -376,16 +537,29 @@ public class AnalysisPipelineStagesBuilder {
         stages.add(assembly);
 
         BioPipelineStage referenceSelection = createStage(PIPELINE_STAGE_REFERENCE_SELECTION);
-        ReferenceSelectionStageParameters referenceSelectionParameters = new ReferenceSelectionStageParameters();
+        ReferenceSelectionStageParameters referenceSelectionParameters = (ReferenceSelectionStageParameters) stageParams(
+                PIPELINE_STAGE_REFERENCE_SELECTION, pipelineConfigurations);
         referenceSelectionParameters.setCandidateReferences(
                 pipelineConfigurations.getCandidateReferenceSequences());
         referenceSelection.setParameters(JsonUtil.toJson(referenceSelectionParameters));
         stages.add(referenceSelection);
 
         BioPipelineStage mapping = createStage(PIPELINE_STAGE_MAPPING);
+        MappingParameters mappingParameters = (MappingParameters) stageParams(
+                PIPELINE_STAGE_MAPPING, pipelineConfigurations);
         stages.add(mapping);
 
         BioPipelineStage varientCall = createStage(PIPELINE_STAGE_VARIANT_CALL);
+        VarientCallParameters variantCallParameters =
+                (VarientCallParameters) stageParams(
+                        PIPELINE_STAGE_VARIANT_CALL,
+                        pipelineConfigurations);
+        synchronizeEvidenceQuality(
+                pipelineConfigurations,
+                mappingParameters,
+                variantCallParameters);
+        mapping.setParameters(JsonUtil.toJson(mappingParameters));
+        varientCall.setParameters(JsonUtil.toJson(variantCallParameters));
         stages.add(varientCall);
 
         BioPipelineStage consensus = createStage(PIPELINE_STAGE_CONSENSUS);
@@ -400,9 +574,8 @@ public class AnalysisPipelineStagesBuilder {
             } else {
                 stage.setStageIndex(-1);
             }
-            if (StringUtils.isBlank(stage.getParameters())) {
-                stage.setParameters(JsonUtil.toJson(stageParams(stage.getStageType())));
-            }
+            initializeStageParameters(stage, pipelineInput, pipelineConfigurations,
+                    BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS);
 
         }
         return stages;

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import com.xjtlu.bio.analysisPipeline.stageResult.ReferenceSelectionStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReferenceSelectionStageOutput;
+import com.xjtlu.bio.entity.BioPipelineStage;
 
 @Component
 public class ReferenceSelectionStageDoneHandler
@@ -21,13 +22,20 @@ public class ReferenceSelectionStageDoneHandler
     }
 
     @Override
+    protected void setSerializedOutput(BioPipelineStage updateStage, String serializedOutput) {
+        updateStage.setOutputInline(serializedOutput);
+    }
+
+    @Override
     protected Pair<Map<String, String>, ReferenceSelectionStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<ReferenceSelectionStageOutput> stageRunResult) {
 
         ReferenceSelectionStageOutput stageOutput = stageRunResult.getStageOutput();
         ReferenceSelectionStageResult result = new ReferenceSelectionStageResult(
                 stageOutput.getSelectedReference(),
-                stageOutput.getCandidateScores());
+                stageOutput.getCandidateScores(),
+                stageOutput.getUnmatchedSegmentKeys());
+        result.setReadFallbackMetrics(stageOutput.getReadFallbackMetrics());
 
         return Pair.of(Map.of(), result);
     }

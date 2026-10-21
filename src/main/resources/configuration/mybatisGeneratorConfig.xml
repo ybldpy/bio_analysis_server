@@ -58,13 +58,25 @@
     </table> -->
 
 
+    <!-- <table tableName="bio_pipeline_log" schema="bio"
+      enableCountByExample="true"
+      enableUpdateByExample="true"
+      enableDeleteByExample="true"
+      enableSelectByExample="true"
+    >
+      <generatedKey column="id" sqlStatement="JDBC" identity="true" />
+    </table> -->
+
+
+    <!-- Only regenerate this table for the reference-library enabled change. -->
     <table tableName="bio_reference_sequence" schema="bio"
       enableCountByExample="true"
       enableUpdateByExample="true"
       enableDeleteByExample="true"
       enableSelectByExample="true"
     >
-      <generatedKey column="stage_id" sqlStatement="JDBC" identity="true" />
+      <generatedKey column="reference_id" sqlStatement="JDBC" identity="true" />
+      <columnOverride column="enabled" javaType="java.lang.Boolean" />
     </table>
 
 

@@ -3,6 +3,7 @@ package com.xjtlu.bio.bio_analysis;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.nio.file.Files;
 import java.util.List;
 
 import org.springframework.boot.test.context.SpringBootTest;
@@ -107,16 +108,16 @@ class TaxonomyStageExecutorTest {
 
         TaxonomyStageInputUrls inputUrls = new TaxonomyStageInputUrls();
 
-        // 这里不要随便写本地路径，除非你的 StorageService 支持 file://
-        // 正常情况下这里应该是 MinIO / S3 / 本项目 storage 能识别的 object key 或 url
-        inputUrls.setR1("sinput/taxonomy/coli.fna");
+        inputUrls.setContigs("sinput/taxonomy/coli.fna");
 
         stage.setInputUrl(objectMapper.writeValueAsString(inputUrls));
 
         BaseStageParams params = new BaseStageParams();
         SequenceMeta sequenceMeta = new SequenceMeta();
         sequenceMeta.setReadLenType(Constants.SequenceInput.READ_LEN_TYPE_SHORT);
-        sequenceMeta.setSequenceLevel(Constants.SequenceInput.SEQUENCE_LEVEL_ASSEMBLY);
+        // Simulate the regular bacteria pipeline: the original sample was reads,
+        // but Taxonomy runs after Assembly and should prefer the supplied contigs.
+        sequenceMeta.setSequenceLevel(Constants.SequenceInput.SEQUENCE_LEVEL_READ);
         sequenceMeta.setQualityEncoding(Constants.SequenceInput.QUALITY_ENCODING_33);
         params.setReadMeta(sequenceMeta);
         stage.setParameters(objectMapper.writeValueAsString(params));
@@ -134,8 +135,21 @@ class TaxonomyStageExecutorTest {
         assertNotNull(output.getCandicates());
         assertFalse(output.getCandicates().isEmpty());
 
-        assertNotNull(output.getStatus());
+        assertEquals(Constants.TaxonomyClassification.STATUS_CONFIDENT, output.getStatus());
         assertNotNull(output.getEvidenceResource());
+        assertNotNull(output.getBinningMetrics());
+        assertEquals(4L, output.getBinningMetrics().getTotalContigs());
+        assertEquals(5_890_207L, output.getBinningMetrics().getTotalAssemblyBases());
+        assertEquals(562, output.getBinningMetrics().getDominantSpeciesTaxId());
+        assertEquals("Escherichia coli", output.getBinningMetrics().getDominantSpeciesName());
+        assertEquals(
+                5_883_492.0d / 5_890_207.0d,
+                output.getBinningMetrics().getDominantSpeciesAssemblyFraction(),
+                1e-12);
+        assertNotNull(output.getMainBinFastaPath());
+        assertTrue(Files.isRegularFile(output.getMainBinFastaPath()));
+        assertNotNull(output.getContigAssignmentReportPath());
+        assertTrue(Files.isRegularFile(output.getContigAssignmentReportPath()));
 
         // System.out.println("taxonomy status = " + output.getStatus());
         // System.out.println("evidence = " + output.getEvidenceResource());

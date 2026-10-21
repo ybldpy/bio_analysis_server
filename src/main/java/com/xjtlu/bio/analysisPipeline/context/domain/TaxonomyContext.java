@@ -1,5 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.context.domain;
 
+import static com.xjtlu.bio.analysisPipeline.Constants.TaxonomyClassification.STATUS_LOW_CONFIDENCE;
+
 import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
 
 public class TaxonomyContext {
@@ -55,12 +57,16 @@ public class TaxonomyContext {
     }
 
     public static TaxonomyContext of(TaxonomyResult r) {
-        if(r == null){
-            return new TaxonomyContext();
-        }
-        
         TaxonomyContext ctx = new TaxonomyContext();
+        if (r == null) {
+            ctx.status = STATUS_LOW_CONFIDENCE;
+            return ctx;
+        }
+
         ctx.status = r.getStatus();
+        if (r.getBest() == null) {
+            return ctx;
+        }
         ctx.taxid = r.getBest().getTaxid();
         ctx.speciesName = r.getBest().getName();
         ctx.rank = r.getBest().getRank();

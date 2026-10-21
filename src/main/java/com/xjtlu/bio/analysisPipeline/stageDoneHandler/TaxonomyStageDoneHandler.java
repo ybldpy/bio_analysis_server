@@ -2,6 +2,7 @@ package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAGE_STATUS_ACTION_REQUIRED;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAGE_STATUS_FINISHED;
+import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAGE_STATUS_NOT_APPLICABLE;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_TAXONOMY;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,7 @@ import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.Taxon;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.TaxonomyStageOutput.TaxonomyClassificationOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.TaxonomicContigBinner;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.utils.JsonUtil;
 
@@ -148,7 +151,8 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
     }
 
     @Override
-    public void handleStageDone(StageRunResult<TaxonomyStageOutput> stageRunResult) {
+    protected void doHandleStageDone(StageRunResult<TaxonomyStageOutput> stageRunResult)
+            throws JsonProcessingException {
         StageContext taxonomyStage = stageRunResult.getStageContext();
         TaxonomyStageOutput taxonomyStageOutput = stageRunResult.getStageOutput();
 
@@ -167,13 +171,22 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         //     return;
         // }
 
-        List<TaxonomyClassificationOutput> candicates = taxonomyStageOutput.getCandicates();
+        List<TaxonomyClassificationOutput> candicates = taxonomyStageOutput.getCandicates() == null
+                ? Collections.emptyList()
+                : taxonomyStageOutput.getCandicates();
         TaxonomyClassificationOutput comfirmedSpecies = taxonomyStageOutput.getComfirmedTaxonomy();
         
         TaxonomyResult taxonomyResult = new TaxonomyResult();
         Taxon best = null;
 
         boolean isConfident = taxonomyStageOutput.getStatus() == Constants.TaxonomyClassification.STATUS_CONFIDENT;
+        if (isConfident && comfirmedSpecies == null) {
+            logger.error("Confident taxonomy stage has no confirmed species. stage={}", taxonomyStage);
+            this.handleFail(taxonomyStage, stageRunResult.getWorkDir() == null
+                    ? null : stageRunResult.getWorkDir().toString(),
+                    "Confident taxonomy stage has no confirmed species");
+            return;
+        }
         if(isConfident){
             best = new Taxon();
             best.setName(comfirmedSpecies.getSpeciesName());
@@ -184,31 +197,59 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
 
         taxonomyResult.setBest(best);
         taxonomyResult.setStatus(taxonomyStageOutput.getStatus());
-        List<Taxon> resultCandicates = taxonomyStageOutput.getCandicates().stream().map(
+        taxonomyResult.setEvidenceResource(taxonomyStageOutput.getEvidenceResource());
+        List<Taxon> resultCandicates = candicates.stream().map(
             (s)->{
                 Taxon taxon = new Taxon();
                 taxon.setName(s.getSpeciesName());
                 taxon.setScore(s.getScore());
                 taxon.setTaxid(s.getSpeciesTaxId());
+                taxon.setRank("S");
                 return taxon;
             }
         ).toList();
 
         taxonomyResult.setCandidates(resultCandicates);
+        taxonomyResult.setBinningMetrics(taxonomyStageOutput.getBinningMetrics());
 
-
-        String serializedResult = null;
-
-        try {
-            serializedResult = JsonUtil.toJson(taxonomyResult);
-        } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            logger.error("stage = {}.json processing exception", taxonomyStage, e);
-            this.handleFail(taxonomyStage, stageRunResult.getWorkDir().toString());
+        Map<String, String> uploadConfig = new LinkedHashMap<>();
+        if (taxonomyStageOutput.getMainBinFastaPath() != null) {
+            String mainBinFastaUrl = this.createStoreObjectName(
+                    taxonomyStage,
+                    TaxonomicContigBinner.MAIN_BIN_FASTA_FILE_NAME);
+            uploadConfig.put(
+                    taxonomyStageOutput.getMainBinFastaPath().toAbsolutePath().toString(),
+                    mainBinFastaUrl);
+            taxonomyResult.setMainBinFastaUrl(mainBinFastaUrl);
         }
+        if (taxonomyStageOutput.getContigAssignmentReportPath() != null) {
+            String assignmentReportUrl = this.createStoreObjectName(
+                    taxonomyStage,
+                    TaxonomicContigBinner.ASSIGNMENT_REPORT_FILE_NAME);
+            uploadConfig.put(
+                    taxonomyStageOutput.getContigAssignmentReportPath().toAbsolutePath().toString(),
+                    assignmentReportUrl);
+            taxonomyResult.setContigAssignmentReportUrl(assignmentReportUrl);
+        }
+
+        if (!uploadConfig.isEmpty() && !this.batchUploadObjectsFromLocal(uploadConfig)) {
+            logger.error("Failed to upload taxonomy binning artifacts. stage={}", taxonomyStage);
+            this.handleFail(taxonomyStage, stageRunResult.getWorkDir() == null
+                    ? null : stageRunResult.getWorkDir().toString(), "Failed to upload taxonomy binning artifacts");
+            return;
+        }
+
+
+        String serializedResult = JsonUtil.toJson(taxonomyResult);
         BioPipelineStage patch = new BioPipelineStage();
 
-        patch.setStatus(isConfident?PIPELINE_STAGE_STATUS_FINISHED:PIPELINE_STAGE_STATUS_ACTION_REQUIRED);
+        if (isConfident) {
+            patch.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+        } else if (taxonomyStageOutput.getStatus() == Constants.TaxonomyClassification.STATUS_OUT_PANEL) {
+            patch.setStatus(PIPELINE_STAGE_STATUS_NOT_APPLICABLE);
+        } else {
+            patch.setStatus(PIPELINE_STAGE_STATUS_ACTION_REQUIRED);
+        }
         patch.setEndTime(new Date());
         patch.setOutputInline(serializedResult);
 
@@ -216,7 +257,7 @@ public class TaxonomyStageDoneHandler extends AbstractStageDoneHandler<TaxonomyS
         int updateRes = updateStageFromVersion(patch, taxonomyStage.getRunStageId(), taxonomyStage.getVersion());
         // this.deleteStageResultDir(taxonomyStageOutput.getParentPath().toString());
 
-        pipelineService.pipelineStageDone(stageRunResult.getStageContext().getRunStageId(), updateRes >= 1);
+        notifyStageDone(taxonomyStage, updateRes >= 1);
         return;
     }
 

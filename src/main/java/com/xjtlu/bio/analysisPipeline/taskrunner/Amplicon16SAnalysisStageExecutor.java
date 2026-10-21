@@ -1,5 +1,6 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MetagenomicsAnalysisStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.Amplicon16SAnalysisStageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.SequenceFileUtil;
 
 
 @Component
@@ -133,6 +135,16 @@ public class Amplicon16SAnalysisStageExecutor extends
         }
 
         loadInput(loadMap);
+        try {
+            r1LocalPath = SequenceFileUtil.unpackZipIfNeeded(r1LocalPath, ".fastq");
+            if (r2LocalPath != null) {
+                r2LocalPath = SequenceFileUtil.unpackZipIfNeeded(r2LocalPath, ".fastq");
+            }
+        } catch (IOException e) {
+            String errorMsg = "Failed to unpack amplicon reads ZIP: " + e.getMessage();
+            logger.error(errorMsg, e);
+            return runFail(stageExecutionInput.stageContext, errorMsg, stageExecutionInput.workDir);
+        }
         Path dada2OutputDir = stageExecutionInput.workDir.resolve("dada2Output");
         ExecuteResult executeResult = runDada2(r1LocalPath, r2LocalPath, stageExecutionInput.workDir, dada2OutputDir);
 

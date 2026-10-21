@@ -7,11 +7,16 @@ import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.requestParameters.BatchCreateAnalysisPipelineRequest;
+import com.xjtlu.bio.requestParameters.ConfirmTaxonomyRequest;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
+import com.xjtlu.bio.response.TaxonomyConfirmationResponse;
+import com.xjtlu.bio.response.VirusTargetOption;
 import com.xjtlu.bio.service.PipelineService;
+import com.xjtlu.bio.service.PipelineTargetService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +39,18 @@ public class PipelineController {
     @Resource
     private PipelineService pipelineService;
 
+    @Resource
+    private PipelineTargetService pipelineTargetService;
+
+    @GetMapping("/virusTargets")
+    public ResponseEntity<Result<List<VirusTargetOption>>> virusTargets() {
+        Result<List<VirusTargetOption>> result = pipelineTargetService.listVirusTargets();
+        if (result.getStatus() == Result.INTERNAL_FAIL) {
+            return ResponseEntity.internalServerError().body(result);
+        }
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/start")
     public ResponseEntity start(@Param("pipelineId")long pipelineId){
 
@@ -54,6 +71,18 @@ public class PipelineController {
         }
 
         
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/stage/taxonomy/confirm")
+    public ResponseEntity<?> confirmTaxonomy(@RequestBody @Valid ConfirmTaxonomyRequest request,
+                                             Principal principal) {
+        String confirmedBy = principal == null ? null : principal.getName();
+        Result<TaxonomyConfirmationResponse> result =
+                this.pipelineService.confirmTaxonomy(request, confirmedBy);
+        if (result.getStatus() == Result.INTERNAL_FAIL) {
+            return ResponseEntity.internalServerError().body(result);
+        }
         return ResponseEntity.ok(result);
     }
 

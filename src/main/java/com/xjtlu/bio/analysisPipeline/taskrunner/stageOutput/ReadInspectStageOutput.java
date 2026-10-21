@@ -1,6 +1,10 @@
 package com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput;
 
 import java.nio.file.Path;
+import java.util.Objects;
+
+import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 
 public class ReadInspectStageOutput implements StageOutput{
 
@@ -8,8 +12,15 @@ public class ReadInspectStageOutput implements StageOutput{
 
     
 
-    private int qualityEncoding;
-    private int readLenType;
+    private SequenceMeta readMeta;
+
+    public SequenceMeta getReadMeta() {
+        return readMeta;
+    }
+
+    public void setReadMeta(SequenceMeta readMeta) {
+        this.readMeta = Objects.requireNonNull(readMeta, "ReadInspect output metadata must not be null");
+    }
 
     private Path r1Path;
     private Path r2Path;
@@ -54,8 +65,11 @@ public class ReadInspectStageOutput implements StageOutput{
     }
 
     public ReadInspectStageOutput(int qualityEncoding, int readLenType, boolean useOriginalSequence, String originalSequenceUrl, Path r1Path, Path r2Path, Path workDir) {
-        this.qualityEncoding = qualityEncoding;
-        this.readLenType = readLenType;
+        this.readMeta = new SequenceMeta();
+        this.readMeta.setQualityEncoding(qualityEncoding);
+        this.readMeta.setReadLenType(readLenType);
+        this.readMeta.setSequenceLevel(Constants.SequenceInput.SEQUENCE_LEVEL_READ);
+        this.readMeta.setSequencingPlatform(Constants.SequencingPlatform.UNKNOWN);
         this.r1Path = r1Path;
         this.r2Path = r2Path;
         this.workDir = workDir;
@@ -65,13 +79,13 @@ public class ReadInspectStageOutput implements StageOutput{
 
 
     public int getQualityEncoding() {
-        return qualityEncoding;
+        return readMeta.getQualityEncoding();
     }
 
 
 
     public void setQualityEncoding(int qualityEncoding) {
-        this.qualityEncoding = qualityEncoding;
+        readMeta.setQualityEncoding(qualityEncoding);
     }
 
 
@@ -81,7 +95,7 @@ public class ReadInspectStageOutput implements StageOutput{
 
 
     public int getReadLenType() {
-        return readLenType;
+        return readMeta.getReadLenType();
     }
 
 
@@ -91,7 +105,7 @@ public class ReadInspectStageOutput implements StageOutput{
 
 
     public void setReadLenType(int readLenType) {
-        this.readLenType = readLenType;
+        readMeta.setReadLenType(readLenType);
     }
 
 

@@ -6,11 +6,19 @@ public class SeroTypingStageOutput implements StageOutput{
 
 
     private Path resultPath;
+    private Path kaptiveKResultPath;
+    private Path kaptiveOResultPath;
 
     
 
     public SeroTypingStageOutput(Path resultPath) {
+        this(resultPath, null, null);
+    }
+
+    public SeroTypingStageOutput(Path resultPath, Path kaptiveKResultPath, Path kaptiveOResultPath) {
         this.resultPath = resultPath;
+        this.kaptiveKResultPath = kaptiveKResultPath;
+        this.kaptiveOResultPath = kaptiveOResultPath;
     }
 
 
@@ -31,6 +39,22 @@ public class SeroTypingStageOutput implements StageOutput{
 
     public void setResultPath(Path resultPath) {
         this.resultPath = resultPath;
+    }
+
+    public Path getKaptiveKResultPath() {
+        return kaptiveKResultPath;
+    }
+
+    public void setKaptiveKResultPath(Path kaptiveKResultPath) {
+        this.kaptiveKResultPath = kaptiveKResultPath;
+    }
+
+    public Path getKaptiveOResultPath() {
+        return kaptiveOResultPath;
+    }
+
+    public void setKaptiveOResultPath(Path kaptiveOResultPath) {
+        this.kaptiveOResultPath = kaptiveOResultPath;
     }
 
 

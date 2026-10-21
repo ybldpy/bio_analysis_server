@@ -49,8 +49,9 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
         String r2Path = stageRunResult.getStageOutput().getR2Path();
 
 
-        String r1Url = this.createStoreObjectName(stageRunResult.getStage(), "trimmed_r1."+r1Path.substring(r1Path.indexOf(".")+1));
-        String r2Url = stageRunResult.getStageOutput().getR2Path() == null?null:this.createStoreObjectName(stageRunResult.getStage(), "trimmed_r2."+r2Path.substring(r2Path.indexOf(".")+1));
+        String r1Url = this.createStoreObjectName(stageRunResult.getStage(), readObjectName("trimmed_r1", r1Path));
+        String r2Url = r2Path == null ? null
+                : this.createStoreObjectName(stageRunResult.getStage(), readObjectName("trimmed_r2", r2Path));
         String jsonUrl = this.createStoreObjectName(stageRunResult.getStage(), jsonFileName);
         String htmlUrl = this.createStoreObjectName(stageRunResult.getStage(), htmlFileName);
 
@@ -68,6 +69,16 @@ public class QcStageDoneHandler extends AbstractStageDoneHandler<QCStageOutput> 
             uploadConfig,
             new QcResult(r1Url, r2Url, htmlUrl, jsonUrl)
         );
+    }
+
+    private String readObjectName(String prefix, String path) {
+        String fileName = substractFileNameFromPath(path);
+        int extensionEnd = fileName.endsWith(".gz") ? fileName.length() - 3 : fileName.length();
+        int extensionStart = fileName.lastIndexOf('.', extensionEnd - 1);
+        if (extensionStart < 0) {
+            throw new IllegalArgumentException("QC output filename has no extension: " + fileName);
+        }
+        return prefix + fileName.substring(extensionStart);
     }
 
 }

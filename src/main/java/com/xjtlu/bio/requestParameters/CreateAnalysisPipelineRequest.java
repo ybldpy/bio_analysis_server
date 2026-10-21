@@ -4,14 +4,26 @@ package com.xjtlu.bio.requestParameters;
 import jakarta.validation.constraints.*;
 import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 public class CreateAnalysisPipelineRequest {
 
     public static class PipelineStageParameters {
         private Integer taxId;
 
-        Map<String, Object> extraParams;
+        /**
+         * 平台编码见 Constants.SequencingPlatform；null、未传或 UNKNOWN（0）均表示未声明，
+         * 由 ReadInspect 尝试检测。
+         */
+        private Integer sequencingPlatform;
+
+        private Map<String, Object> extraParams;
+
+        public Integer getSequencingPlatform() {
+            return sequencingPlatform;
+        }
+
+        public void setSequencingPlatform(Integer sequencingPlatform) {
+            this.sequencingPlatform = sequencingPlatform;
+        }
 
         public Map<String, Object> getExtraParams() {
             return extraParams;

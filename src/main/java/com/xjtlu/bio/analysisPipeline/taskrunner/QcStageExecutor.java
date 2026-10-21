@@ -13,6 +13,7 @@ import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.QCStageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.SequenceFileUtil;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -41,7 +42,7 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
     private static final int TOOL_CODE_FASTQ_LONG = 1;
 
     private List<String> buildQcRunCmd(int toolCode, Path read1InputPath, Path read2InputPath, Path outputRead1Path,
-            Path outputRead2Path, Path jsonPath, Path htmlPath) {
+            Path outputRead2Path, Path jsonPath, Path htmlPath, QcParameters parameters) {
 
         List<String> cmd = new ArrayList<>();
 
@@ -78,6 +79,21 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
 
         }
 
+        boolean shortReads = toolCode == TOOL_CODE_FASTQ;
+        QcParameters.ReadFilters filters = shortReads
+                ? parameters.getShortReadFilters() : parameters.getLongReadFilters();
+        cmd.addAll(List.of(
+                "--qualified_quality_phred", Integer.toString(filters.getQualifiedQualityPhred()),
+                "--unqualified_percent_limit", Integer.toString(filters.getUnqualifiedPercentLimit()),
+                shortReads ? "--average_qual" : "--mean_qual", Integer.toString(filters.getMeanQuality()),
+                "--length_required", Integer.toString(filters.getMinimumLength()),
+                "--length_limit", Integer.toString(filters.getMaximumLength()),
+                "--n_base_limit", Integer.toString(filters.getNBaseLimit())));
+        if (!shortReads) {
+            cmd.addAll(List.of("--n_percent_limit",
+                    Integer.toString(parameters.getLongReadFilters().getNPercentLimit())));
+        }
+
         return cmd;
     }
 
@@ -100,24 +116,9 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
         boolean hasR2 = inputUrl2 != null && qcParams.getSequenceMeta().getReadLenType() != Constants.SequenceInput.READ_LEN_TYPE_LONG;
 
         String input2FileName = !hasR2 ? null : inputUrl2.substring(inputUrl2.lastIndexOf("/") + 1);
-        boolean isGz = Constants.CompressedFormat.isGzip(input1FileName);
-        QCStageOutput qcStageOutput = new QCStageOutput(outputDir.resolve(input1FileName).toString(),
-                !hasR2 ? null : outputDir.resolve(input2FileName).toString(),
-                outputDir.resolve("cleaned.html").toString(),
-                outputDir.resolve("cleaned.json").toString(), isGz);
-
-        Path trimmedR1Path = Path.of(qcStageOutput.getR1Path());
-        Path trimmedR2Path = !hasR2 ? null
-                : Path.of(qcStageOutput.getR2Path());
-
-        if (!hasR2) {
-            qcStageOutput.setR2Path(null);
-        }
-        Path outputQcJson = Path.of(qcStageOutput.getJsonPath());
-        Path outputQcHtml = Path.of(qcStageOutput.getHtmlPath());
-
-        Path r1Path = inputDir.resolve(input1FileName);
-        Path r2Path = !hasR2 ? null : inputDir.resolve(input2FileName);
+        Path r1Path = inputDir.resolve(SequenceFileUtil.isZip(input1FileName) ? "r1.fastq.zip" : input1FileName);
+        Path r2Path = !hasR2 ? null : inputDir.resolve(
+                SequenceFileUtil.isZip(input2FileName) ? "r2.fastq.zip" : input2FileName);
 
         HashMap<String, Path> loadMap = new HashMap<>();
         loadMap.put(inputUrl1, r1Path);
@@ -127,10 +128,30 @@ public class QcStageExecutor extends AbstractPipelineStageExector<QCStageOutput,
 
         loadInput(loadMap);
 
+        try {
+            r1Path = SequenceFileUtil.unpackZipIfNeeded(r1Path, ".fastq");
+            if (r2Path != null) {
+                r2Path = SequenceFileUtil.unpackZipIfNeeded(r2Path, ".fastq");
+            }
+        } catch (IOException e) {
+            return runFail(bioPipelineStage, "Failed to unpack ZIP QC input", e, outputDir);
+        }
+
+        // Derive output names from usable inputs, never from a ZIP archive suffix.
+        boolean isGz = SequenceFileUtil.isGzip(r1Path);
+        QCStageOutput qcStageOutput = new QCStageOutput(outputDir.resolve(r1Path.getFileName()).toString(),
+                r2Path == null ? null : outputDir.resolve(r2Path.getFileName()).toString(),
+                outputDir.resolve("cleaned.html").toString(),
+                outputDir.resolve("cleaned.json").toString(), isGz);
+        Path trimmedR1Path = Path.of(qcStageOutput.getR1Path());
+        Path trimmedR2Path = r2Path == null ? null : Path.of(qcStageOutput.getR2Path());
+        Path outputQcJson = Path.of(qcStageOutput.getJsonPath());
+        Path outputQcHtml = Path.of(qcStageOutput.getHtmlPath());
+
         List<String> cmd = buildQcRunCmd(
                 qcParams.getSequenceMeta().getReadLenType() == Constants.SequenceInput.READ_LEN_TYPE_SHORT ? TOOL_CODE_FASTQ
                         : TOOL_CODE_FASTQ_LONG,
-                r1Path, r2Path, trimmedR1Path, trimmedR2Path, outputQcJson, outputQcHtml);
+                r1Path, r2Path, trimmedR1Path, trimmedR2Path, outputQcJson, outputQcHtml, qcParams);
 
         int runResult = 0;
         Exception runException = null;

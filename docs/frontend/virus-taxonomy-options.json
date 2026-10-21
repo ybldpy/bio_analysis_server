@@ -1,0 +1,1583 @@
+{
+  "schemaVersion": 3,
+  "snapshotDate": "2026-10-20",
+  "title": "病毒专项平铺选项与参考分类成员映射",
+  "scope": "本期疾控专项最终平铺选项；拆分项与原独立项处于同一级，不保留可选父类。不能唯一绑定taxId的6个人工聚合项已按用户确认拆成原有具体分类。所有参考成员仍限于此前核对的78个本地taxId，未扩大范围。",
+  "sourceTable": "bio_reference_sequence",
+  "sequenceFilesChecked": false,
+  "backendIntegrated": true,
+  "targetOptionsTable": "bio_pipeline_target",
+  "targetOptionsMigration": "scripts/migrations/20261020_add_bio_pipeline_target.sql",
+  "memberMappingTable": "bio_reference_taxonomy_member",
+  "databaseMigration": "scripts/migrations/20261020_add_bio_reference_taxonomy_member.sql",
+  "optionCount": 67,
+  "referenceTaxonCount": 78,
+  "referenceRecordCount": 201,
+  "selectionContract": {
+    "displayMode": "FLAT",
+    "labelField": "label",
+    "valueField": "taxId",
+    "categorySelectable": false,
+    "requiresParentSelection": false,
+    "taxIdRequired": true,
+    "nullTaxIdSelectable": false,
+    "taxIdBindingStatusField": "taxIdBindingStatus",
+    "memberTaxIdsField": "memberTaxIds",
+    "membershipMode": "EXPLICIT_SNAPSHOT",
+    "canSubmitOptionKeyToCurrentApi": false,
+    "canSubmitMemberTaxIdsToCurrentApi": false,
+    "note": "options是选项初始化与审计快照；前端运行时请求GET /pipeline/virusTargets，使用data中的label、taxId、pipelineType。optionKey仅为字典内部标识，不作为提交值。不要按referenceTaxa.category重新构造必选父级。前端不提交memberTaxIds，后端在任务启动时查询成员映射表；本文件的memberTaxIds仅为初始化映射的审计快照。"
+  },
+  "currentApiContract": {
+    "targetOptions": {
+      "endpoint": "GET /pipeline/virusTargets",
+      "dataPath": "data",
+      "fields": ["label", "taxId", "pipelineType"],
+      "sourceTable": "bio_pipeline_target",
+      "enabledOnly": true,
+      "sort": ["sort_order", "id"],
+      "note": "启用状态控制选项展示，本次接口未改变创建或启动时的既有校验规则。"
+    },
+    "referenceMatch": "DATABASE_MEMBERS_OR_EXACT_TAX_ID",
+    "memberMappingReadTime": "PIPELINE_START",
+    "singleCreate": {
+      "endpoint": "POST /pipeline/create",
+      "taxIdPath": "pipelineStageParameters.taxId",
+      "pipelineTypePath": "pipelineType"
+    },
+    "batchCreate": {
+      "endpoint": "POST /pipeline/batchCreatePipelines",
+      "taxIdPath": "pipelines[i].pipelineParameters.taxId",
+      "pipelineTypePath": "pipelineType",
+      "note": "pipelineType 对整批共用；不同 pipelineType 应分批提交。"
+    },
+    "generalVirusPipelineType": 100,
+    "covidPipelineType": 101,
+    "covidFixedTaxId": 2697049,
+    "unknownTaxIdAllowed": false
+  },
+  "notes": [
+    "前端实时选项由GET /pipeline/virusTargets从bio_pipeline_target下发；本文件的67项仅为初始化和审计快照，修改文件不会改变运行配置。接口只返回启用的普通病毒和新冠目标，不公开参考成员或数据库内部字段。",
+    "第20项“其他病毒”本期不提供。最终67个选项全部平铺；拆分后的流感A/B/C、副流感1/2/3/4、汉坦6个具体种和HIV-1/2与新冠等项目同级，大类不再作为选项。",
+    "原人腺病毒、人诺如病毒、肠道病毒本期范围、轮状病毒本期范围、人札如病毒和人星状病毒6个聚合项，已分别拆成15、7、10、3、3、5个原有具体分类项；未使用更广的属/科编号冒充集合。",
+    "每项均有label和非空真实taxId；43个进一步拆分项沿用此前已核对的来源名称与taxId，不用某个代表株伪装整个型别，不要求所有分类都具有species层级。",
+    "前端展示label、选中值使用taxId；optionKey仅是内部追踪信息，memberTaxIds用于说明参考成员，前端不提交它们替代taxId。",
+    "memberTaxIds是初始化映射的显式成员快照，不代表所有下级分类完整集合；运行时以后端bio_reference_taxonomy_member表为准，修改本文件不会改变运行范围。",
+    "referenceTaxa完整保留原78项taxId、organismName、category及记录数；其中category仅是来源审计信息，不能变成用户必须先选择的父级。",
+    "普通病毒与新冠启动时查询成员映射表；有配置按明确成员查询，无配置保留原tax_id精确查询。初始7组映射共18条，其他60项无需配置；不递归展开、不隐式加入目标自身、不因数据库异常改用其他范围。",
+    "backendIntegrated表示当前代码已接入数据库映射；部署到其他环境需先执行databaseMigration并加载新代码。本机bio开发库已应用迁移，原参考记录taxId和创建请求格式未修改。",
+    "映射在每次新任务启动时读取，无应用层缓存；配置修改需作为同一事务提交，已有Stage保留自己的候选参数快照。不要用重跑种子迁移代替日常配置维护。",
+    "referenceRecordCount为参考记录行数，不是完整基因组数量；未检查序列文件存在性、节段完整性或分析功能覆盖。",
+    "范围限制仍见coverageNote；选择一个目标不代表已实现自动分型。HIV选项不代表专门耐药分析已实现。",
+    "schemaVersion=3：options为label+taxId平铺结构，不含category或children；selectionContract.valueField从旧版optionKey改为taxId。"
+  ],
+  "verificationSources": [
+    "Local read-only taxonomy audit: target/virus-specialty-taxonomy-audit-20261020.json",
+    "https://www.ncbi.nlm.nih.gov/taxonomy",
+    "https://ictv.global/report/chapter/hantaviridae/hantaviridae/mammantavirinae/orthohantavirus",
+    "https://www.cdc.gov/flu/about/viruses-types.html"
+  ],
+  "options": [
+    {
+      "label": "新冠病毒（SARS-CoV-2）",
+      "taxId": 2697049,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "sars_cov_2",
+      "pipelineType": 101,
+      "memberTaxIds": [
+        2697049
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=2697049&mode=Info"
+    },
+    {
+      "label": "猴痘病毒",
+      "taxId": 10244,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "mpox",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10244
+      ],
+      "referenceRecordCount": 2,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10244&mode=Info"
+    },
+    {
+      "label": "甲型流感病毒（A）",
+      "taxId": 11320,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "influenza_a",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        641809,
+        93838,
+        130760,
+        488241,
+        335341,
+        211044,
+        1332244
+      ],
+      "referenceRecordCount": 56,
+      "coverageNote": "聚合现有7个具体株的参考记录，不要求前端选择历史株；不代表全部亚型或当前流行株，成员也不全是人源。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11320&mode=Info"
+    },
+    {
+      "label": "乙型流感病毒（B）",
+      "taxId": 11520,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "influenza_b",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        518987
+      ],
+      "referenceRecordCount": 8,
+      "coverageNote": "当前成员仅B/Lee/1940参考记录，不代表乙型流感所有谱系。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11520&mode=Info"
+    },
+    {
+      "label": "丙型流感病毒（C）",
+      "taxId": 11552,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "influenza_c",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11553
+      ],
+      "referenceRecordCount": 7,
+      "coverageNote": "当前成员仅C/Ann Arbor/1/50参考记录，不代表丙型流感所有谱系。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11552&mode=Info"
+    },
+    {
+      "label": "人副流感病毒1型",
+      "taxId": 12730,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "human_parainfluenza_1",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        12730
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=12730&mode=Info"
+    },
+    {
+      "label": "人副流感病毒2型",
+      "taxId": 2560525,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "human_parainfluenza_2",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        2560525
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=2560525&mode=Info"
+    },
+    {
+      "label": "人副流感病毒3型",
+      "taxId": 11216,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "human_parainfluenza_3",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11216
+      ],
+      "referenceRecordCount": 2,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11216&mode=Info"
+    },
+    {
+      "label": "人副流感病毒4型",
+      "taxId": 2560526,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "human_parainfluenza_4",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11224
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "业务入口聚合到4型；当前清单只有4a成员，未纳入4b，不能据此承诺4型全覆盖。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=2560526&mode=Info"
+    },
+    {
+      "label": "人呼吸道合胞病毒（RSV）",
+      "taxId": 11250,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "human_rsv",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11250,
+        208893
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "合并通用分类记录及A型记录，不强制用户预选A/B；本清单没有单列B型taxId，不能仅由此判断通用记录是否包含B型参考。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11250&mode=Info"
+    },
+    {
+      "label": "人腺病毒 1 型",
+      "taxId": 10533,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10533",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10533
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10533&mode=Info"
+    },
+    {
+      "label": "人腺病毒 2 型",
+      "taxId": 10515,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10515",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10515
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10515&mode=Info"
+    },
+    {
+      "label": "人腺病毒 5 型",
+      "taxId": 28285,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_28285",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        28285
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=28285&mode=Info"
+    },
+    {
+      "label": "人腺病毒 6 型",
+      "taxId": 10534,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10534",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10534
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10534&mode=Info"
+    },
+    {
+      "label": "人腺病毒 7 型",
+      "taxId": 10519,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10519",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10519
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10519&mode=Info"
+    },
+    {
+      "label": "人腺病毒 14 型",
+      "taxId": 10521,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10521",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10521
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10521&mode=Info"
+    },
+    {
+      "label": "人腺病毒 35 型",
+      "taxId": 10522,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10522",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10522
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10522&mode=Info"
+    },
+    {
+      "label": "人腺病毒 41 型",
+      "taxId": 10524,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10524",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10524
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10524&mode=Info"
+    },
+    {
+      "label": "人腺病毒 54 型",
+      "taxId": 651580,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_651580",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        651580
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=651580&mode=Info"
+    },
+    {
+      "label": "Human mastadenovirus A",
+      "taxId": 129875,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_129875",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        129875
+      ],
+      "referenceRecordCount": 2,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=129875&mode=Info"
+    },
+    {
+      "label": "Human mastadenovirus B",
+      "taxId": 108098,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_108098",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        108098
+      ],
+      "referenceRecordCount": 2,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=108098&mode=Info"
+    },
+    {
+      "label": "Human mastadenovirus C",
+      "taxId": 129951,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_129951",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        129951
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=129951&mode=Info"
+    },
+    {
+      "label": "Human mastadenovirus D",
+      "taxId": 130310,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_130310",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        130310
+      ],
+      "referenceRecordCount": 2,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=130310&mode=Info"
+    },
+    {
+      "label": "Human mastadenovirus E",
+      "taxId": 130308,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_130308",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        130308
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=130308&mode=Info"
+    },
+    {
+      "label": "Human mastadenovirus F",
+      "taxId": 130309,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_130309",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        130309
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=130309&mode=Info"
+    },
+    {
+      "label": "人偏肺病毒（hMPV）",
+      "taxId": 162145,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "human_metapneumovirus",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        162145
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=162145&mode=Info"
+    },
+    {
+      "label": "诺如病毒 GI（本 taxId 记录）",
+      "taxId": 122928,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_122928",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        122928
+      ],
+      "referenceRecordCount": 4,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=122928&mode=Info"
+    },
+    {
+      "label": "诺如病毒 GII（本 taxId 记录）",
+      "taxId": 122929,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_122929",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        122929
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=122929&mode=Info"
+    },
+    {
+      "label": "诺如病毒 GII.17",
+      "taxId": 552592,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_552592",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        552592
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=552592&mode=Info"
+    },
+    {
+      "label": "诺如病毒 GII.2",
+      "taxId": 490039,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_490039",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        490039
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=490039&mode=Info"
+    },
+    {
+      "label": "Norovirus GI/Hu/JP/2007/GI.P3_GI.3/Shimizu/KK2866",
+      "taxId": 1529909,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1529909",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1529909
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1529909&mode=Info"
+    },
+    {
+      "label": "Norovirus GII/Hu/JP/2007/GII.P15_GII.15/Sapporo/HK299",
+      "taxId": 1529918,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1529918",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1529918
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1529918&mode=Info"
+    },
+    {
+      "label": "Norovirus GII/Hu/JP/2011/GII/Yuzawa/Gira2HS",
+      "taxId": 1529924,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1529924",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1529924
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1529924&mode=Info"
+    },
+    {
+      "label": "肠道病毒 A（本 taxId 记录）",
+      "taxId": 138948,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_138948",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        138948
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=138948&mode=Info"
+    },
+    {
+      "label": "肠道病毒 B（本 taxId 记录）",
+      "taxId": 138949,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_138949",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        138949
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=138949&mode=Info"
+    },
+    {
+      "label": "肠道病毒 C（本 taxId 记录）",
+      "taxId": 138950,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_138950",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        138950
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=138950&mode=Info"
+    },
+    {
+      "label": "肠道病毒 D（本 taxId 记录）",
+      "taxId": 138951,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_138951",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        138951
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=138951&mode=Info"
+    },
+    {
+      "label": "肠道病毒 A71",
+      "taxId": 39054,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_39054",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        39054
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=39054&mode=Info"
+    },
+    {
+      "label": "肠道病毒 D68",
+      "taxId": 42789,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_42789",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        42789
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=42789&mode=Info"
+    },
+    {
+      "label": "柯萨奇病毒 A2",
+      "taxId": 33757,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_33757",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        33757
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=33757&mode=Info"
+    },
+    {
+      "label": "柯萨奇病毒 A6",
+      "taxId": 86107,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_86107",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        86107
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=86107&mode=Info"
+    },
+    {
+      "label": "柯萨奇病毒 B3",
+      "taxId": 12072,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_12072",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        12072
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=12072&mode=Info"
+    },
+    {
+      "label": "柯萨奇病毒 B4",
+      "taxId": 12073,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_12073",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        12073
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=12073&mode=Info"
+    },
+    {
+      "label": "轮状病毒 A",
+      "taxId": 28875,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_28875",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        28875
+      ],
+      "referenceRecordCount": 11,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=28875&mode=Info"
+    },
+    {
+      "label": "人轮状病毒 B",
+      "taxId": 10942,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_10942",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        10942
+      ],
+      "referenceRecordCount": 11,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10942&mode=Info"
+    },
+    {
+      "label": "轮状病毒 C",
+      "taxId": 36427,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_36427",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        36427
+      ],
+      "referenceRecordCount": 11,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=36427&mode=Info"
+    },
+    {
+      "label": "Sapovirus Hu/Dresden/pJG-Sap01/DE",
+      "taxId": 291175,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_291175",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        291175
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=291175&mode=Info"
+    },
+    {
+      "label": "Sapovirus Hu/GI/Sapporo/MT-2010/1982",
+      "taxId": 758863,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_758863",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        758863
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=758863&mode=Info"
+    },
+    {
+      "label": "Sapovirus Hu/Nagoya/NGY-1/2012/JPN",
+      "taxId": 1280920,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1280920",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1280920
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1280920&mode=Info"
+    },
+    {
+      "label": "星状病毒 MLB1",
+      "taxId": 568715,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_568715",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        568715
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=568715&mode=Info"
+    },
+    {
+      "label": "星状病毒 VA1",
+      "taxId": 645687,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_645687",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        645687
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=645687&mode=Info"
+    },
+    {
+      "label": "Human astrovirus BF34",
+      "taxId": 1518575,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1518575",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1518575
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1518575&mode=Info"
+    },
+    {
+      "label": "Mamastrovirus 1",
+      "taxId": 1239565,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1239565",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1239565
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1239565&mode=Info"
+    },
+    {
+      "label": "Human astrovirus（未分类条目，非全部人星状病毒）",
+      "taxId": 1868658,
+      "taxIdBindingStatus": "VERIFIED_SOURCE_TAXON",
+      "optionKey": "taxon_1868658",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1868658
+      ],
+      "referenceRecordCount": 1,
+      "coverageNote": "本项使用原始具体分类名称和taxId，仅包含该taxId当前参考记录；不将它冒充整个原业务大类，也不自动展开下级分类。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1868658&mode=Info"
+    },
+    {
+      "label": "甲肝病毒",
+      "taxId": 12092,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hepatitis_a",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        12092
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=12092&mode=Info"
+    },
+    {
+      "label": "风疹病毒",
+      "taxId": 11041,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "rubella",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11041
+      ],
+      "referenceRecordCount": 2,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11041&mode=Info"
+    },
+    {
+      "label": "基孔肯雅病毒",
+      "taxId": 37124,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "chikungunya",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        37124
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=37124&mode=Info"
+    },
+    {
+      "label": "登革热病毒",
+      "taxId": 12637,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "dengue",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11053,
+        11060,
+        11069,
+        11070
+      ],
+      "referenceRecordCount": 4,
+      "coverageNote": "聚合现有DENV-1至DENV-4成员，不要求创建任务前预先知道血清型；本字典不实现血清型判定。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=12637&mode=Info"
+    },
+    {
+      "label": "大别班达病毒（SFTSV）",
+      "taxId": 1003835,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "sftsv",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1003835,
+        992212
+      ],
+      "referenceRecordCount": 6,
+      "coverageNote": "合并通用分类及HB29具体株参考记录，不要求用户选择具体株。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1003835&mode=Info"
+    },
+    {
+      "label": "Orthohantavirus hantanense",
+      "taxId": 3052480,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hantavirus_hantaan",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        3052480
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "本期明确范围中的具体种；六个选项不代表整个汉坦病毒类群。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=3052480&mode=Info"
+    },
+    {
+      "label": "Orthohantavirus seoulense",
+      "taxId": 3052498,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hantavirus_seoul",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        3052498
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "本期明确范围中的具体种；六个选项不代表整个汉坦病毒类群。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=3052498&mode=Info"
+    },
+    {
+      "label": "Orthohantavirus puumalaense",
+      "taxId": 3052493,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hantavirus_puumala",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        3052493
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "本期明确范围中的具体种；六个选项不代表整个汉坦病毒类群。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=3052493&mode=Info"
+    },
+    {
+      "label": "Orthohantavirus dobravaense",
+      "taxId": 3052477,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hantavirus_dobrava",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        3052477
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "本期明确范围中的具体种；六个选项不代表整个汉坦病毒类群。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=3052477&mode=Info"
+    },
+    {
+      "label": "Orthohantavirus sinnombreense",
+      "taxId": 3052499,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hantavirus_sin_nombre",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        3052499
+      ],
+      "referenceRecordCount": 6,
+      "coverageNote": "本期明确范围中的具体种；六个选项不代表整个汉坦病毒类群。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=3052499&mode=Info"
+    },
+    {
+      "label": "Orthohantavirus andesense",
+      "taxId": 1980456,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hantavirus_andes",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        1980456
+      ],
+      "referenceRecordCount": 3,
+      "coverageNote": "本期明确范围中的具体种；六个选项不代表整个汉坦病毒类群。",
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1980456&mode=Info"
+    },
+    {
+      "label": "HIV-1",
+      "taxId": 11676,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hiv_1",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11676
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11676&mode=Info"
+    },
+    {
+      "label": "HIV-2",
+      "taxId": 11709,
+      "taxIdBindingStatus": "VERIFIED_NCBI_TAXON",
+      "optionKey": "hiv_2",
+      "pipelineType": 100,
+      "memberTaxIds": [
+        11709
+      ],
+      "referenceRecordCount": 1,
+      "taxonomySource": "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=11709&mode=Info"
+    }
+  ],
+  "referenceTaxa": [
+    {
+      "label": "新冠病毒（SARS-CoV-2）",
+      "taxId": 2697049,
+      "organismName": "Severe acute respiratory syndrome coronavirus 2",
+      "category": "新冠病毒",
+      "pipelineType": 101,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "猴痘病毒",
+      "taxId": 10244,
+      "organismName": "Monkeypox virus",
+      "category": "猴痘病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "Influenza A virus (A/California/07/2009(H1N1))",
+      "taxId": 641809,
+      "organismName": "Influenza A virus (A/California/07/2009(H1N1))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza A virus (A/goose/Guangdong/1/1996(H5N1))",
+      "taxId": 93838,
+      "organismName": "Influenza A virus (A/goose/Guangdong/1/1996(H5N1))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza A virus (A/Hong Kong/1073/99(H9N2))",
+      "taxId": 130760,
+      "organismName": "Influenza A virus (A/Hong Kong/1073/99(H9N2))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza A virus (A/Korea/426/1968(H2N2))",
+      "taxId": 488241,
+      "organismName": "Influenza A virus (A/Korea/426/1968(H2N2))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza A virus (A/New York/392/2004(H3N2))",
+      "taxId": 335341,
+      "organismName": "Influenza A virus (A/New York/392/2004(H3N2))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza A virus (A/Puerto Rico/8/1934(H1N1))",
+      "taxId": 211044,
+      "organismName": "Influenza A virus (A/Puerto Rico/8/1934(H1N1))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza A virus (A/Shanghai/02/2013(H7N9))",
+      "taxId": 1332244,
+      "organismName": "Influenza A virus (A/Shanghai/02/2013(H7N9))",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza B virus (B/Lee/1940)",
+      "taxId": 518987,
+      "organismName": "Influenza B virus (B/Lee/1940)",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 8
+    },
+    {
+      "label": "Influenza C virus (C/Ann Arbor/1/50)",
+      "taxId": 11553,
+      "organismName": "Influenza C virus (C/Ann Arbor/1/50)",
+      "category": "流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 7
+    },
+    {
+      "label": "人副流感病毒 1 型",
+      "taxId": 12730,
+      "organismName": "Human respirovirus 1",
+      "category": "副流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人副流感病毒 2 型",
+      "taxId": 2560525,
+      "organismName": "Human orthorubulavirus 2",
+      "category": "副流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人副流感病毒 3 型",
+      "taxId": 11216,
+      "organismName": "Human respirovirus 3",
+      "category": "副流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "人副流感病毒 4a 型",
+      "taxId": 11224,
+      "organismName": "Human parainfluenza virus 4a",
+      "category": "副流感病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Human orthopneumovirus（本 taxId 记录）",
+      "taxId": 11250,
+      "organismName": "Human orthopneumovirus",
+      "category": "呼吸道合胞病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "人呼吸道合胞病毒 A",
+      "taxId": 208893,
+      "organismName": "Human respiratory syncytial virus A",
+      "category": "呼吸道合胞病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 1 型",
+      "taxId": 10533,
+      "organismName": "Human adenovirus 1",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 2 型",
+      "taxId": 10515,
+      "organismName": "Human adenovirus 2",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 5 型",
+      "taxId": 28285,
+      "organismName": "Human adenovirus 5",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 6 型",
+      "taxId": 10534,
+      "organismName": "Human adenovirus 6",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 7 型",
+      "taxId": 10519,
+      "organismName": "Human adenovirus 7",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 14 型",
+      "taxId": 10521,
+      "organismName": "Human adenovirus 14",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 35 型",
+      "taxId": 10522,
+      "organismName": "Human adenovirus 35",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 41 型",
+      "taxId": 10524,
+      "organismName": "Human adenovirus 41",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人腺病毒 54 型",
+      "taxId": 651580,
+      "organismName": "Human adenovirus 54",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Human mastadenovirus A",
+      "taxId": 129875,
+      "organismName": "Human mastadenovirus A",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "Human mastadenovirus B",
+      "taxId": 108098,
+      "organismName": "Human mastadenovirus B",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "Human mastadenovirus C",
+      "taxId": 129951,
+      "organismName": "Human mastadenovirus C",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Human mastadenovirus D",
+      "taxId": 130310,
+      "organismName": "Human mastadenovirus D",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "Human mastadenovirus E",
+      "taxId": 130308,
+      "organismName": "Human mastadenovirus E",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Human mastadenovirus F",
+      "taxId": 130309,
+      "organismName": "Human mastadenovirus F",
+      "category": "腺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "人偏肺病毒",
+      "taxId": 162145,
+      "organismName": "Human metapneumovirus",
+      "category": "偏肺病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "诺如病毒 GI（本 taxId 记录）",
+      "taxId": 122928,
+      "organismName": "Norovirus GI",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 4
+    },
+    {
+      "label": "诺如病毒 GII（本 taxId 记录）",
+      "taxId": 122929,
+      "organismName": "Norovirus GII",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "诺如病毒 GII.17",
+      "taxId": 552592,
+      "organismName": "Norovirus GII.17",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "诺如病毒 GII.2",
+      "taxId": 490039,
+      "organismName": "Norovirus GII.2",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Norovirus GI/Hu/JP/2007/GI.P3_GI.3/Shimizu/KK2866",
+      "taxId": 1529909,
+      "organismName": "Norovirus GI/Hu/JP/2007/GI.P3_GI.3/Shimizu/KK2866",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Norovirus GII/Hu/JP/2007/GII.P15_GII.15/Sapporo/HK299",
+      "taxId": 1529918,
+      "organismName": "Norovirus GII/Hu/JP/2007/GII.P15_GII.15/Sapporo/HK299",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Norovirus GII/Hu/JP/2011/GII/Yuzawa/Gira2HS",
+      "taxId": 1529924,
+      "organismName": "Norovirus GII/Hu/JP/2011/GII/Yuzawa/Gira2HS",
+      "category": "诺如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "肠道病毒 A（本 taxId 记录）",
+      "taxId": 138948,
+      "organismName": "Enterovirus A",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "肠道病毒 B（本 taxId 记录）",
+      "taxId": 138949,
+      "organismName": "Enterovirus B",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "肠道病毒 C（本 taxId 记录）",
+      "taxId": 138950,
+      "organismName": "Enterovirus C",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "肠道病毒 D（本 taxId 记录）",
+      "taxId": 138951,
+      "organismName": "Enterovirus D",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "肠道病毒 A71",
+      "taxId": 39054,
+      "organismName": "Enterovirus A71",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "肠道病毒 D68",
+      "taxId": 42789,
+      "organismName": "enterovirus D68",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "柯萨奇病毒 A2",
+      "taxId": 33757,
+      "organismName": "Coxsackievirus A2",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "柯萨奇病毒 A6",
+      "taxId": 86107,
+      "organismName": "Coxsackievirus A6",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "柯萨奇病毒 B3",
+      "taxId": 12072,
+      "organismName": "Coxsackievirus B3",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "柯萨奇病毒 B4",
+      "taxId": 12073,
+      "organismName": "Coxsackievirus B4",
+      "category": "肠道病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "轮状病毒 A",
+      "taxId": 28875,
+      "organismName": "Rotavirus A",
+      "category": "轮状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 11
+    },
+    {
+      "label": "人轮状病毒 B",
+      "taxId": 10942,
+      "organismName": "Human rotavirus B",
+      "category": "轮状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 11
+    },
+    {
+      "label": "轮状病毒 C",
+      "taxId": 36427,
+      "organismName": "Rotavirus C",
+      "category": "轮状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 11
+    },
+    {
+      "label": "Sapovirus Hu/Dresden/pJG-Sap01/DE",
+      "taxId": 291175,
+      "organismName": "Sapovirus Hu/Dresden/pJG-Sap01/DE",
+      "category": "札如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Sapovirus Hu/GI/Sapporo/MT-2010/1982",
+      "taxId": 758863,
+      "organismName": "Sapovirus Hu/GI/Sapporo/MT-2010/1982",
+      "category": "札如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Sapovirus Hu/Nagoya/NGY-1/2012/JPN",
+      "taxId": 1280920,
+      "organismName": "Sapovirus Hu/Nagoya/NGY-1/2012/JPN",
+      "category": "札如病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "星状病毒 MLB1",
+      "taxId": 568715,
+      "organismName": "Astrovirus MLB1",
+      "category": "星状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "星状病毒 VA1",
+      "taxId": 645687,
+      "organismName": "Astrovirus VA1",
+      "category": "星状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Human astrovirus BF34",
+      "taxId": 1518575,
+      "organismName": "Human astrovirus BF34",
+      "category": "星状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Mamastrovirus 1",
+      "taxId": 1239565,
+      "organismName": "Mamastrovirus 1",
+      "category": "星状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "Human astrovirus（未分类条目，非全部人星状病毒）",
+      "taxId": 1868658,
+      "organismName": "Human astrovirus",
+      "category": "星状病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "甲肝病毒（Hepatovirus A）",
+      "taxId": 12092,
+      "organismName": "Hepatovirus A",
+      "category": "甲肝病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "风疹病毒",
+      "taxId": 11041,
+      "organismName": "Rubella virus",
+      "category": "风疹病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 2
+    },
+    {
+      "label": "基孔肯雅病毒",
+      "taxId": 37124,
+      "organismName": "Chikungunya virus",
+      "category": "基孔肯雅病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "登革热病毒 1 型",
+      "taxId": 11053,
+      "organismName": "dengue virus type 1",
+      "category": "登革热病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "登革热病毒 2 型",
+      "taxId": 11060,
+      "organismName": "dengue virus type 2",
+      "category": "登革热病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "登革热病毒 3 型",
+      "taxId": 11069,
+      "organismName": "dengue virus type 3",
+      "category": "登革热病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "登革热病毒 4 型",
+      "taxId": 11070,
+      "organismName": "dengue virus type 4",
+      "category": "登革热病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "大别班达病毒（SFTSV，本 taxId 记录）",
+      "taxId": 1003835,
+      "organismName": "Severe fever with thrombocytopenia syndrome virus",
+      "category": "大别班达病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "SFTS virus HB29",
+      "taxId": 992212,
+      "organismName": "SFTS virus HB29",
+      "category": "大别班达病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "Orthohantavirus hantanense",
+      "taxId": 3052480,
+      "organismName": "Orthohantavirus hantanense",
+      "category": "汉坦病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "Orthohantavirus seoulense",
+      "taxId": 3052498,
+      "organismName": "Orthohantavirus seoulense",
+      "category": "汉坦病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "Orthohantavirus puumalaense",
+      "taxId": 3052493,
+      "organismName": "Orthohantavirus puumalaense",
+      "category": "汉坦病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "Orthohantavirus dobravaense",
+      "taxId": 3052477,
+      "organismName": "Orthohantavirus dobravaense",
+      "category": "汉坦病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "Orthohantavirus sinnombreense",
+      "taxId": 3052499,
+      "organismName": "Orthohantavirus sinnombreense",
+      "category": "汉坦病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 6
+    },
+    {
+      "label": "Orthohantavirus andesense",
+      "taxId": 1980456,
+      "organismName": "Orthohantavirus andesense",
+      "category": "汉坦病毒",
+      "pipelineType": 100,
+      "referenceRecordCount": 3
+    },
+    {
+      "label": "HIV-1",
+      "taxId": 11676,
+      "organismName": "Human immunodeficiency virus 1",
+      "category": "HIV",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    },
+    {
+      "label": "HIV-2",
+      "taxId": 11709,
+      "organismName": "Human immunodeficiency virus 2",
+      "category": "HIV",
+      "pipelineType": 100,
+      "referenceRecordCount": 1
+    }
+  ],
+  "displayMode": "FLAT",
+  "resolvedTaxIdOptionCount": 67,
+  "pendingTaxIdOptionCount": 0,
+  "sourceCategoryCount": 19
+}

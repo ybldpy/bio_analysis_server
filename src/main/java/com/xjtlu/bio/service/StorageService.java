@@ -37,6 +37,15 @@ public interface StorageService {
 
     boolean exists(String key);
 
+    /**
+     * Checks object availability using storage metadata/readability, not content validation.
+     * Providers may override this with a stronger readability check; the compatibility
+     * default retains the provider's existing object-existence semantics.
+     */
+    default boolean isReadableObject(String key) {
+        return exists(key);
+    }
+
     /** 不存在也不报错，返回是否真的删掉了东西。 */
     boolean delete(String key);
 

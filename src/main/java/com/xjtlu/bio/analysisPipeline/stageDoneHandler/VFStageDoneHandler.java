@@ -28,7 +28,7 @@ public class VFStageDoneHandler extends AbstractStageDoneHandler<VirulenceFactor
         VirulenceFactorStageOutput virulenceFactorStageOutput = stageRunResult.getStageOutput();
         Path tsvResultLocalPath = virulenceFactorStageOutput.getVfResult();
 
-        String outputName = "amr.tsv";
+        String outputName = "vf.tsv";
         String tsvUrl = createStoreObjectName(stageRunResult.getStageContext(), outputName);
 
         return Pair.of(

@@ -2,7 +2,9 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MAPPING;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,11 +13,14 @@ import java.util.Map;
 
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
+import com.xjtlu.bio.analysisPipeline.stageMetrics.MappingResultMetrics;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.MappingStageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.MappingMetricsCalculator;
+import com.xjtlu.bio.utils.JsonUtil;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -52,12 +57,28 @@ public class MappingStageExecutor
         MappingInputUrls mappingInputUrls = stageExecutionInput.input;
         MappingParameters parameters = stageExecutionInput.stageParameters;
 
+        Path inputTmpPath = stageExecutionInput.inputDir;
+        Path workDir = stageExecutionInput.workDir;
+
+        SequenceMeta readMeta = parameters == null ? null : parameters.getSequenceMeta();
+        if (readMeta == null
+                || (readMeta.getReadLenType() != Constants.SequenceInput.READ_LEN_TYPE_SHORT
+                    && readMeta.getReadLenType() != Constants.SequenceInput.READ_LEN_TYPE_LONG)) {
+            return runFail(bioPipelineStage,
+                    "Mapping requires a valid readLenType from ReadInspect", workDir);
+        }
+        if (mappingInputUrls == null || mappingInputUrls.getR1Url() == null
+                || mappingInputUrls.getR1Url().isBlank()) {
+            return runFail(bioPipelineStage, "Mapping requires an R1 input", workDir);
+        }
+
+        boolean shortReads = readMeta.getReadLenType() == Constants.SequenceInput.READ_LEN_TYPE_SHORT;
         ReferenceGenome referenceGenome = parameters.getReferenceGenome();
         String inputR1Url = mappingInputUrls.getR1Url();
         String inputR2Url = mappingInputUrls.getR2Url();
-
-        Path inputTmpPath = stageExecutionInput.inputDir;
-        Path workDir = stageExecutionInput.workDir;
+        if (inputR2Url != null && inputR2Url.isBlank()) {
+            inputR2Url = null;
+        }
 
         Path r1TmpPath = inputTmpPath.resolve(inputR1Url.substring(inputR1Url.lastIndexOf("/") + 1));
         Path r2TmpPath = inputR2Url == null ? null
@@ -77,20 +98,33 @@ public class MappingStageExecutor
         Path bamSortedTmp = stageExecutionInput.workDir.resolve("aln_sorted.bam");
         Path bamIndexTmp = stageExecutionInput.workDir.resolve("aln_sorted.bam.bai");
 
-        
-        List<String> cmd = new ArrayList<>();
-        cmd.addAll(this.analysisPipelineToolsConfig.getMinimap2());
-        cmd.add("-ax");
-        cmd.add(parameters.getSequenceMeta().getReadLenType() == Constants.SequenceInput.READ_LEN_TYPE_SHORT? "sr":"map-ont");
-        cmd.add(refseqLocalPath.toString());
-        cmd.add(r1TmpPath.toString());
-        
-        if (r2TmpPath != null) {
-            cmd.add(r2TmpPath.toString());
+        Path bowtie2IndexPrefix = workDir.resolve("bowtie2_reference");
+        if (shortReads) {
+            List<String> indexCommand = new ArrayList<>(analysisPipelineToolsConfig.getBowtie2Build());
+            indexCommand.addAll(List.of(
+                    "--seed", "1",
+                    refseqLocalPath.toString(),
+                    bowtie2IndexPrefix.toString()));
+            ExecuteResult indexResult = _execute(indexCommand, workDir);
+            if (!indexResult.success()) {
+                return runFail(bioPipelineStage, "构建Bowtie2索引失败", indexResult.ex, workDir);
+            }
+            List<StageOutputValidationResult> indexErrors = validateBowtie2Index(bowtie2IndexPrefix);
+            if (!indexErrors.isEmpty()) {
+                return runFail(bioPipelineStage,
+                        "Bowtie2索引不完整: " + createStageOutputValidationErrorMessge(indexErrors),
+                        null, workDir);
+            }
         }
 
         Path samPath = workDir.resolve("aln.sam");
-        ExecuteResult executeResult = _execute(cmd, workDir, samPath, null);
+        List<String> cmd = buildMappingCommand(
+                shortReads, refseqLocalPath, bowtie2IndexPrefix, r1TmpPath, r2TmpPath, samPath);
+        logger.info("stage = {}, readLenType = {}, mapping tool = {}", bioPipelineStage,
+                readMeta.getReadLenType(), shortReads ? "Bowtie2" : "minimap2");
+        ExecuteResult executeResult = shortReads
+                ? _execute(cmd, workDir)
+                : _execute(cmd, workDir, samPath, null);
         if (!executeResult.success()) {
             logger.error("stage id = {}, exit code = {}, exception = ", bioPipelineStage,
                     executeResult.runCode, executeResult.ex);
@@ -177,16 +211,33 @@ public class MappingStageExecutor
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
         }
 
+        Path idxstatsPath = workDir.resolve("mapping_idxstats.tsv");
+        cmd.clear();
+        cmd.addAll(analysisPipelineToolsConfig.getSamtools());
+        cmd.add("idxstats");
+        cmd.add(bamSortedTmp.toAbsolutePath().toString());
+
+        executeResult = _execute(cmd, workDir, idxstatsPath, null);
+        if (!executeResult.success()) {
+            logger.error("stage id = {}, 生成idxstats失败. exit code = {}, exception = ", bioPipelineStage,
+                    executeResult.runCode, executeResult.ex);
+            return this.runFail(bioPipelineStage, "生成idxstats失败", executeResult.ex, workDir);
+        }
+
+        errorOutput = validateOutputFiles(idxstatsPath);
+        if (!errorOutput.isEmpty()) {
+            StageOutputValidationResult error = errorOutput.get(0);
+            logger.error("stage id = {}, 未生成idxstats文件. ", bioPipelineStage, error.ioException);
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
+        }
+
 
 
         Path coverageDepthPath = stageExecutionInput.workDir.resolve("coverage_depth.tsv");
-        cmd.clear();
-        cmd.addAll(analysisPipelineToolsConfig.getSamtools());
-        cmd.addAll(List.of(
-            "depth",
-            "-aa",
-            bamSortedTmp.toAbsolutePath().toString()
-        ));
+        cmd = buildCoverageDepthCommand(
+                analysisPipelineToolsConfig.getSamtools(),
+                bamSortedTmp,
+                parameters);
 
         executeResult = _execute(cmd, workDir, coverageDepthPath, null);
         if (!executeResult.success()) {
@@ -202,35 +253,115 @@ public class MappingStageExecutor
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
         }
 
+        Path metricsJsonPath = workDir.resolve(MappingStageOutput.METRICS_JSON);
+        MappingResultMetrics metrics;
+        try {
+            metrics = MappingMetricsCalculator.calculate(coverageDepthPath, idxstatsPath);
+            Files.writeString(
+                    metricsJsonPath,
+                    JsonUtil.toJson(metrics),
+                    StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            logger.error(
+                    "stage id = {}, 生成mapping metrics失败. depth={}, idxstats={}",
+                    bioPipelineStage,
+                    coverageDepthPath,
+                    idxstatsPath,
+                    e);
+            return this.runFail(bioPipelineStage, "生成mapping metrics失败: " + e.getMessage(), e, workDir);
+        }
+
+        errorOutput = validateOutputFiles(metricsJsonPath);
+        if (!errorOutput.isEmpty()) {
+            StageOutputValidationResult error = errorOutput.get(0);
+            logger.error("stage id = {}, 未生成mapping metrics文件. ", bioPipelineStage, error.ioException);
+            return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutput), null, workDir);
+        }
+
         return OK(
-            new MappingStageOutput(bamSortedTmp, bamIndexTmp, coverageDepthPath),
+            new MappingStageOutput(
+                    bamSortedTmp,
+                    bamIndexTmp,
+                    coverageDepthPath,
+                    metricsJsonPath,
+                    metrics),
             stageExecutionInput
         );
 
     }
 
-    private String buildMappingPipelineCmd(File refSeq, Path r1, Path r2, Path bamSortedOut) {
-        StringBuilder sb = new StringBuilder(256);
-        // mapping tool（输出到 stdout）
-        sb.append(String.join(" ", this.analysisPipelineToolsConfig.getMinimap2())).append(" -ax sr ")
-                .append(quote(refSeq.getAbsolutePath())).append(' ')
-                .append(quote(r1.toString())).append(' ');
-        if (r2 != null) {
-            sb.append(quote(r2.toString())).append(' ');
+    static List<String> buildCoverageDepthCommand(
+            List<String> samtoolsCommand,
+            Path sortedBam,
+            MappingParameters parameters) {
+        if (parameters.getMinimumMappingQuality() < 0) {
+            throw new IllegalArgumentException(
+                    "minimumMappingQuality must be at least 0");
         }
-        // view: 从 stdin 读 SAM，输出 BAM 到 stdout
-        sb.append("| ").append((String.join(" ", this.analysisPipelineToolsConfig.getSamtools())))
-                .append(" view -bS - ");
-        // sort: 从 stdin 读 BAM，输出最终排序 bam
-        sb.append("| ").append((String.join(" ", this.analysisPipelineToolsConfig.getSamtools()))).append(" sort -o ")
-                .append(quote(bamSortedOut.toString())).append(" -");
-        return sb.toString();
+        if (parameters.getMinimumBaseQuality() < 0) {
+            throw new IllegalArgumentException(
+                    "minimumBaseQuality must be at least 0");
+        }
+
+        List<String> command = new ArrayList<>(samtoolsCommand);
+        command.addAll(List.of(
+                "depth",
+                "-aa",
+                // samtools depth uses -q for base quality and -Q for mapping
+                // quality; bcftools mpileup uses the opposite letter mapping.
+                "-q",
+                String.valueOf(parameters.getMinimumBaseQuality()),
+                "-Q",
+                String.valueOf(parameters.getMinimumMappingQuality()),
+                sortedBam.toAbsolutePath().toString()));
+        return command;
     }
 
-    private static String quote(String s) {
-        if (s == null)
-            return "''";
-        return "'" + s.replace("'", "'\"'\"'") + "'";
+    private List<String> buildMappingCommand(
+            boolean shortReads,
+            Path reference,
+            Path bowtie2IndexPrefix,
+            Path r1,
+            Path r2,
+            Path samPath) {
+        List<String> command = new ArrayList<>();
+        if (shortReads) {
+            command.addAll(analysisPipelineToolsConfig.getBowtie2());
+            command.addAll(List.of(
+                    "--local", "--very-sensitive-local", "--seed", "1",
+                    "-x", bowtie2IndexPrefix.toString()));
+            if (r2 == null) {
+                command.addAll(List.of("-U", r1.toString()));
+            } else {
+                command.addAll(List.of("-1", r1.toString(), "-2", r2.toString()));
+            }
+            // Write SAM directly so wrappers such as conda run do not buffer
+            // the entire alignment output or alter its stdout formatting.
+            command.addAll(List.of("-S", samPath.toString()));
+        } else {
+            command.addAll(analysisPipelineToolsConfig.getMinimap2());
+            command.addAll(List.of("-ax", "map-ont", reference.toString(), r1.toString()));
+            if (r2 != null) {
+                command.add(r2.toString());
+            }
+        }
+        return command;
+    }
+
+    private List<StageOutputValidationResult> validateBowtie2Index(Path prefix) {
+        List<String> parts = List.of("1", "2", "3", "4", "rev.1", "rev.2");
+        Path[] smallIndex = parts.stream()
+                .map(part -> Path.of(prefix + "." + part + ".bt2"))
+                .toArray(Path[]::new);
+        List<StageOutputValidationResult> errors = validateOutputFiles(smallIndex);
+        if (errors.isEmpty()) {
+            return errors;
+        }
+        Path[] largeIndex = parts.stream()
+                .map(part -> Path.of(prefix + "." + part + ".bt2l"))
+                .toArray(Path[]::new);
+        List<StageOutputValidationResult> largeErrors = validateOutputFiles(largeIndex);
+        return largeErrors.isEmpty() ? largeErrors : errors;
     }
 
 }

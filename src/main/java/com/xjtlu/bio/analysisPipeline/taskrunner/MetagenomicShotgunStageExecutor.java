@@ -631,6 +631,16 @@ public class MetagenomicShotgunStageExecutor extends
         }
 
         loadInput(loadMap);
+        try {
+            r1LocalPath = SequenceFileUtil.unpackZipIfNeeded(r1LocalPath, ".fastq");
+            if (r2LocalPath != null) {
+                r2LocalPath = SequenceFileUtil.unpackZipIfNeeded(r2LocalPath, ".fastq");
+            }
+        } catch (IOException e) {
+            String errorMsg = "Failed to unpack shotgun reads ZIP: " + e.getMessage();
+            logger.error(errorMsg, e);
+            return runFail(stageExecutionInput.stageContext, errorMsg, stageExecutionInput.workDir);
+        }
 
         Path hostRemovalDir = stageExecutionInput.workDir.resolve("hostRemoval");
         try {
@@ -646,8 +656,11 @@ public class MetagenomicShotgunStageExecutor extends
                     stageExecutionInput.workDir);
         }
 
-        Path removedHostR1Path = hostRemovalDir.resolve("nohost_" + r1LocalPath.getFileName());
-        Path removedHostR2Path = r2LocalPath != null ? hostRemovalDir.resolve("nohost_" + r2LocalPath.getFileName())
+        // Host removal must produce gzip files for the downstream --gzip-compressed contract.
+        Path removedHostR1Path = hostRemovalDir.resolve("nohost_"
+                + SequenceFileUtil.getUncompressedFileName(r1LocalPath.getFileName().toString()) + ".gz");
+        Path removedHostR2Path = r2LocalPath != null ? hostRemovalDir.resolve("nohost_"
+                + SequenceFileUtil.getUncompressedFileName(r2LocalPath.getFileName().toString()) + ".gz")
                 : null;
 
         boolean removeSuccess = doRemoveHost(hostRemovalDir, r1LocalPath, r2LocalPath, removedHostR1Path,

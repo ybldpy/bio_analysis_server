@@ -57,6 +57,13 @@ public class ReferenceComparsionStageExecutor extends
 
         this.loadInput(loadMap);
 
+        try {
+            inputLocalPath = uncompressIfCompressedFormat(inputLocalPath);
+        } catch (IOException e) {
+            return runFail(stageExecutionInput.stageContext, workDir,
+                    "Unable to decompress reference comparison sample: " + e.getMessage(), e);
+        }
+
         Path alignmentPafPath = workDir.resolve("alignment.paf");
         Path differenceTsvPath = workDir.resolve("reference_difference.tsv");
 

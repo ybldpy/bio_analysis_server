@@ -14,6 +14,7 @@ import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
+import com.xjtlu.bio.service.command.UpdateStageCommand;
 
 import jakarta.annotation.Resource;
 
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -54,6 +56,30 @@ public class PipelineStagePoller {
         }
     }
 
+    // Independent of dispatch: a lost final callback must not leave an ended pipeline RUNNING.
+    @Scheduled(fixedDelay = 12000, initialDelay = 12000)
+    public void reconcileCompletedPipelines() {
+        BioAnalysisPipelineExample runningPipelineQuery = new BioAnalysisPipelineExample();
+        runningPipelineQuery.createCriteria().andStatusEqualTo(PipelineService.PIPELINE_STATUS_RUNNING);
+        Result<List<BioAnalysisPipeline>> runningPipelines = pipelineService.queryPipelines(runningPipelineQuery);
+        if (runningPipelines == null || runningPipelines.getStatus() != Result.SUCCESS
+                || runningPipelines.getData() == null || runningPipelines.getData().isEmpty()) {
+            return;
+        }
+
+        for (BioAnalysisPipeline pipeline : runningPipelines.getData()) {
+            if (pipeline == null || pipeline.getPipelineId() == null) {
+                continue;
+            }
+            try {
+                pipelineService.reconcilePipelineCompletion(pipeline.getPipelineId());
+            } catch (Exception e) {
+                // A transient failure for one pipeline must not block reconciliation of the others.
+                logger.error("Failed to reconcile pipeline completion, pipelineId={}", pipeline.getPipelineId(), e);
+            }
+        }
+    }
+
     // 2 mins per check
     @Scheduled(fixedDelay = 12000, initialDelay = 12000)
     public void dispatchPendingStages() {
@@ -64,7 +90,8 @@ public class PipelineStagePoller {
         Result<List<BioAnalysisPipeline>> runningPipelinesQueryResult = this.pipelineService
                 .queryPipelines(runningPipelineQuery);
 
-        if (runningPipelinesQueryResult.getStatus() != Result.SUCCESS) {
+        if (runningPipelinesQueryResult == null || runningPipelinesQueryResult.getStatus() != Result.SUCCESS
+                || runningPipelinesQueryResult.getData() == null || runningPipelinesQueryResult.getData().isEmpty()) {
             return;
         }
 
@@ -78,6 +105,9 @@ public class PipelineStagePoller {
         }
 
         List<BioPipelineStage> stages = this.pipelineService.queryStages(stagesQuery);
+        if (stages == null || stages.isEmpty()) {
+            return;
+        }
 
         Map<Long, List<BioPipelineStage>> pipelineStagesMap = new HashMap<>();
 
@@ -93,21 +123,32 @@ public class PipelineStagePoller {
             List<BioPipelineStage> currentPipelineStages = pipelineAndStage.getValue();
 
             for (BioPipelineStage stage : currentPipelineStages) {
-                if (stage.getStatus() == StageStatus.PIPELINE_STAGE_STATUS_PENDING) {
+                if (Objects.equals(stage.getStatus(), StageStatus.PIPELINE_STAGE_STATUS_PENDING)) {
                     long stageId = stage.getStageId();
                     logger.info("发现待处理任务 [PipelineId: {}, StageId: {}]，正在评估调度策略...", pipelineId, stageId);
 
                     try {
                         OrchestratePlan plan = stageOrchestrator.makePlan(currentPipelineStages, stageId);
-                        int res = pipelineService.updateStageFromVersion(plan.getUpdateStageCommands().get(0));
+                        if (plan == null || plan.getUpdateStageCommands().isEmpty()) {
+                            continue;
+                        }
 
-                        if (res == 1) {
-                            logger.info("任务状态抢占成功，已成功提交至执行任务池 [PipelineId: {}, StageId: {}]", pipelineId, stageId);
-                            pipelineStageTaskDispatcher.addTask(plan.getRunStages().get(0));
-                        } else {
-                            // res != 1 通常意味着乐观锁版本冲突，或者状态被 UI/其他地方改掉了
+                        List<UpdateStageCommand> updates = plan.getUpdateStageCommands();
+                        // Batch updates return 0 only when the entire plan has committed.
+                        int res = pipelineService.batchUpdateStages(updates);
+                        if (res != 0) {
                             logger.warn("任务状态抢占失败（可能已被更新或状态冲突），跳过本次调度 [PipelineId: {}, StageId: {}, 返回值: {}]", pipelineId,
                                     stageId, res);
+                            // makePlan mutates the snapshot; reload it next round after a failed commit.
+                            break;
+                        }
+
+                        // A skip plan legitimately updates state without starting any task.
+                        for (BioPipelineStage runStage : plan.getRunStages()) {
+                            if (!pipelineStageTaskDispatcher.addTask(runStage)) {
+                                logger.warn("任务已排队但暂未入执行队列，等待后续补投 [PipelineId: {}, StageId: {}]",
+                                        pipelineId, runStage.getStageId());
+                            }
                         }
                     } catch (JsonProcessingException e) {
                         // 1. 致命缺陷：序列化解析出错，必须把异常栈 e 传进 log.error，否则永远不知道报错细节！

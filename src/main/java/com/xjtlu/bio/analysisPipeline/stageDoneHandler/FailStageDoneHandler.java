@@ -25,10 +25,11 @@ public class FailStageDoneHandler extends AbstractStageDoneHandler implements St
     }
 
     @Override
-    public void handleStageDone(StageRunResult stageRunResult) {
+    protected void doHandleStageDone(StageRunResult stageRunResult) {
 
         StageContext stageContext = stageRunResult.getStageContext();
-        handleFail(stageContext, stageRunResult.getWorkDir().toString());
+        handleFail(stageContext, stageRunResult.getWorkDir() == null
+                ? null : stageRunResult.getWorkDir().toString(), stageRunResult.getFailReason());
         return;
 
 

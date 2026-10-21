@@ -1,11 +1,10 @@
 package com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls;
 
-public class ConsensusStageInputUrls implements StageInputUrls{
+public class ConsensusStageInputUrls implements StageInputUrls {
 
     private String vcfGz;
     private String vcfTbi;
-
-    
+    private String coverageDepthUrl;
 
     public String getVcfGz() {
         return vcfGz;
@@ -29,6 +28,13 @@ public class ConsensusStageInputUrls implements StageInputUrls{
         this.vcfTbi = vcfTbi;
     }
 
+    public String getCoverageDepthUrl() {
+        return coverageDepthUrl;
+    }
+
+    public void setCoverageDepthUrl(String coverageDepthUrl) {
+        this.coverageDepthUrl = coverageDepthUrl;
+    }
 
 
     public ConsensusStageInputUrls() {

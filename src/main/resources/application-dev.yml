@@ -43,6 +43,7 @@ analysis-pipeline:
     tools:
         fastp: ["${analysis-pipeline.conda}", "run", "-n", "bio-fastp","fastp"]
         spades: ["${analysis-pipeline.conda}", "run", "-n", "bio-spades", "spades.py"]
+        flye: ["${analysis-pipeline.conda}", "run", "-n", "bio-flye", "flye"]
         samtools: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "samtools"]
         # minimap2: ["${analysis-pipeline.conda}", "run", "-n", "bio-map", "minimap2"]
         minimap2: ["/usr/conda/envs/bio-map/bin/minimap2"]
@@ -54,7 +55,9 @@ analysis-pipeline:
         fastANI: ["${analysis-pipeline.conda}", "run", "-n", "bio-taxonomy", "fastANI"]
         seqsero2: ["${analysis-pipeline.conda}", "run", "-n", "seqsero2", "SeqSero2_package.py"]
         ectyper: ["${analysis-pipeline.conda}", "run", "-n", "ectyper", "ectyper"]
-        kaptive: ["${analysis-pipeline.conda}", "run", "-n", "kaptive", "kaptive", "-k", "/home/jcy/refereceTmp/kaptive_db"]
+        kaptive: ["${analysis-pipeline.conda}", "run", "-n", "kaptive", "kaptive"]
+        kaptiveKDatabase: "/home/jcy/refereceTmp/kaptive_db/Klebsiella_k_locus_primary_reference.gbk"
+        kaptiveODatabase: "/home/jcy/refereceTmp/kaptive_db/Klebsiella_o_locus_primary_reference.gbk"
         seroBA: ["${analysis-pipeline.conda}", "run", "-n", "seroba", "seroba"]
         vep: ["${analysis-pipeline.conda}", "run", "-n", "bio-vep", "vep"]
         fastplong: ["${analysis-pipeline.conda}", "run", "-n", "fastplong", "fastplong"]
@@ -90,16 +93,24 @@ analysis-pipeline:
         assembly:
             contigsFileName: "contigs.fasta"
             scaffoldFileName: "scaffolds.fasta"
+            flye:
+                # Platform alone does not identify raw/HQ/HiFi read subtype.
+                # ONT: nano-raw, nano-hq, nano-corr; PacBio: pacbio-raw, pacbio-hifi, pacbio-corr.
+                ont-input-mode: nano-raw
+                pacbio-input-mode: pacbio-raw
         mapping:
             bamFileName: "result.bam"
             bamIndexFileName: "result.bam.bai"
         varient:
+            rawVcfFileName: "variants.raw.vcf.gz"
+            rawVcfIndexFileName: "variants.raw.vcf.gz.tbi"
             vcfFileName: "variants.vcf.gz"
             vcfIndexFileName: "variants.vcf.gz.tbi"
+            metricsFileName: "variant.metrics.json"
         consensus:
             fastaFileName: "consensus.fa"
-            maskBedFileName: "consensus.mask.bed"   # 可选
-            qcFileName: "consensus.qc.json"         # 可选（覆盖率/缺失率）
+            maskBedFileName: "consensus.mask.bed"
+            metricsFileName: "consensus.metrics.json"
         mlst:
             tsvFileName: "mlst.tsv"
             jsonFileName: "mlst.json"
@@ -123,7 +134,3 @@ analysis-pipeline:
         
         
         
-
-
-
-

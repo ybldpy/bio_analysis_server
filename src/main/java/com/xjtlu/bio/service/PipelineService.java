@@ -27,12 +27,14 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
 import com.xjtlu.bio.analysisPipeline.Constants;
+import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.SegmentOrdinalResolver;
 import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator;
@@ -40,6 +42,9 @@ import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator.MissingUpstream
 import com.xjtlu.bio.analysisPipeline.workflow.StageOrchestrator.OrchestratePlan;
 import com.xjtlu.bio.analysisPipeline.stageDoneHandler.StageDoneHandler;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
+import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult;
+import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.ManualConfirmation;
+import com.xjtlu.bio.analysisPipeline.stageResult.TaxonomyResult.Taxon;
 import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder;
 import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder.PipelineConfigurations;
 import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder.PipelineSampleInput;
@@ -49,6 +54,7 @@ import com.xjtlu.bio.entity.BioAnalysisPipeline;
 import com.xjtlu.bio.entity.BioAnalysisPipelineExample;
 import com.xjtlu.bio.entity.BioPipelineInputFile;
 import com.xjtlu.bio.entity.BioPipelineInputFileExample;
+import com.xjtlu.bio.entity.BioPipelineLog;
 import com.xjtlu.bio.entity.BioPipelineStage;
 import com.xjtlu.bio.entity.BioPipelineStageExample;
 import com.xjtlu.bio.entity.BioProject;
@@ -61,15 +67,18 @@ import com.xjtlu.bio.mapper.BioAnalysisPipelineMapper;
 import com.xjtlu.bio.mapper.BioAnalysisPipelineMapperExtension;
 import com.xjtlu.bio.mapper.BioAnalysisStageMapperExtension;
 import com.xjtlu.bio.mapper.BioPipelineStageMapper;
+import com.xjtlu.bio.mapper.BioPipelineLogMapper;
 import com.xjtlu.bio.mapper.BioReferenceSequenceMapper;
 import com.xjtlu.bio.mapper.BioRefseqMapper;
 import com.xjtlu.bio.mapper.BioSampleMapper;
 import com.xjtlu.bio.requestParameters.AnalysisPipelineParameters;
 import com.xjtlu.bio.requestParameters.BatchCreateAnalysisPipelineRequest;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest;
+import com.xjtlu.bio.requestParameters.ConfirmTaxonomyRequest;
 import com.xjtlu.bio.requestParameters.BatchCreateAnalysisPipelineRequest.AnalysisPipeline;
 import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest.PipelineStageParameters;
 import com.xjtlu.bio.service.command.UpdateStageCommand;
+import com.xjtlu.bio.response.TaxonomyConfirmationResponse;
 import com.xjtlu.bio.utils.JsonUtil;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.*;
@@ -89,6 +98,8 @@ public class PipelineService {
 
     @Resource
     private BioPipelineStageMapper bioPipelineStageMapper;
+    @Resource
+    private BioPipelineLogMapper bioPipelineLogMapper;
     @Resource
     private BioAnalysisStageMapperExtension bioAnalysisStageMapperExtension;
     @Resource
@@ -118,6 +129,9 @@ public class PipelineService {
 
     @Resource
     private BioReferenceSequenceMapper bioReferenceSequenceMapper;
+
+    @Resource
+    private ReferenceTaxonomyResolver referenceTaxonomyResolver;
 
     @Resource
     @Lazy
@@ -433,6 +447,10 @@ public class PipelineService {
     private String checkInputFiles(List<BioPipelineInputFile> bioPipelineInputFiles,
             BioAnalysisPipeline analysisPipeline) {
 
+        if (analysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID_WASTEWATER) {
+            return checkCovidWastewaterInputFiles(bioPipelineInputFiles);
+        }
+
         if (bioPipelineInputFiles.isEmpty()) {
             return "分析任务没有输入";
         }
@@ -470,6 +488,34 @@ public class PipelineService {
         } else {
             return null;
         }
+    }
+
+    private String checkCovidWastewaterInputFiles(List<BioPipelineInputFile> inputs) {
+        if (inputs == null || inputs.isEmpty()) {
+            return "新冠污水分析缺少 R1，请上传新冠扩增子 FASTQ";
+        }
+        Set<String> inputKeys = new HashSet<>();
+        boolean hasR1 = false;
+        for (BioPipelineInputFile input : inputs) {
+            if (input == null || !Objects.equals(input.getFileRole(),
+                    PipelineInputService.PIPELINE_INPUT_TYPE_SEQUENCE_READ)) {
+                return "新冠污水分析仅支持 READ 输入，请上传新冠扩增子 FASTQ，不支持 assembly 或参考输入";
+            }
+            String key = input.getInputKey();
+            // Use the existing upload contract: one sample, with an optional second read.
+            if (!"sample/0/0".equals(key) && !"sample/0/1".equals(key)) {
+                return "新冠污水分析仅支持单样本，输入键须为 sample/0/0（R1）或 sample/0/1（R2）";
+            }
+            if (!inputKeys.add(key)) {
+                return "新冠污水分析存在重复输入槽位";
+            }
+            if (input.getFilePath() == null || input.getFilePath().isBlank()) {
+                return "新冠污水分析缺少 " + (key.endsWith("/0") ? "R1" : "R2")
+                        + " 文件，请上传新冠扩增子 FASTQ";
+            }
+            hasR1 |= key.endsWith("/0");
+        }
+        return hasR1 ? null : "新冠污水分析缺少 R1，请上传新冠扩增子 FASTQ";
     }
 
     public BioPipelineStage queryStageById(long stageId) {
@@ -701,10 +747,18 @@ public class PipelineService {
     private Result startRegularPipeline(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineInputFile> inputs)
             throws JsonMappingException, JsonProcessingException {
 
+        boolean covidWastewater = bioAnalysisPipeline.getPipelineType()
+                == PipelineType.PIPELINE_VIRUS_COVID_WASTEWATER;
         List<PipelineSampleInput> pipelineSampleInputs = paritionSubPipelineSampleInputFiles(inputs);
+        if (covidWastewater && pipelineSampleInputs.size() != 1) {
+            return new Result(Result.BUSINESS_FAIL, null, "新冠污水分析仅支持一个 READ 样本，请上传新冠扩增子 FASTQ");
+        }
 
         AnalysisPipelineParameters pipelineParameters = JsonUtil.toObject(bioAnalysisPipeline.getPipelineParameters(),
                 AnalysisPipelineParameters.class);
+        if (covidWastewater && pipelineParameters == null) {
+            pipelineParameters = new AnalysisPipelineParameters();
+        }
 
 
 
@@ -713,24 +767,13 @@ public class PipelineService {
 
         }
 
-        List<BioReferenceSequence> refseqList = Collections.emptyList();
-
-        Integer taxId = pipelineParameters.getTaxId();
-
-        if (bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID) {
-            taxId = COVID_19_TAX_ID;
-        }
-
-        if (taxId != null) {
-            BioReferenceSequenceExample bioRefseqExample = new BioReferenceSequenceExample();
-            bioRefseqExample.createCriteria().andTaxIdEqualTo(taxId);
-            refseqList = this.bioReferenceSequenceMapper.selectByExampleWithBLOBs(bioRefseqExample);
-        }
+        List<BioReferenceSequence> refseqList = covidWastewater ? Collections.emptyList() : findCandidateReferences(
+                bioAnalysisPipeline.getPipelineType(), pipelineParameters.getTaxId());
 
         boolean requiresReferenceSelection = bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS
                 || bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID;
         if (requiresReferenceSelection && (refseqList == null || refseqList.isEmpty())) {
-            return new Result(Result.BUSINESS_FAIL, null, "创建失败： 未找到参考基因组");
+            return new Result(Result.BUSINESS_FAIL, null, "创建失败：未找到已启用的参考基因组");
         }
 
 
@@ -738,8 +781,17 @@ public class PipelineService {
 
 
 
-        List<BioPipelineStage> stages = this.buildRegularPipelineStages(bioAnalysisPipeline.getPipelineId(),
-                bioAnalysisPipeline.getPipelineType(), refseqList, pipelineParameters, pipelineSampleInputs.get(0));
+        List<BioPipelineStage> stages;
+        try {
+            stages = this.buildRegularPipelineStages(bioAnalysisPipeline.getPipelineId(),
+                    bioAnalysisPipeline.getPipelineType(), refseqList, pipelineParameters, pipelineSampleInputs.get(0));
+        } catch (IllegalArgumentException | JsonProcessingException e) {
+            if (!covidWastewater) {
+                throw e;
+            }
+            return new Result(Result.PARAMETER_NOT_VALID, null,
+                    "新冠污水分析参数无效，请检查 extraParams.stageParams[\"92\"] 中 threads、timeoutSeconds 的范围及 analysisProfile 标识");
+        }
 
 
         try {
@@ -872,6 +924,29 @@ public class PipelineService {
         }
     }
 
+    /** Best-effort logging after the version-checked FAIL update. Content is plain text. */
+    public void recordStageFailure(StageContext stageContext, String failMessage) {
+        try {
+            BioPipelineLog log = new BioPipelineLog();
+            log.setPipelineId(stageContext.getPipelineId());
+            log.setStageId(stageContext.getRunStageId());
+            log.setStageVersion(stageContext.getVersion());
+            log.setLevel("ERROR");
+            log.setEventType("STAGE_FAILED");
+            log.setContent(failMessage == null ? "Stage failed without a failure message" : failMessage);
+            log.setCreatedAt(new Date());
+            if (bioPipelineLogMapper.insert(log) != 1) {
+                throw new IllegalStateException("Failed to insert stage failure log, stageId="
+                        + stageContext.getRunStageId());
+            }
+        } catch (Exception e) {
+            logger.error("Failed to persist failure log, pipelineId={}, stageId={}, version={}, message={}",
+                    stageContext == null ? null : stageContext.getPipelineId(),
+                    stageContext == null ? null : stageContext.getRunStageId(),
+                    stageContext == null ? null : stageContext.getVersion(), failMessage, e);
+        }
+    }
+
     public Result<List<BioAnalysisPipeline>> queryPipelines(BioAnalysisPipelineExample condition) {
 
         try {
@@ -994,15 +1069,53 @@ public class PipelineService {
                 source.getRawMetadata());
     }
 
+    private List<BioReferenceSequence> findCandidateReferences(int pipelineType, Integer taxId) {
+        if (pipelineType == PipelineType.PIPELINE_VIRUS_COVID_WASTEWATER) {
+            // Wastewater resources are managed by backend configuration, not target selection.
+            return Collections.emptyList();
+        }
+        if (pipelineType == PipelineType.PIPELINE_VIRUS_COVID) {
+            taxId = COVID_19_TAX_ID;
+        }
+        if (taxId == null) {
+            return Collections.emptyList();
+        }
+
+        BioReferenceSequenceExample example = new BioReferenceSequenceExample();
+        BioReferenceSequenceExample.Criteria criteria = example.createCriteria().andEnabledEqualTo(true);
+        boolean virusPipeline = pipelineType == PipelineType.PIPELINE_VIRUS
+                || pipelineType == PipelineType.PIPELINE_VIRUS_COVID;
+        if (virusPipeline) {
+            List<Integer> members = referenceTaxonomyResolver.resolveMemberTaxIds(taxId);
+            if (members.size() == 1 && members.get(0).equals(taxId)) {
+                criteria.andTaxIdEqualTo(taxId);
+            } else {
+                criteria.andTaxIdIn(members);
+            }
+        } else {
+            criteria.andTaxIdEqualTo(taxId);
+        }
+        return bioReferenceSequenceMapper.selectByExampleWithBLOBs(example);
+    }
+
     private List<BioPipelineStage> buildRegularPipelineStages(long pipelineId, int pipelineType,
             List<BioReferenceSequence> refseqList,
             AnalysisPipelineParameters pipelineStageParameters, PipelineSampleInput pipelineSampleInput)
             throws JsonMappingException, JsonProcessingException {
 
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
+        pipelineConfigurations.setExtraParams(
+                pipelineStageParameters.getExtraParams());
+        if (pipelineSampleInput.getSequencePlatform() == null
+                || pipelineSampleInput.getSequencePlatform() == Constants.SequencingPlatform.UNKNOWN) {
+            pipelineSampleInput.setSequencePlatform(pipelineStageParameters.getSequencingPlatform());
+        }
         List<BioPipelineStage> stages = Collections.emptyList();
 
-        if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS
+        if (pipelineType == PipelineType.PIPELINE_VIRUS_COVID_WASTEWATER) {
+            stages = AnalysisPipelineStagesBuilder.buildCovidWastewaterStages(
+                    pipelineSampleInput, pipelineConfigurations);
+        } else if (pipelineType == Constants.PipelineType.PIPELINE_VIRUS
                 || pipelineType == Constants.PipelineType.PIPELINE_VIRUS_COVID) {
 
             List<ReferenceSequence> candidateReferences = refseqList.stream()
@@ -1071,6 +1184,221 @@ public class PipelineService {
         return new Result<Boolean>(Result.SUCCESS, true, null);
     }
 
+    public Result<TaxonomyConfirmationResponse> confirmTaxonomy(
+            ConfirmTaxonomyRequest request, String confirmedBy) {
+        if (request == null || request.getStageId() == null || request.getStageId() <= 0
+                || request.getTaxId() == null || request.getTaxId() <= 0
+                || (request.getReason() != null && request.getReason().length() > 2000)) {
+            return new Result<>(Result.PARAMETER_NOT_VALID, null, "分类确认参数不合法");
+        }
+
+        Result<TaxonomyConfirmationResponse> saved;
+        try {
+            // Use a separate transaction definition, not the shared template:
+            // confirmation must commit before dispatch, and CAS retries must see
+            // a concurrent winner rather than a REPEATABLE_READ snapshot.
+            TransactionTemplate confirmationTransaction = new TransactionTemplate(
+                    rcTransactionTemplate.getTransactionManager(), rcTransactionTemplate);
+            confirmationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            confirmationTransaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+            saved = confirmationTransaction.execute(transaction -> {
+                try {
+                    return saveTaxonomyConfirmation(request, confirmedBy);
+                } catch (JsonProcessingException e) {
+                    transaction.setRollbackOnly();
+                    logger.error("Failed to parse or serialize taxonomy confirmation. stageId={}",
+                            request.getStageId(), e);
+                    return new Result<>(Result.INTERNAL_FAIL, null, "分类结果解析或保存失败");
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Failed to save taxonomy confirmation. stageId={}", request.getStageId(), e);
+            return new Result<>(Result.INTERNAL_FAIL, null, "保存分类确认失败");
+        }
+
+        if (saved == null) {
+            return new Result<>(Result.INTERNAL_FAIL, null, "保存分类确认失败");
+        }
+        if (saved.getStatus() != Result.SUCCESS) {
+            return saved;
+        }
+
+        // TransactionTemplate has committed before any task can consume this result.
+        TaxonomyConfirmationResponse response = saved.getData();
+        try {
+            response.setDownstreamScheduled(resumeConfirmedTaxonomy(request.getStageId()));
+        } catch (Exception e) {
+            logger.error("Taxonomy confirmation saved but downstream resume failed. stageId={}",
+                    request.getStageId(), e);
+        }
+        if (!response.isDownstreamScheduled()) {
+            return new Result<>(Result.INTERNAL_FAIL, response,
+                    "人工确认已保存，但下游调度尚未完成；可重复提交同一确认请求重试调度");
+        }
+        return new Result<>(Result.SUCCESS, response, null);
+    }
+
+    private Result<TaxonomyConfirmationResponse> saveTaxonomyConfirmation(
+            ConfirmTaxonomyRequest request, String confirmedBy) throws JsonProcessingException {
+        BioPipelineStage stage = bioPipelineStageMapper.selectByPrimaryKey(request.getStageId());
+        if (stage == null) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "分析阶段不存在");
+        }
+        if (!Objects.equals(stage.getStageType(), Constants.StageType.PIPELINE_STAGE_TAXONOMY)) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "只能确认 Taxonomy 阶段的分类结果");
+        }
+        if (stage.getVersion() == null) {
+            return new Result<>(Result.INTERNAL_FAIL, null, "分析阶段缺少版本信息");
+        }
+        int currentVersion = stage.getVersion();
+
+        BioAnalysisPipeline pipeline = bioAnalysisPipelineMapper.selectByPrimaryKey(stage.getPipelineId());
+        if (pipeline == null) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "分析任务不存在");
+        }
+        TaxonomyResult taxonomy = JsonUtil.toObject(stage.getOutputInline(), TaxonomyResult.class);
+        if (taxonomy == null) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "分析阶段尚无可确认的分类结果");
+        }
+
+        if (Objects.equals(stage.getStatus(), PIPELINE_STAGE_STATUS_FINISHED)) {
+            if (!isSameManualTaxonomyConfirmation(stage, taxonomy, request)) {
+                return new Result<>(Result.BUSINESS_FAIL, null, "分类已经确定，不能通过确认接口更改物种");
+            }
+            if (!Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_RUNNING)
+                    && !Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_COMPELETE)) {
+                return new Result<>(Result.BUSINESS_FAIL, null, "当前分析任务状态不允许恢复调度");
+            }
+            return confirmedTaxonomyResponse(stage, request.getTaxId(), true);
+        }
+
+        if (!Objects.equals(stage.getStatus(), PIPELINE_STAGE_STATUS_ACTION_REQUIRED)) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "分析阶段当前不处于等待人工确认状态");
+        }
+        if (!Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_RUNNING)) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "当前分析任务状态不允许确认分类");
+        }
+        if (currentVersion == Integer.MAX_VALUE) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "分析阶段版本已达上限，无法保存确认");
+        }
+        if (taxonomy.getStatus() != Constants.TaxonomyClassification.STATUS_AMBIGUOUS
+                && taxonomy.getStatus() != Constants.TaxonomyClassification.STATUS_LOW_CONFIDENCE
+                && taxonomy.getStatus() != Constants.TaxonomyClassification.STATUS_OUT_PANEL) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "当前分类结果无需人工确认");
+        }
+
+        Taxon selected = taxonomy.getCandidates() == null ? null : taxonomy.getCandidates().stream()
+                .filter(Objects::nonNull)
+                .filter(candidate -> candidate.getTaxid() == request.getTaxId())
+                .findFirst().orElse(null);
+        if (selected == null) {
+            return new Result<>(Result.BUSINESS_FAIL, null, "所选物种不在本阶段的分类候选中");
+        }
+
+        Date confirmedAt = new Date();
+        ManualConfirmation confirmation = new ManualConfirmation();
+        confirmation.setSpeciesTaxId(selected.getTaxid());
+        confirmation.setConfirmedAt(confirmedAt);
+        confirmation.setConfirmedBy(confirmedBy);
+        confirmation.setReason(request.getReason());
+        confirmation.setOriginalStatus(taxonomy.getStatus());
+        confirmation.setOriginalEvidenceResource(taxonomy.getEvidenceResource());
+
+        Taxon best = new Taxon();
+        best.setTaxid(selected.getTaxid());
+        best.setName(selected.getName());
+        best.setRank("S");
+        best.setScore(selected.getScore());
+        taxonomy.setBest(best);
+        taxonomy.setManualConfirmation(confirmation);
+        taxonomy.setStatus(Constants.TaxonomyClassification.STATUS_CONFIDENT);
+        taxonomy.setEvidenceResource(Constants.TaxonomyClassification.EVIDENCE_USER_CONFIRMED);
+
+        BioPipelineStage patch = new BioPipelineStage();
+        patch.setOutputInline(JsonUtil.toJson(taxonomy));
+        patch.setStatus(PIPELINE_STAGE_STATUS_FINISHED);
+        patch.setEndTime(confirmedAt);
+        patch.setVersion(currentVersion + 1);
+        BioPipelineStageExample condition = new BioPipelineStageExample();
+        condition.createCriteria().andStageIdEqualTo(stage.getStageId())
+                .andStatusEqualTo(PIPELINE_STAGE_STATUS_ACTION_REQUIRED)
+                .andVersionEqualTo(currentVersion);
+        int updated = bioPipelineStageMapper.updateByExampleSelective(patch, condition);
+        if (updated != 1) {
+            // A simultaneous identical confirmation may have won the version check.
+            BioPipelineStage current = bioPipelineStageMapper.selectByPrimaryKey(request.getStageId());
+            TaxonomyResult currentTaxonomy = current == null ? null
+                    : JsonUtil.toObject(current.getOutputInline(), TaxonomyResult.class);
+            if (isSameManualTaxonomyConfirmation(current, currentTaxonomy, request)) {
+                return confirmedTaxonomyResponse(current, request.getTaxId(), true);
+            }
+            return new Result<>(Result.BUSINESS_FAIL, null, "分析阶段版本已变化，请刷新后重新确认");
+        }
+        stage.setVersion(patch.getVersion());
+        return confirmedTaxonomyResponse(stage, request.getTaxId(), false);
+    }
+
+    private boolean isSameManualTaxonomyConfirmation(BioPipelineStage stage, TaxonomyResult taxonomy,
+            ConfirmTaxonomyRequest request) {
+        return stage != null && stage.getVersion() != null
+                && Objects.equals(stage.getStatus(), PIPELINE_STAGE_STATUS_FINISHED)
+                && taxonomy != null && taxonomy.getBest() != null
+                && taxonomy.getManualConfirmation() != null
+                && taxonomy.getStatus() == Constants.TaxonomyClassification.STATUS_CONFIDENT
+                && Constants.TaxonomyClassification.EVIDENCE_USER_CONFIRMED.equals(taxonomy.getEvidenceResource())
+                && taxonomy.getBest().getTaxid() == request.getTaxId()
+                && taxonomy.getManualConfirmation().getSpeciesTaxId() == request.getTaxId();
+    }
+
+    private Result<TaxonomyConfirmationResponse> confirmedTaxonomyResponse(
+            BioPipelineStage stage, int taxId, boolean alreadyConfirmed) {
+        return new Result<>(Result.SUCCESS, new TaxonomyConfirmationResponse(
+                stage.getStageId(), taxId, stage.getVersion(), false, alreadyConfirmed), null);
+    }
+
+    private boolean resumeConfirmedTaxonomy(long stageId) {
+        BioAnalysisPipeline pipeline = bioAnalysisPipelineMapperExtension.selectPipelineTypeByStageId(stageId);
+        if (pipeline == null) {
+            return false;
+        }
+        if (Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_COMPELETE)) {
+            return true;
+        }
+        if (!Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_RUNNING)) {
+            return false;
+        }
+
+        int scheduled = scheduleDownstreamStages(stageId, pipeline);
+        if (scheduled == SCHEDULE_PIPELINE_COMPELETE) {
+            handlePipelineFinish(pipeline);
+            BioAnalysisPipeline refreshed = bioAnalysisPipelineMapper.selectByPrimaryKey(pipeline.getPipelineId());
+            return refreshed != null && Objects.equals(refreshed.getStatus(), PIPELINE_STATUS_COMPELETE);
+        }
+        if (scheduled != OK && scheduled != NO_EFFECTIVE_UPDATE) {
+            return false;
+        }
+
+        List<BioPipelineStage> stages = bioAnalysisStageMapperExtension.selectAllPipelineStagesByStageId(stageId);
+        if (stages == null || stages.isEmpty()) {
+            return false;
+        }
+        BioPipelineStage serotype = stages.stream()
+                .filter(stage -> Objects.equals(stage.getStageType(), Constants.StageType.PIPELINE_STAGE_SEROTYPE))
+                .findFirst().orElse(null);
+        if (serotype == null) {
+            return true;
+        }
+        if (Objects.equals(serotype.getStatus(), PIPELINE_STAGE_STATUS_QUEUING)) {
+            // The first enqueue could have failed after its QUEUING update committed.
+            // addTask also deduplicates tasks already queued or running.
+            return pipelineStageTaskDispatcher.addTask(serotype);
+        }
+        return Objects.equals(serotype.getStatus(), PIPELINE_STAGE_STATUS_RUNNING)
+                || Objects.equals(serotype.getStatus(), PIPELINE_STAGE_STATUS_FINISHED)
+                || Objects.equals(serotype.getStatus(), PIPELINE_STAGE_STATUS_NOT_APPLICABLE)
+                || Objects.equals(serotype.getStatus(), PIPELINE_STAGE_STATUS_FAIL);
+    }
+
     private void handleSubPipelineFinish(BioAnalysisPipeline subPipeline) {
 
         if (subPipeline.getPipelineType() == PipelineType.PIPELINE_SNP_ANALYSIS_MERGE) {
@@ -1108,13 +1436,39 @@ public class PipelineService {
         startPipeline(mergePipeline.getPipelineId());
     }
 
+    /** Recheck persisted state without restarting analysis or replaying downstream scheduling. */
+    public void reconcilePipelineCompletion(long pipelineId) {
+        BioAnalysisPipeline pipeline = bioAnalysisPipelineMapper.selectByPrimaryKey(pipelineId);
+        if (pipeline == null || !Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_RUNNING)) {
+            return;
+        }
+
+        BioPipelineStageExample stagesQuery = new BioPipelineStageExample();
+        stagesQuery.createCriteria().andPipelineIdEqualTo(pipelineId);
+        // Completion needs only stage statuses, not potentially large inline result payloads.
+        List<BioPipelineStage> stages = bioPipelineStageMapper.selectByExample(stagesQuery);
+        if (allStagesFinished(stages)) {
+            handlePipelineFinish(pipeline);
+        }
+    }
+
+    private static boolean allStagesFinished(List<BioPipelineStage> stages) {
+        // A container pipeline without its own stages is not finished merely because the list is empty.
+        return stages != null && !stages.isEmpty() && stages.stream().allMatch(stage -> stage != null
+                && (Objects.equals(stage.getStatus(), PIPELINE_STAGE_STATUS_FINISHED)
+                        || Objects.equals(stage.getStatus(), PIPELINE_STAGE_STATUS_NOT_APPLICABLE)));
+    }
+
     private void handlePipelineFinish(BioAnalysisPipeline pipeline) {
+        if (pipeline == null || !Objects.equals(pipeline.getStatus(), PIPELINE_STATUS_RUNNING)) {
+            return;
+        }
 
         BioAnalysisPipeline patch = new BioAnalysisPipeline();
         patch.setStatus(PIPELINE_STATUS_COMPELETE);
         BioAnalysisPipelineExample updateCondition = new BioAnalysisPipelineExample();
         updateCondition.createCriteria().andPipelineIdEqualTo(pipeline.getPipelineId())
-                .andStatusEqualTo(pipeline.getStatus());
+                .andStatusEqualTo(PIPELINE_STATUS_RUNNING);
         try {
             int updateRes = this.bioAnalysisPipelineMapper.updateByExampleSelective(patch, updateCondition);
             if (updateRes <= 0) {
@@ -1234,18 +1588,7 @@ public class PipelineService {
                 List<BioPipelineStage> refreshedStages = this.bioAnalysisStageMapperExtension
                         .selectAllPipelineStagesByStageId(finishedStageId);
 
-                boolean finished = refreshedStages != null && !refreshedStages.isEmpty();
-                if (finished) {
-                    for (BioPipelineStage stage : refreshedStages) {
-                        if (stage.getStatus() != PIPELINE_STAGE_STATUS_FINISHED
-                                && stage.getStatus() != PIPELINE_STAGE_STATUS_NOT_APPLICABLE) {
-                            finished = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (finished) {
+                if (allStagesFinished(refreshedStages)) {
                     return SCHEDULE_PIPELINE_COMPELETE;
                 }
             }
@@ -1279,7 +1622,7 @@ public class PipelineService {
     }
 
     // 如果更新成功的数量!=list.size()回滚
-    // 0: fail. 1: success
+    // 返回值：0 成功；100 更新数量不符（事务回滚）；-1 异常。
     // remember to remain current version in stage here
     public int batchUpdateStages(List<UpdateStageCommand> updateStageCommands) {
 

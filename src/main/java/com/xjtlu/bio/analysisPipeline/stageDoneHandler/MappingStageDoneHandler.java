@@ -9,6 +9,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_MAPPING;
@@ -24,6 +25,7 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
     private String bamIndexFileName;
 
     private static final String COVERAGE_DEPTH_FILE_NAME = "coverage_depth.tsv";
+    private static final String METRICS_FILE_NAME = MappingStageOutput.METRICS_JSON;
 
     @Override
     public int getType() {
@@ -51,114 +53,30 @@ public class MappingStageDoneHandler extends AbstractStageDoneHandler<MappingSta
         String bamUrl = this.createStoreObjectName(stageRunResult.getStage(),bamFileName);
         String bamIndexUrl = this.createStoreObjectName(stageRunResult.getStage(), bamIndexFileName);
         String coverageDepthUrl = this.createStoreObjectName(stageRunResult.getStage(), COVERAGE_DEPTH_FILE_NAME);
-        
+        MappingStageOutput stageOutput = stageRunResult.getStageOutput();
+        String metricsUrl = stageOutput.getMetricsJsonPath() == null
+                ? null
+                : this.createStoreObjectName(stageRunResult.getStage(), METRICS_FILE_NAME);
+
+        Map<String, String> uploadConfig = new LinkedHashMap<>();
+        uploadConfig.put(stageOutput.getBamPath().toAbsolutePath().toString(), bamUrl);
+        uploadConfig.put(stageOutput.getBamIndexPath().toAbsolutePath().toString(), bamIndexUrl);
+        uploadConfig.put(
+                stageOutput.getCoverageDepthPath().toAbsolutePath().toString(),
+                coverageDepthUrl);
+        if (stageOutput.getMetricsJsonPath() != null) {
+            uploadConfig.put(
+                    stageOutput.getMetricsJsonPath().toAbsolutePath().toString(),
+                    metricsUrl);
+        }
 
         return Pair.of(
-            Map.of(
-                stageRunResult.getStageOutput().getBamPath().toAbsolutePath().toString(), 
-                bamUrl, 
-                stageRunResult.getStageOutput().getBamIndexPath().toAbsolutePath().toString(), 
+            uploadConfig,
+            new MappingResult(
+                bamUrl,
                 bamIndexUrl,
-                stageRunResult.getStageOutput().getCoverageDepthPath().toAbsolutePath().toString(),
-                coverageDepthUrl),
-            new MappingResult(bamUrl, bamIndexUrl, coverageDepthUrl)
+                coverageDepthUrl,
+                metricsUrl)
         );
     }
-
-
-
-
-    // @Override
-    // public void handleStageDone(StageRunResult<MappingStageOutput> stageRunResult) {
-    //     MappingStageOutput mappingStageOutput = (MappingStageOutput) stageRunResult.getStageOutput();
-    //     BioPipelineStage bioPipelineStage = stageRunResult.getStage();
-
-    //     String bamObjectName = createStoreObjectName(bioPipelineStage,
-    //             substractFileNameFromPath(mappingStageOutput.getBamPath()));
-
-    //     String bamIndexObjectName = createStoreObjectName(bioPipelineStage,
-    //             substractFileNameFromPath(mappingStageOutput.getBamIndexPath()));
-
-    //     HashMap<String, String> outputStoreMap = new HashMap<>();
-    //     outputStoreMap.put(mappingStageOutput.getBamPath().toString(), bamObjectName);
-    //     outputStoreMap.put(mappingStageOutput.getBamIndexPath().toString(), bamIndexObjectName);
-
-    //     boolean storeSuccss  = this.batchUploadObjectsFromLocal(outputStoreMap);
-    //     Path outputDirPath = Path.of(mappingStageOutput.getBamPath()).getParent();
-    //     if (!storeSuccss) {
-    //         this.handleUnsuccessUpload(bioPipelineStage, outputDirPath.toString());
-    //         return;
-    //     }
-
-    //     this.deleteStageResultDir(outputDirPath.toString());
-
-    //     String serializedOutput = null;
-    //     HashMap<String,String> outputUrlMap = new HashMap<>();
-    //     outputUrlMap.put(PIPELINE_STAGE_MAPPING_OUTPUT_BAM_KEY, bamObjectName);
-    //     outputUrlMap.put(PIPELINE_STAGE_MAPPING_OUTPUT_BAM_INDEX_KEY, bamIndexObjectName);
-    //     try {
-    //         serializedOutput = JsonUtil.toJson(outputUrlMap);
-    //     } catch (JsonProcessingException e) {
-            
-    //         logger.error("stage id = {}. parsing {} to json error", bioPipelineStage.getStageId(), outputDirPath);
-    //     }
-
-    //     int updateRes = updateStageFinish(bioPipelineStage, serializedOutput);
-    //     if(updateRes!=1){
-    //         return;            
-    //     }
-
-
-
-    //     BioPipelineStageExample nextStagesExample = new BioPipelineStageExample();
-    //     nextStagesExample.createCriteria()
-    //             .andPipelineIdEqualTo(bioPipelineStage.getPipelineId())
-    //             .andStageIndexGreaterThanOrEqualTo(bioPipelineStage.getStageIndex() + 1);
-
-    //     List<BioPipelineStage> nextStages = pipelineService.getStagesFromExample(nextStagesExample);
-
-    //     if (nextStages == null || nextStages.isEmpty()) {
-    //         return;
-    //     }
-
-    //     // 这里主要是用来看是否后续阶段。
-    //     BioPipelineStage varientStage = nextStages.stream()
-    //             .filter(stage -> stage.getStageType() == PIPELINE_STAGE_VARIANT_CALL).findFirst().orElse(null);
-
-    //     if (varientStage != null) {
-    //         BioPipelineStage updateVarientStage = new BioPipelineStage();
-    //         HashMap<String, Object> inputMap = new HashMap<>();
-    //         inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_KEY, bamObjectName);
-    //         inputMap.put(PIPELINE_STAGE_VARIENT_CALL_INPUT_BAM_INDEX_KEY, bamIndexObjectName);
-    //         String serializedInputUrl = null;
-    //         try {
-    //             serializedInputUrl = JsonUtil.toJson(inputMap);
-    //         } catch (JsonProcessingException e) {
-    //             // TODO Auto-generated catch block
-    //             logger.error("{} parsing json exception", varientStage, e);
-    //         }
-
-    //         int curVersion = varientStage.getVersion();
-
-    //         updateVarientStage.setInputUrl(serializedInputUrl);
-    //         varientStage.setInputUrl(serializedInputUrl);
-
-    //         updateVarientStage.setParameters(bioPipelineStage.getParameters());
-    //         varientStage.setParameters(updateVarientStage.getParameters());
-    //         updateVarientStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-    //         varientStage.setStatus(PIPELINE_STAGE_STATUS_QUEUING);
-
-    //         updateVarientStage.setVersion(varientStage.getVersion()+1);
-    //         varientStage.setVersion(varientStage.getVersion()+1);
-
-    //         updateRes = this.updateStageFromVersion(updateVarientStage, varientStage.getStageId(),
-    //                 curVersion);
-    //         if (updateRes != 1) {
-    //             return;
-    //         }
-    //         pipelineService.addStageTask(varientStage);
-    //         return;
-    //     }
-    //     // todo: bacterial part. do it later
-    // }
 }

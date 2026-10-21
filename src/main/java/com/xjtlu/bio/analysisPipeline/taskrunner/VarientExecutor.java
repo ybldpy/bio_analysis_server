@@ -2,8 +2,8 @@ package com.xjtlu.bio.analysisPipeline.taskrunner;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_VARIANT_CALL;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -21,6 +21,10 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParamete
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.VariantStageOutput;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.FaiBuilder.FaiBuildException;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.VariantFilterExpressionBuilder;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.VariantVcfMetricsParser;
+import com.xjtlu.bio.analysisPipeline.stageMetrics.VariantCallResultMetrics;
+import com.xjtlu.bio.utils.JsonUtil;
 
 import jakarta.annotation.Resource;
 
@@ -51,6 +55,19 @@ public class VarientExecutor
         StageContext bioPipelineStage = stageExecutionInput.stageContext;
         VarientCallInputUrls varientCallInputUrls = stageExecutionInput.input;
         VarientCallParameters varientCallParameters = stageExecutionInput.stageParameters;
+
+        final String variantFilterExpression;
+        try {
+            variantFilterExpression =
+                    VariantFilterExpressionBuilder.buildExclusionExpression(
+                            varientCallParameters);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return this.runFail(
+                    bioPipelineStage,
+                    "Invalid variant call parameters: " + e.getMessage(),
+                    e,
+                    stageExecutionInput.workDir);
+        }
 
         ReferenceGenome referenceGenome = varientCallParameters.getReferenceGenome();
 
@@ -91,13 +108,16 @@ public class VarientExecutor
 
         // 工具路径与参数
 
-        int threads = 2;
+        int threads = varientCallParameters.getThreads();
 
         // 中间与最终产物
         Path bcfRaw = workDir.resolve("raw.bcf");
-
-        Path vcfGz = stageExecutionInput.workDir.resolve(VariantStageOutput.VCF_GZ);
-        Path vcfTbi = stageExecutionInput.workDir.resolve(VariantStageOutput.VCF_TBI);
+        Path rawVcfGz = workDir.resolve(VariantStageOutput.RAW_VCF_GZ);
+        Path rawVcfTbi = workDir.resolve(VariantStageOutput.RAW_VCF_TBI);
+        Path normalizedVcfGz = workDir.resolve("variants.normalized.vcf.gz");
+        Path vcfGz = workDir.resolve(VariantStageOutput.VCF_GZ);
+        Path vcfTbi = workDir.resolve(VariantStageOutput.VCF_TBI);
+        Path metricsJson = stageExecutionInput.workDir.resolve(VariantStageOutput.METRICS_JSON);
 
         // ---------- 1) mpileup: BAM -> BCF ----------
         // -Ou 输出未压缩 BCF 到 stdout（这里我们直接 -o 写文件，避免管道）
@@ -107,9 +127,9 @@ public class VarientExecutor
         cmd.add("-f");
         cmd.add(refseqLocalPath.toString());
         cmd.add("-q");
-        cmd.add("20"); // 最小比对质量
+        cmd.add(String.valueOf(varientCallParameters.getMinimumMappingQuality()));
         cmd.add("-Q");
-        cmd.add("20"); // 最小碱基质量
+        cmd.add(String.valueOf(varientCallParameters.getMinimumBaseQuality()));
         cmd.add("-a");
         cmd.add("DP,AD"); // 输出深度/等位深度
         cmd.add("--threads");
@@ -131,7 +151,7 @@ public class VarientExecutor
                     null, workDir);
         }
 
-        // ---------- 2) call: BCF -> VCF.GZ ----------
+        // ---------- 2) call: BCF -> raw VCF.GZ ----------
         cmd.clear();
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.add("call");
@@ -142,7 +162,7 @@ public class VarientExecutor
         cmd.add(String.valueOf(threads));
         cmd.add("-Oz"); // 压缩 VCF
         cmd.add("-o");
-        cmd.add(vcfGz.toString());
+        cmd.add(rawVcfGz.toString());
         cmd.add(bcfRaw.toString());
 
         executeResult = _execute(cmd, workDir);
@@ -151,34 +171,163 @@ public class VarientExecutor
             return this.runFail(bioPipelineStage, "生成VCF.gz失败", executeResult.ex, workDir);
         }
 
-        errorOutputValidationResults = validateOutputFiles(vcfGz);
+        errorOutputValidationResults = validateOutputFiles(rawVcfGz);
         if (!errorOutputValidationResults.isEmpty()) {
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
                     null, workDir);
         }
 
-        // ---------- 3) index: VCF.GZ -> TBI ----------
+        // ---------- 3) index raw VCF ----------
         cmd = new ArrayList<>();
         cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
         cmd.add("index");
         cmd.add("-t"); // 生成 TBI
         cmd.add("--threads");
         cmd.add(String.valueOf(threads));
-        cmd.add(vcfGz.toString());
+        cmd.add(rawVcfGz.toString());
 
         executeResult = _execute(cmd, workDir);
         if (!executeResult.success()) {
-            return this.runFail(bioPipelineStage, "生成TBI失败", executeResult.ex, workDir);
+            return this.runFail(bioPipelineStage, "Failed to index raw VCF", executeResult.ex, workDir);
         }
 
-        vcfTbi = workDir.resolve(vcfGz.getFileName() + ".tbi");
-        errorOutputValidationResults = validateOutputFiles(vcfTbi);
+        rawVcfTbi = workDir.resolve(rawVcfGz.getFileName() + ".tbi");
+        errorOutputValidationResults = validateOutputFiles(rawVcfTbi);
         if (!errorOutputValidationResults.isEmpty()) {
             return this.runFail(bioPipelineStage, createStageOutputValidationErrorMessge(errorOutputValidationResults),
                     null, workDir);
         }
 
-        return OK(new VariantStageOutput(vcfGz.toString(), vcfTbi.toString()), stageExecutionInput);
+        // ---------- 4) normalize calls against the selected reference ----------
+        cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
+        cmd.add("norm");
+        cmd.add("-f");
+        cmd.add(refseqLocalPath.toString());
+        cmd.add("--threads");
+        cmd.add(String.valueOf(threads));
+        cmd.add("-Oz");
+        cmd.add("-o");
+        cmd.add(normalizedVcfGz.toString());
+        cmd.add(rawVcfGz.toString());
+
+        executeResult = _execute(cmd, workDir);
+        if (!executeResult.success()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    "Failed to normalize raw VCF",
+                    executeResult.ex,
+                    workDir);
+        }
+
+        errorOutputValidationResults = validateOutputFiles(normalizedVcfGz);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null,
+                    workDir);
+        }
+
+        // ---------- 5) soft-filter normalized calls ----------
+        // Passing records are reset to PASS; rejected records remain in the
+        // VCF and are tagged LowConfidence for audit.
+        cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
+        cmd.add("filter");
+        cmd.add("-m");
+        cmd.add("x");
+        cmd.add("-s");
+        cmd.add(VariantFilterExpressionBuilder.LOW_CONFIDENCE_FILTER_NAME);
+        cmd.add("-e");
+        cmd.add(variantFilterExpression);
+        cmd.add("--threads");
+        cmd.add(String.valueOf(threads));
+        cmd.add("-Oz");
+        cmd.add("-o");
+        cmd.add(vcfGz.toString());
+        cmd.add(normalizedVcfGz.toString());
+
+        executeResult = _execute(cmd, workDir);
+        if (!executeResult.success()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    "Failed to filter normalized VCF",
+                    executeResult.ex,
+                    workDir);
+        }
+
+        errorOutputValidationResults = validateOutputFiles(vcfGz);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null,
+                    workDir);
+        }
+
+        // ---------- 6) index filtered VCF ----------
+        cmd = new ArrayList<>();
+        cmd.addAll(this.analysisPipelineToolsConfig.getBcftools());
+        cmd.add("index");
+        cmd.add("-t");
+        cmd.add("--threads");
+        cmd.add(String.valueOf(threads));
+        cmd.add(vcfGz.toString());
+
+        executeResult = _execute(cmd, workDir);
+        if (!executeResult.success()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    "Failed to index filtered VCF",
+                    executeResult.ex,
+                    workDir);
+        }
+
+        vcfTbi = workDir.resolve(vcfGz.getFileName() + ".tbi");
+        errorOutputValidationResults = validateOutputFiles(vcfTbi);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null,
+                    workDir);
+        }
+
+        VariantCallResultMetrics metrics;
+        try {
+            metrics = VariantVcfMetricsParser.parse(vcfGz);
+            Files.writeString(
+                    metricsJson,
+                    JsonUtil.toJson(metrics),
+                    StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            logger.error("Failed to calculate variant metrics from {}", vcfGz, e);
+            return this.runFail(
+                    bioPipelineStage,
+                    "Failed to calculate variant metrics: " + e.getMessage(),
+                    e,
+                    workDir);
+        }
+
+        errorOutputValidationResults = validateOutputFiles(metricsJson);
+        if (!errorOutputValidationResults.isEmpty()) {
+            return this.runFail(
+                    bioPipelineStage,
+                    createStageOutputValidationErrorMessge(errorOutputValidationResults),
+                    null,
+                    workDir);
+        }
+
+        return OK(
+                new VariantStageOutput(
+                        rawVcfGz.toString(),
+                        rawVcfTbi.toString(),
+                        vcfGz.toString(),
+                        vcfTbi.toString(),
+                        metricsJson.toString(),
+                        metrics),
+                stageExecutionInput);
     }
 
     @Override

@@ -267,6 +267,7 @@ public abstract class AbstractPipelineStageExector<T extends StageOutput, Input 
     public StageRunResult<T> execute(BioPipelineStage bioPipelineStage) {
 
         StageContext stageContext = new StageContext();
+        stageContext.setPipelineId(bioPipelineStage.getPipelineId() == null ? 0L : bioPipelineStage.getPipelineId());
         stageContext.setRunStageId(bioPipelineStage.getStageId());
         stageContext.setVersion(bioPipelineStage.getVersion());
         stageContext.setStageType(bioPipelineStage.getStageType());

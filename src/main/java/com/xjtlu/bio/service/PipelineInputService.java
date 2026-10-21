@@ -3,6 +3,7 @@ package com.xjtlu.bio.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -83,6 +84,7 @@ public class PipelineInputService {
 
     private static final int INPUT_NOT_ALLOWED_SEQUENCE_READ_NOT_SUPPORT_FASTA = 4;
     private static final int INPUT_NOT_ALLOWED_SEQUENCE_ASSEMBLY_NOT_SUPPORT_FASTQ = 5;
+    private static final int INPUT_NOT_ALLOWED_WASTEWATER_REQUIRES_READ_FASTQ = 6;
 
     private static final Pattern SAMPLE_READ_KEY_PATTERN = Pattern.compile("^sample/\\d+/[01]$");
 
@@ -161,6 +163,12 @@ public class PipelineInputService {
             String inputKey,
             List<BioPipelineInputFile> inputFiles) {
 
+        if (pipeline.getPipelineType() == Constants.PipelineType.PIPELINE_VIRUS_COVID_WASTEWATER
+                && (inputSequenceLevel != PIPELINE_INPUT_TYPE_SEQUENCE_READ
+                        || !isWastewaterFastqFileName(sequenceFileName))) {
+            return INPUT_NOT_ALLOWED_WASTEWATER_REQUIRES_READ_FASTQ;
+        }
+
         BioPipelineInputFile inputFile = inputFiles.stream().filter(in -> in.getInputKey().equals(inputKey)).findAny()
                 .orElse(null);
         if (inputFile != null) {
@@ -207,6 +215,14 @@ public class PipelineInputService {
 
         return INPUT_ALLOWED;
 
+    }
+
+    private static boolean isWastewaterFastqFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return false;
+        }
+        String uncompressed = Constants.CompressedFormat.removeCompressedSuffix(fileName).toLowerCase(Locale.ROOT);
+        return uncompressed.endsWith(".fastq") || uncompressed.endsWith(".fq");
     }
 
     private String inputLockKey(long pipelineId, int inputType, String inputKey) {
@@ -292,6 +308,10 @@ public class PipelineInputService {
             List<BioPipelineInputFile> inputs = this.bioPipelineInputFileMapper.selectByExample(query);
 
             int inputAllowedCode = isInputAllowed(pipelines.get(0), fileName, inputType, inputKey, inputs);
+            if (inputAllowedCode == INPUT_NOT_ALLOWED_WASTEWATER_REQUIRES_READ_FASTQ) {
+                return new Result<>(Result.BUSINESS_FAIL, -1L,
+                        "新冠污水分析仅支持 READ 输入，请上传新冠扩增子 FASTQ/FQ（可使用 .gz/.gzip/.zip 压缩），不支持 assembly 或参考输入。文件名校验不能确认扩增子建库类型。");
+            }
             if (inputAllowedCode == INPUT_NOT_ALLOWED_DUPLICATE_KEY) {
 
                 BioPipelineInputFile inputFile = inputs.stream().filter(pin -> pin.getInputKey().equals(inputKey))

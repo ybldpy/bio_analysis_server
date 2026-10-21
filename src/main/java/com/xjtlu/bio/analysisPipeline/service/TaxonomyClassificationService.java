@@ -129,30 +129,61 @@ public class TaxonomyClassificationService {
 
 
 
-    public List<TaxonomyClassificationItem> parseFastANIReport(Path report) throws ReportParseException{
+    public List<TaxonomyClassificationItem> parseFastANIReport(Path report) throws ReportParseException {
 
         List<TaxonomyClassificationItem> items = new ArrayList<>();
-        try(BufferedReader bufferedReader = Files.newBufferedReader(report)){
+        try (BufferedReader bufferedReader = Files.newBufferedReader(report)) {
 
-            String line = null;
-            while((line = bufferedReader.readLine())!=null){
-                String stripdLine = line.strip();
-                String[] cols = stripdLine.split("\t");
-                String referenceGenome = cols[1].substring(cols[1].lastIndexOf("/")+1);
-                referenceGenome = referenceGenome.substring(0, referenceGenome.length()-".fna".length());
-                double percentage = Double.parseDouble(cols[2]);
-                int matchedFragments = Integer.parseInt(cols[3]);
-                int totalFragments = Integer.parseInt(cols[4]);
-                FastANIMeta correspondingAniMeta = this.fastANIMetaQueryMap.get(referenceGenome);
+            String line;
+            long lineNumber = 0L;
+            while ((line = bufferedReader.readLine()) != null) {
+                lineNumber++;
+                if (line.isBlank()) {
+                    continue;
+                }
+                String[] cols = line.strip().split("\t", -1);
+                if (cols.length < 5) {
+                    throw new ReportParseException(
+                            "Malformed FastANI report row at " + report.toAbsolutePath() + ":" + lineNumber);
+                }
 
-                TaxonomyClassificationItem  item = new TaxonomyClassificationItem(
-                    percentage,
-                    matchedFragments,
-                    totalFragments,
-                    RANK_CODE_SPECIES,
-                    correspondingAniMeta.taxId,
-                    correspondingAniMeta.name
-                );
+                String referenceGenome = Path.of(cols[1]).getFileName().toString();
+                if (!referenceGenome.endsWith(".fna")) {
+                    throw new ReportParseException(
+                            "FastANI reference does not use the expected .fna suffix at "
+                                    + report.toAbsolutePath() + ":" + lineNumber + ": " + cols[1]);
+                }
+                referenceGenome = referenceGenome.substring(0, referenceGenome.length() - ".fna".length());
+
+                double percentage;
+                long matchedFragments;
+                long totalFragments;
+                try {
+                    percentage = Double.parseDouble(cols[2]);
+                    matchedFragments = Long.parseLong(cols[3]);
+                    totalFragments = Long.parseLong(cols[4]);
+                } catch (NumberFormatException e) {
+                    throw new ReportParseException(
+                            "Invalid numeric value in FastANI report at "
+                                    + report.toAbsolutePath() + ":" + lineNumber,
+                            e);
+                }
+                FastANIMeta correspondingAniMeta = this.fastANIMetaQueryMap == null
+                        ? null
+                        : this.fastANIMetaQueryMap.get(referenceGenome);
+                if (correspondingAniMeta == null) {
+                    throw new ReportParseException(
+                            "FastANI reference is missing from metadata at "
+                                    + report.toAbsolutePath() + ":" + lineNumber + ": " + referenceGenome);
+                }
+
+                TaxonomyClassificationItem item = new TaxonomyClassificationItem(
+                        percentage,
+                        matchedFragments,
+                        totalFragments,
+                        RANK_CODE_SPECIES,
+                        correspondingAniMeta.speciesTaxId,
+                        correspondingAniMeta.speciesName);
                 items.add(item);
             }
             return items;
@@ -163,8 +194,6 @@ public class TaxonomyClassificationService {
                     e);
         }
 
-        
-
     }
 
     public List<TaxonomyClassificationItem> parseKraken2Report(Path report) throws ReportParseException {
@@ -172,8 +201,10 @@ public class TaxonomyClassificationService {
         List<TaxonomyClassificationItem> items = new ArrayList<>();
         try (BufferedReader buffer = Files.newBufferedReader(report)) {
 
-            String line = null;
+            String line;
+            long lineNumber = 0L;
             while ((line = buffer.readLine()) != null) {
+                lineNumber++;
 
                 if (line.isBlank()) {
                     continue;
@@ -184,14 +215,26 @@ public class TaxonomyClassificationService {
                     continue;
                 }
 
-                String[] cols = line.strip().split("\t", 6);
-                TaxonomyClassificationItem taxonomyClassificationItem = new TaxonomyClassificationItem(
-                        Double.parseDouble(cols[0].strip()),
-                        Long.parseLong(cols[1].strip()),
-                        Long.parseLong(cols[2].strip()),
-                        cols[3].strip(),
-                        Integer.parseInt(cols[4].strip()),
-                        cols[5].strip());
+                String[] cols = line.split("\t", 6);
+                if (cols.length < 6) {
+                    throw new ReportParseException(
+                            "Malformed Kraken2 report row at " + report.toAbsolutePath() + ":" + lineNumber);
+                }
+                TaxonomyClassificationItem taxonomyClassificationItem;
+                try {
+                    taxonomyClassificationItem = new TaxonomyClassificationItem(
+                            Double.parseDouble(cols[0].strip()),
+                            Long.parseLong(cols[1].strip()),
+                            Long.parseLong(cols[2].strip()),
+                            cols[3].strip(),
+                            Integer.parseInt(cols[4].strip()),
+                            cols[5].strip());
+                } catch (NumberFormatException e) {
+                    throw new ReportParseException(
+                            "Invalid numeric value in Kraken2 report at "
+                                    + report.toAbsolutePath() + ":" + lineNumber,
+                            e);
+                }
                 items.add(taxonomyClassificationItem);
             }
 
@@ -225,7 +268,7 @@ public class TaxonomyClassificationService {
 
     public boolean isSupported(int queryId, int level){
 
-        return supportedFamilys.contains(queryId);
+        return supportedFamilys != null && supportedFamilys.contains(queryId);
 
 
     }

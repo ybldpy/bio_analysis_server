@@ -34,6 +34,24 @@ public final class PafAlignmentStatsParser {
     }
 
     public static AlignmentStats parse(Path pafPath, Path referenceFastaPath) throws IOException {
+        return parseInternal(pafPath, referenceFastaPath, null);
+    }
+
+    /**
+     * Computes statistics using primary alignments whose mapping quality meets
+     * the supplied minimum. PAF mapping quality 255 means unavailable, so it is
+     * excluded even when the minimum is zero.
+     */
+    public static AlignmentStats parse(
+            Path pafPath, Path referenceFastaPath, int minimumMappingQuality) throws IOException {
+        if (minimumMappingQuality < 0 || minimumMappingQuality > 254) {
+            throw new IllegalArgumentException("Minimum mapping quality must be between 0 and 254");
+        }
+        return parseInternal(pafPath, referenceFastaPath, minimumMappingQuality);
+    }
+
+    private static AlignmentStats parseInternal(
+            Path pafPath, Path referenceFastaPath, Integer minimumMappingQuality) throws IOException {
         Map<String, Long> referenceLengths = readFastaRecordLengths(referenceFastaPath);
         long referenceBases = sumReferenceBases(referenceLengths, referenceFastaPath);
 
@@ -114,6 +132,10 @@ public final class PafAlignmentStatsParser {
                         fields[11], pafPath, lineNumber, "mapping quality");
                 if (mappingQuality < 0L || mappingQuality > 255L) {
                     throw invalidPafRow(pafPath, lineNumber, "invalid mapping quality");
+                }
+                if (minimumMappingQuality != null
+                        && (mappingQuality == 255L || mappingQuality < minimumMappingQuality)) {
+                    continue;
                 }
 
                 intervalsByReference

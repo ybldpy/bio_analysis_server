@@ -579,20 +579,42 @@ class ReferenceSelectionAggregationTest {
     }
 
     @Test
-    void rejectsSegmentGroupWithoutUsableAlignment() {
+    void skipsUnmatchedSegmentGroupWhenAnotherGroupMatches() {
         List<ReferenceCandidateScore> scores = new ArrayList<>(List.of(
                 score("SEG1", "SEGMENT_1", 100.0d, 100L),
+                score("SEG2", "SEGMENT_2", 0.0d, 0L)));
+
+        ReferenceSelectionStageExecutor.CandidateSelection selection =
+                ReferenceSelectionStageExecutor.selectBestCandidatesBySegment(scores);
+
+        assertEquals(
+                List.of("SEG1"),
+                selection.winners().stream()
+                        .map(ReferenceCandidateScore::getReferenceAccession)
+                        .toList());
+        assertEquals(List.of("SEGMENT_2"), selection.unmatchedSegmentKeys());
+        assertEquals(
+                List.of("SEG1", "SEG2"),
+                selection.orderedScores().stream()
+                        .map(ReferenceCandidateScore::getReferenceAccession)
+                        .toList());
+    }
+
+    @Test
+    void rejectsWhenAllSegmentGroupsAreUnmatched() {
+        List<ReferenceCandidateScore> scores = new ArrayList<>(List.of(
+                score("SEG1", "SEGMENT_1", 0.0d, 0L),
                 score("SEG2", "SEGMENT_2", 0.0d, 0L)));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> ReferenceSelectionStageExecutor.selectBestCandidatesBySegment(scores));
 
-        assertTrue(exception.getMessage().contains("SEGMENT_2"));
+        assertTrue(exception.getMessage().contains("any candidate reference group"));
     }
 
     @Test
-    void doneHandlerReturnsDomainResultWithoutUploadingFiles() {
+    void doneHandlerReturnsDomainResultWithoutUploadingFiles() throws Exception {
         ReferenceSequence segment1 = referenceSequence("SEG1_WIN", "RNA 1");
         ReferenceSequence segment2 = referenceSequence("SEG2_WIN", "RNA 2");
         ReferenceGenome referenceGenome = ReferenceGenome.fromSelectedSequences(
@@ -603,7 +625,8 @@ class ReferenceSelectionAggregationTest {
         ReferenceSelectionStageOutput output = new ReferenceSelectionStageOutput(
                 referenceGenome,
                 List.of(),
-                comparisonReport);
+                comparisonReport,
+                List.of("SEGMENT_3"));
         StageContext stageContext = new StageContext(42L, 0, 0, 7);
         StageRunResult<ReferenceSelectionStageOutput> stageRunResult = StageRunResult.OK(
                 output,
@@ -616,6 +639,14 @@ class ReferenceSelectionAggregationTest {
         assertTrue(uploadPlan.getLeft().isEmpty());
         assertEquals(referenceGenome, uploadPlan.getRight().getSelectedReference());
         assertTrue(uploadPlan.getRight().getCandidateScores().isEmpty());
+        assertEquals(List.of("SEGMENT_3"), uploadPlan.getRight().getUnmatchedSegmentKeys());
+        assertTrue(uploadPlan.getRight().isPartial());
+
+        ReferenceSelectionStageResult restoredResult = JsonUtil.toObject(
+                JsonUtil.toJson(uploadPlan.getRight()),
+                ReferenceSelectionStageResult.class);
+        assertEquals(List.of("SEGMENT_3"), restoredResult.getUnmatchedSegmentKeys());
+        assertTrue(restoredResult.isPartial());
     }
 
     private static ReferenceCandidateScore score(

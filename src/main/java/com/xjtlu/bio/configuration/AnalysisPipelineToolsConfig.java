@@ -14,6 +14,7 @@ public class AnalysisPipelineToolsConfig {
 
     private List<String> fastp;
     private List<String> spades;
+    private List<String> flye;
 
     private List<String> amrfinder;
     private List<String> virulenceFactor;
@@ -61,11 +62,27 @@ public class AnalysisPipelineToolsConfig {
     }
 
     public List<String> getKaptive() {
-        return getCopy(kaptive);
+        return kaptive == null ? null : getCopy(kaptive);
     }
 
     public void setKaptive(List<String> kaptive) {
         this.kaptive = kaptive;
+    }
+
+    public String getKaptiveKDatabase() {
+        return kaptiveKDatabase;
+    }
+
+    public void setKaptiveKDatabase(String kaptiveKDatabase) {
+        this.kaptiveKDatabase = kaptiveKDatabase;
+    }
+
+    public String getKaptiveODatabase() {
+        return kaptiveODatabase;
+    }
+
+    public void setKaptiveODatabase(String kaptiveODatabase) {
+        this.kaptiveODatabase = kaptiveODatabase;
     }
 
     public List<String> getSeroBA() {
@@ -79,6 +96,8 @@ public class AnalysisPipelineToolsConfig {
     private List<String> ectyper;
 
     private List<String> kaptive;
+    private String kaptiveKDatabase;
+    private String kaptiveODatabase;
 
     private List<String> seroBA;
     
@@ -138,6 +157,14 @@ public class AnalysisPipelineToolsConfig {
 
     public void setSpades(List<String> spades) {
         this.spades = spades;
+    }
+
+    public List<String> getFlye() {
+        return flye == null ? null : new ArrayList<>(flye);
+    }
+
+    public void setFlye(List<String> flye) {
+        this.flye = flye;
     }
 
     public List<String> getMinimap2() {

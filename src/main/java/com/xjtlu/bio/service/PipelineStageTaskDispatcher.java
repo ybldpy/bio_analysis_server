@@ -121,8 +121,10 @@ public class PipelineStageTaskDispatcher implements Runnable {
 
     }
 
-    public boolean addTask(BioPipelineStage bioPipelineStage) {
+    public synchronized boolean addTask(BioPipelineStage bioPipelineStage) {
 
+        // Do not expose a provisional reservation as an already queued task.
+        // offer is non-blocking; concurrent submitters wait only for this attempt.
         if (!this.inStageIdSet.add(bioPipelineStage.getStageId())) {
             return true; // 已经在队列里：幂等成功
         }

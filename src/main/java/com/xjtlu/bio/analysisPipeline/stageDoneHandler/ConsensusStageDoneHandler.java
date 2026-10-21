@@ -20,6 +20,12 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
 
     @Value("${analysis-pipeline.stage.consensus.fastaFileName}")
     private String consensusOutputFileName;
+
+    @Value("${analysis-pipeline.stage.consensus.maskBedFileName}")
+    private String maskBedFileName;
+
+    @Value("${analysis-pipeline.stage.consensus.metricsFileName:${analysis-pipeline.stage.consensus.qcFileName:consensus.metrics.json}}")
+    private String metricsFileName;
     @Override
     public int getType() {
         return PIPELINE_STAGE_CONSENSUS;
@@ -30,9 +36,19 @@ public class ConsensusStageDoneHandler extends AbstractStageDoneHandler<Consensu
     protected Pair<Map<String, String>, ConsensusStageResult> buildUploadConfigAndOutputUrlMap(
             StageRunResult<ConsensusStageOutput> stageRunResult) {
         String consensusUrl = this.createStoreObjectName(stageRunResult.getStageContext(), consensusOutputFileName);
+        String maskBedUrl = this.createStoreObjectName(
+                stageRunResult.getStageContext(), maskBedFileName);
+        String metricsUrl = this.createStoreObjectName(
+                stageRunResult.getStageContext(), metricsFileName);
         return Pair.of(
-            Map.of(stageRunResult.getStageOutput().getConsensusFa(), consensusUrl),
-            new ConsensusStageResult(consensusUrl)
+            Map.of(
+                stageRunResult.getStageOutput().getConsensusFa(), consensusUrl,
+                stageRunResult.getStageOutput().getMaskBed(), maskBedUrl,
+                stageRunResult.getStageOutput().getMetricsJson(), metricsUrl),
+            new ConsensusStageResult(
+                consensusUrl,
+                maskBedUrl,
+                metricsUrl)
         );
     }
 

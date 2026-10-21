@@ -37,6 +37,7 @@ public class Constants {
 
         public static final int PIPELINE_VIRUS = 100;
         public static final int PIPELINE_VIRUS_COVID = 101;
+        public static final int PIPELINE_VIRUS_COVID_WASTEWATER = 102;
         public static final int PIPELINE_REGULAR_BACTERIA = 200;
 
         public static final int PIPELINE_SNP_ANALYSIS = 300;
@@ -385,6 +386,7 @@ public class Constants {
 
         public static final int PIPELINE_STAGE_METAGENOMICS_AMPLICON16S = 90;
         public static final int PIPELINE_STAGE_METAGENOMICS_SHORTGUN = 91;
+        public static final int PIPELINE_STAGE_COVID_WASTEWATER = 92;
 
 
         // 物种鉴定
@@ -419,6 +421,7 @@ public class Constants {
 
         public static final String PIPELINE_STAGE_NAME_REFERENCE_COMPARISON = "参考基因组比对";
         public static final String PIPELINE_STAGE_NAME_REFERENCE_SELECTION = "参考基因组选择";
+        public static final String PIPELINE_STAGE_NAME_COVID_WASTEWATER = "新冠污水分析";
 
         public static final Map<Integer, String> STAGE_NAME_MAP = Map.ofEntries(
                 Map.entry(PIPELINE_STAGE_QC, PIPELINE_STAGE_NAME_QC),
@@ -434,6 +437,7 @@ public class Constants {
                 Map.entry(PIPELINE_STAGE_READ_INSPECT, PIPELINE_STAGE_NAME_READ_INSPECT),
                 Map.entry(PIPELINE_STAGE_REFERENCE_SELECTION, PIPELINE_STAGE_NAME_REFERENCE_SELECTION),
                 Map.entry(PIPELINE_STAGE_SNP_ANNOTATION, PIPELINE_STAGE_NAME_SNP_ANNOTATION),
+                Map.entry(PIPELINE_STAGE_COVID_WASTEWATER, PIPELINE_STAGE_NAME_COVID_WASTEWATER),
                 Map.entry(PIPELINE_STAGE_DEPTH_COVERAGE, PIPELINE_STAGE_NAME_DEPTH_COVERAGE)
             );
     }

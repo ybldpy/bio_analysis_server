@@ -2,14 +2,21 @@ package com.xjtlu.bio.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SecureDirectoryStream;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -39,7 +46,9 @@ public class LocalStorageService implements StorageService {
     }
 
     private ReentrantReadWriteLock lockFor(String key) {
-        int lockIndex = Math.floorMod(key.hashCode(), LOCK_NUM);
+        // Legacy callers may spell the same object with './' or repeated separators.
+        String lockKey = Path.of(key).normalize().toString();
+        int lockIndex = Math.floorMod(lockKey.hashCode(), LOCK_NUM);
         return reentrantReadWriteLockPool[lockIndex];
     }
 
@@ -179,15 +188,186 @@ public class LocalStorageService implements StorageService {
     }
 
     @Override
+    public boolean isReadableObject(String key) {
+        ReentrantReadWriteLock lock = null;
+        try {
+            Path relative = validateManagedKey(key);
+            lock = lockFor(relative.toString());
+            lock.readLock().lock();
+            Path root = Paths.get(base).toAbsolutePath().normalize().toRealPath();
+            Path object = prepareManagedObject(root, relative, false);
+            return Files.isRegularFile(object, LinkOption.NOFOLLOW_LINKS) && Files.isReadable(object);
+        } catch (IOException | RuntimeException e) {
+            return false;
+        } finally {
+            if (lock != null) {
+                lock.readLock().unlock();
+            }
+        }
+    }
+
+    @Override
     public boolean delete(String key) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'delete'");
+        ReentrantReadWriteLock lock = null;
+        try {
+            Path relative = validateManagedKey(key);
+            lock = lockFor(relative.toString());
+            lock.writeLock().lock();
+            Path root = Paths.get(base).toAbsolutePath().normalize().toRealPath();
+            try (DirectoryStream<Path> directory = Files.newDirectoryStream(root)) {
+                if (!(directory instanceof SecureDirectoryStream<Path> secureDirectory)) {
+                    throw new IOException("Storage filesystem does not support safe file deletion");
+                }
+                return deleteRegularFile(secureDirectory, relative);
+            }
+        } catch (NoSuchFileException e) {
+            return false;
+        } catch (Exception e) {
+            logger.warn("Unable to delete local storage object {}", key, e);
+            return false;
+        } finally {
+            if (lock != null) {
+                lock.writeLock().unlock();
+            }
+        }
     }
 
     @Override
     public PutResult putObject(String key, InputStream data, PutOptions opts) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'putObject'");
+        // The configured storage tree must be service-owned, not concurrently
+        // writable by untrusted local users. Parent checks cannot make path-based
+        // publication race-free against malicious external directory replacement.
+        ReentrantReadWriteLock lock = null;
+        Path temporary = null;
+        Exception failure = null;
+        boolean published = false;
+        try {
+            Path root;
+            Path relative;
+            Path object;
+            boolean overwrite = opts == null || opts.overwrite;
+            // Own the input before validating anything, and close it before publishing.
+            try (InputStream input = Objects.requireNonNull(data, "Object input stream is required")) {
+                relative = validateManagedKey(key);
+                lock = lockFor(relative.toString());
+                lock.writeLock().lock();
+                Path configuredRoot = Paths.get(base).toAbsolutePath().normalize();
+                Files.createDirectories(configuredRoot);
+                root = configuredRoot.toRealPath();
+                object = prepareManagedObject(root, relative, true);
+                checkWritableTarget(object, overwrite);
+                // Keeping temporary files in the trusted root also isolates them from
+                // changes to nested object directories while the input is being read.
+                temporary = Files.createTempFile(root, ".object-write-", ".tmp");
+                try (OutputStream output = Files.newOutputStream(temporary,
+                        StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING,
+                        LinkOption.NOFOLLOW_LINKS)) {
+                    input.transferTo(output);
+                }
+            }
+
+            prepareManagedObject(root, relative, false);
+            checkWritableTarget(object, overwrite);
+            if (overwrite) {
+                Files.move(temporary, object, StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                // Unlike ATOMIC_MOVE, hard-link publication never replaces an existing
+                // directory entry, even across processes or for a dangling symlink.
+                // Fail closed if the filesystem does not support same-filesystem links.
+                Files.createLink(object, temporary);
+            }
+            published = true;
+        } catch (Exception e) {
+            failure = e;
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (Exception cleanupFailure) {
+                    if (failure != null) {
+                        failure.addSuppressed(cleanupFailure);
+                    } else {
+                        // Publication already committed: do not falsely report a failed
+                        // write and cause callers to discard a successfully stored object.
+                        logger.warn("Unable to clean local storage temporary file {}", temporary, cleanupFailure);
+                    }
+                }
+            }
+            if (lock != null) {
+                lock.writeLock().unlock();
+            }
+        }
+        return new PutResult(published, failure);
+    }
+
+    private Path validateManagedKey(String key) {
+        Objects.requireNonNull(key, "Object key is required");
+        Path relative = Path.of(key);
+        if (key.isBlank() || relative.isAbsolute()) {
+            throw new IllegalArgumentException("Object key must be a relative file path");
+        }
+        for (Path component : relative) {
+            if (component.toString().equals("..")) {
+                throw new IllegalArgumentException("Parent traversal is not allowed in object keys");
+            }
+        }
+        Path normalized = relative.normalize();
+        if (normalized.toString().isEmpty() || !key.equals(normalized.toString())) {
+            throw new IllegalArgumentException("Object key must be a canonical relative file path");
+        }
+        return normalized;
+    }
+
+    private Path prepareManagedObject(Path root, Path relative, boolean createParents) throws IOException {
+        Path object = root.resolve(relative).normalize();
+        if (object.equals(root) || !object.startsWith(root)) {
+            throw new IOException("Object key resolves outside the storage directory");
+        }
+        Path parent = root;
+        for (int index = 0; index < relative.getNameCount() - 1; index++) {
+            parent = parent.resolve(relative.getName(index));
+            if (createParents) {
+                try {
+                    Files.createDirectory(parent);
+                } catch (FileAlreadyExistsException ignored) {
+                    // Validate the existing entry without following symbolic links.
+                }
+            }
+            if (!Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)) {
+                throw new NotDirectoryException(parent.toString());
+            }
+        }
+        return object;
+    }
+
+    private void checkWritableTarget(Path object, boolean overwrite) throws IOException {
+        if (Files.exists(object, LinkOption.NOFOLLOW_LINKS)) {
+            if (!overwrite) {
+                throw new FileAlreadyExistsException(object.toString());
+            }
+            if (!Files.isRegularFile(object, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Only regular storage files can be overwritten");
+            }
+        }
+    }
+
+    private boolean deleteRegularFile(SecureDirectoryStream<Path> directory, Path relative) throws IOException {
+        Path name = relative.getName(0);
+        if (relative.getNameCount() > 1) {
+            try (SecureDirectoryStream<Path> child = directory.newDirectoryStream(name, LinkOption.NOFOLLOW_LINKS)) {
+                return deleteRegularFile(child, relative.subpath(1, relative.getNameCount()));
+            }
+        }
+        BasicFileAttributeView attributes = directory.getFileAttributeView(
+                name, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+        if (!attributes.readAttributes().isRegularFile()) {
+            return false;
+        }
+        // deleteFile cannot remove a directory, even if an external writer replaces
+        // the checked entry with an empty directory immediately before deletion.
+        directory.deleteFile(name);
+        return true;
     }
 
 }

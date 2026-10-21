@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_VARIANT_CALL;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 
@@ -26,6 +27,12 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
     private String vcfFileName;
     @Value("${analysis-pipeline.stage.varient.vcfIndexFileName}")
     private String vcfFileIndexFileName;
+    @Value("${analysis-pipeline.stage.varient.rawVcfFileName:variants.raw.vcf.gz}")
+    private String rawVcfFileName;
+    @Value("${analysis-pipeline.stage.varient.rawVcfIndexFileName:variants.raw.vcf.gz.tbi}")
+    private String rawVcfFileIndexFileName;
+    @Value("${analysis-pipeline.stage.varient.metricsFileName:${analysis-pipeline.stage.varient.qcFileName:variant.metrics.json}}")
+    private String metricsFileName;
 
     @Override
     public int getType() {
@@ -39,10 +46,40 @@ public class VarientStageDoneHandler extends AbstractStageDoneHandler<VariantSta
         VariantStageOutput variantStageOutput = stageRunResult.getStageOutput();
         String vcfGzUrl = this.createStoreObjectName(stageRunResult.getStage(), vcfFileName);
         String vcfTbiUrl = this.createStoreObjectName(stageRunResult.getStage(), vcfFileIndexFileName);
+        Map<String, String> uploadConfig = new LinkedHashMap<>();
+        uploadConfig.put(variantStageOutput.getVcfGz(), vcfGzUrl);
+        uploadConfig.put(variantStageOutput.getVcfTbi(), vcfTbiUrl);
+
+        String rawVcfGzUrl = null;
+        String rawVcfTbiUrl = null;
+        if (variantStageOutput.getRawVcfGz() != null
+                && !variantStageOutput.getRawVcfGz().isBlank()
+                && variantStageOutput.getRawVcfTbi() != null
+                && !variantStageOutput.getRawVcfTbi().isBlank()) {
+            rawVcfGzUrl = this.createStoreObjectName(
+                    stageRunResult.getStage(), rawVcfFileName);
+            rawVcfTbiUrl = this.createStoreObjectName(
+                    stageRunResult.getStage(), rawVcfFileIndexFileName);
+            uploadConfig.put(variantStageOutput.getRawVcfGz(), rawVcfGzUrl);
+            uploadConfig.put(variantStageOutput.getRawVcfTbi(), rawVcfTbiUrl);
+        }
+
+        String metricsUrl = null;
+        if (variantStageOutput.getMetricsJson() != null
+                && !variantStageOutput.getMetricsJson().isBlank()) {
+            metricsUrl = this.createStoreObjectName(
+                    stageRunResult.getStage(), metricsFileName);
+            uploadConfig.put(variantStageOutput.getMetricsJson(), metricsUrl);
+        }
 
         return Pair.of(
-            Map.of(variantStageOutput.getVcfGz(), vcfGzUrl, variantStageOutput.getVcfTbi(), vcfTbiUrl),
-            new VarientCallStageResult(vcfGzUrl, vcfTbiUrl)
+            uploadConfig,
+            new VarientCallStageResult(
+                    rawVcfGzUrl,
+                    rawVcfTbiUrl,
+                    vcfGzUrl,
+                    vcfTbiUrl,
+                    metricsUrl)
         );
     }
 

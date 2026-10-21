@@ -64,12 +64,18 @@ public class AssemblyStageDoneHandler extends AbstractStageDoneHandler<AssemblyS
 
 
         String contigUrl = this.createStoreObjectName(stageRunResult.getStageContext(), contigsFileName);
-        String scaffoldUrl = this.createStoreObjectName(stageRunResult.getStageContext(), scaffoldFileName);
+        AssemblyStageOutput output = stageRunResult.getStageOutput();
+        Map<String, String> uploadConfig = new HashMap<>();
+        uploadConfig.put(output.getContigPath(), contigUrl);
 
-        return Pair.of(
-            Map.of(stageRunResult.getStageOutput().getContigPath(), contigUrl, stageRunResult.getStageOutput().getScaffoldPath(), scaffoldUrl),
-            new AssemblyResult(contigUrl, scaffoldUrl)
-        );
+        // The executor may successfully produce contigs without scaffolds.
+        String scaffoldUrl = null;
+        if (output.getScaffoldPath() != null) {
+            scaffoldUrl = this.createStoreObjectName(stageRunResult.getStageContext(), scaffoldFileName);
+            uploadConfig.put(output.getScaffoldPath(), scaffoldUrl);
+        }
+
+        return Pair.of(uploadConfig, new AssemblyResult(contigUrl, scaffoldUrl));
     }
 
 

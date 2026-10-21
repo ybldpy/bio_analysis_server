@@ -1,6 +1,7 @@
 package com.xjtlu.bio.analysisPipeline.stageDoneHandler;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -8,7 +9,6 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
-import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageResult.ReadInspectStageResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
@@ -28,7 +28,8 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
     }
 
     @Override
-    public void handleStageDone(StageRunResult<ReadInspectStageOutput> stageRunResult) {
+    protected void doHandleStageDone(StageRunResult<ReadInspectStageOutput> stageRunResult)
+            throws JsonProcessingException {
 
         ReadInspectStageOutput readInspectStageOutput = stageRunResult.getStageOutput();
 
@@ -38,127 +39,57 @@ public class ReadInspectStageDoneHandler extends AbstractStageDoneHandler<ReadIn
 
         String r1Url = null;
         String r2Url = null;
+        Path r1Path = readInspectStageOutput.getR1Path();
+        Path r2Path = readInspectStageOutput.getR2Path();
 
-        Path resultDir = readInspectStageOutput.getWorkDir();
-
-
-        BioPipelineStage runStage = null;
-        if (readInspectStageOutput.getR1Path() == null) {
-            
-            try {
-                runStage = this.pipelineService
-                        .queryStageById(stageRunResult.getStageContext().getRunStageId());
-            } catch (Exception e) {
-                logger.error("Failed to query run stage in ReadInspectStageDoneHandler, stageId={}",
-                        runStageId, e);
-                handleFail(stageRunResult.getStageContext(), resultDir.toString());
-            }
-
-            // unable to find run stage. Something must happen; discard update
+        // Each slot may independently retain its original object or publish a
+        // materialized file. A missing R2 path can also mean single-end input.
+        if (r1Path == null || r2Path == null) {
+            BioPipelineStage runStage = this.pipelineService.queryStageById(runStageId);
             if (runStage == null) {
-                logger.debug("Cannot find run stage, stageId={}", runStageId);
-                handleFail(stageRunResult.getStageContext(), resultDir.toString());
+                throw new IllegalStateException("Cannot find run stage, stageId=" + runStageId);
             }
 
-            ReadInspectStageInputUrls readInspectStageInputUrls;
-            try {
-                readInspectStageInputUrls = JsonUtil.toObject(runStage.getInputUrl(),
-                        ReadInspectStageInputUrls.class);
-            } catch (JsonProcessingException e) {
-                logger.error(
-                        "Failed to parse ReadInspectStageInputUrls, stageId={}, inputUrl={}",
-                        runStageId,
-                        runStage.getInputUrl(),
-                        e);
-
-                handleFail(
-                        stageRunResult.getStageContext(),
-                        "failed to parse ReadInspectStageInputUrls, stageId=" + runStageId);
-                return;
-            }
+            ReadInspectStageInputUrls readInspectStageInputUrls = JsonUtil.toObject(
+                    runStage.getInputUrl(), ReadInspectStageInputUrls.class);
 
             r1Url = readInspectStageInputUrls.getRead1Url();
             r2Url = readInspectStageInputUrls.getRead2Url();
+        }
 
-        } else {
+        Map<String, String> uploadMap = new LinkedHashMap<>();
+        if (r1Path != null) {
+            r1Url = createStoreObjectName(stageRunResult.getStageContext(), r1Path.getFileName().toString());
+            uploadMap.put(r1Path.toString(), r1Url);
+        }
+        if (r2Path != null) {
+            r2Url = createStoreObjectName(stageRunResult.getStageContext(), r2Path.getFileName().toString());
+            uploadMap.put(r2Path.toString(), r2Url);
+        }
 
-            String r1ObjectName = createStoreObjectName(stageRunResult.getStageContext(),
-                    readInspectStageOutput.getR1Path().getFileName().toString());
-            String r2ObjectName = createStoreObjectName(stageRunResult.getStageContext(),
-                    readInspectStageOutput.getR2Path().getFileName().toString());
-
-            Map<String, String> uploadMap = Map.of(readInspectStageOutput.getR1Path().toString(), r1ObjectName,
-                    readInspectStageOutput.getR2Path().toString(), r2ObjectName);
-
+        if (!uploadMap.isEmpty()) {
             boolean uploadRes = this.batchUploadObjectsFromLocal(uploadMap);
 
             if (!uploadRes) {
-                handleFail(stageRunResult.getStageContext(), stageRunResult.getWorkDir().toString());
+                handleFail(stageRunResult.getStageContext(), stageRunResult.getWorkDir() == null
+                        ? null : stageRunResult.getWorkDir().toString(), "Failed to upload ReadInspect outputs");
                 return;
             }
-            r1Url = r1ObjectName;
-            r2Url = r2ObjectName;
         }
 
         ReadInspectStageResult readInspectStageResult = new ReadInspectStageResult();
-
-
-
-        // BaseStageParams params = null;
-        // try {
-        //     params = JsonUtil.toObject(runStage.getParameters(),BaseStageParams.class);
-        // } catch (JsonProcessingException e) {
-        //     logger.error(
-        //                 "Failed to parse Parameters, stageId={}, inputUrl={}",
-        //                 runStageId,
-        //                 runStage.getInputUrl(),
-        //                 e);
-
-        //         handleFail(
-        //                 stageRunResult.getStageContext(),
-        //                 "failed to parse Parameters, stageId=" + runStageId);
-        //         return;
-        // }
-
-
-        SequenceMeta readMeta = new SequenceMeta();
-        readMeta.setQualityEncoding(readInspectStageOutput.getQualityEncoding());
-        readMeta.setReadLenType(readInspectStageOutput.getReadLenType());
-        readInspectStageResult.setReadMeta(readMeta);
+        readInspectStageResult.setReadMeta(readInspectStageOutput.getReadMeta());
 
         readInspectStageResult.setR1Url(r1Url);
         readInspectStageResult.setR2Url(r2Url);
 
-        String serializedResult = null;
-        try {
-            serializedResult = JsonUtil.toJson(readInspectStageResult);
-        } catch (JsonProcessingException e) {
-            logger.error(
-                    "Failed to serialize ReadInspectStageResult, stageId={}, result={}",
-                    runStageId,
-                    readInspectStageResult,
-                    e);
-
-            handleFail(
-                    stageRunResult.getStageContext(),
-                    "failed to serialize ReadInspectStageResult, stageId=" + runStageId);
-            return;
+        String serializedResult = JsonUtil.toJson(readInspectStageResult);
+        int updateRes = updateStageFinish(stageRunResult.getStageContext(), serializedResult);
+        if (updateRes > 0) {
+            cleanupAfterCompletion(stageRunResult.getWorkDir() == null
+                    ? null : stageRunResult.getWorkDir().toString());
         }
-
-        try {
-            updateStageFinish(stageRunResult.getStageContext(), serializedResult);
-        } catch (Exception e) {
-
-            logger.error(
-                    "Failed to update ReadInspect stage finish status, stageId={}, serializedResult={}",
-                    runStageId,
-                    serializedResult,
-                    e);
-        }
-
-        this.deleteStageResultDir(stageRunResult.getWorkDir().toString());
-
-        pipelineService.pipelineStageDone(stageRunResult.getStageContext().getRunStageId(), true);
+        notifyStageDone(stageRunResult.getStageContext(), updateRes > 0);
 
     }
 

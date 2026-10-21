@@ -1,25 +1,25 @@
 package com.xjtlu.bio.analysisPipeline.stageResult;
 
-public class VFResult implements StageResult{
+import com.fasterxml.jackson.annotation.JsonAlias;
 
+public class VFResult implements StageResult {
 
-    private String amrTsv;
+    // Read historical result snapshots without emitting the old AMR property.
+    @JsonAlias("amrTsv")
+    private String vfTsv;
 
-    public String getAmrTsv() {
-        return amrTsv;
+    public String getVfTsv() {
+        return vfTsv;
     }
 
-    public void setAmrTsv(String amrTsv) {
-        this.amrTsv = amrTsv;
+    public void setVfTsv(String vfTsv) {
+        this.vfTsv = vfTsv;
     }
 
     public VFResult() {
     }
 
-    public VFResult(String amrTsv) {
-        this.amrTsv = amrTsv;
+    public VFResult(String vfTsv) {
+        this.vfTsv = vfTsv;
     }
-
-    
-
 }

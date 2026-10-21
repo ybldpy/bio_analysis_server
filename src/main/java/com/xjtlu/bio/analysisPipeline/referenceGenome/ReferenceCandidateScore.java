@@ -3,8 +3,14 @@ package com.xjtlu.bio.analysisPipeline.referenceGenome;
 import com.fasterxml.jackson.annotation.JsonAlias;
 
 public class ReferenceCandidateScore {
+    public enum EvidenceSource {
+        CONTIGS, READS
+    }
+
     private String referenceAccession;
     private String segmentKey;
+    private EvidenceSource evidenceSource = EvidenceSource.CONTIGS;
+    private String rejectionReason;
 
     // Percentage in [0, 100], calculated from PAF matching/alignment bases.
     @JsonAlias("averageNucleotideIdentity")
@@ -125,5 +131,21 @@ public class ReferenceCandidateScore {
 
     public void setScore(double score) {
         this.score = score;
+    }
+
+    public EvidenceSource getEvidenceSource() {
+        return evidenceSource;
+    }
+
+    public void setEvidenceSource(EvidenceSource evidenceSource) {
+        this.evidenceSource = evidenceSource;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 }

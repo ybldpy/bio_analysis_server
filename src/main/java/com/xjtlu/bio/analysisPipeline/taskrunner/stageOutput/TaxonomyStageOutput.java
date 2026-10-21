@@ -3,6 +3,8 @@ package com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput;
 import java.nio.file.Path;
 import java.util.List;
 
+import com.xjtlu.bio.analysisPipeline.stageMetrics.TaxonomyBinningMetrics;
+
 public class TaxonomyStageOutput implements StageOutput{
     
     
@@ -63,6 +65,10 @@ public class TaxonomyStageOutput implements StageOutput{
 
     private String evidenceResource;
 
+    private Path mainBinFastaPath;
+    private Path contigAssignmentReportPath;
+    private TaxonomyBinningMetrics binningMetrics;
+
 
 
 
@@ -107,11 +113,40 @@ public class TaxonomyStageOutput implements StageOutput{
         this.evidenceResource = evidenceResource;
     }
 
+    public Path getMainBinFastaPath() {
+        return mainBinFastaPath;
+    }
+
+    public void setMainBinFastaPath(Path mainBinFastaPath) {
+        this.mainBinFastaPath = mainBinFastaPath;
+    }
+
+    public Path getContigAssignmentReportPath() {
+        return contigAssignmentReportPath;
+    }
+
+    public void setContigAssignmentReportPath(Path contigAssignmentReportPath) {
+        this.contigAssignmentReportPath = contigAssignmentReportPath;
+    }
+
+    public TaxonomyBinningMetrics getBinningMetrics() {
+        return binningMetrics;
+    }
+
+    public void setBinningMetrics(TaxonomyBinningMetrics binningMetrics) {
+        this.binningMetrics = binningMetrics;
+    }
+
 
     @Override
     public Path getParentPath() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getParentPath'");
+        if (contigAssignmentReportPath != null) {
+            return contigAssignmentReportPath.toAbsolutePath().getParent();
+        }
+        if (mainBinFastaPath != null) {
+            return mainBinFastaPath.toAbsolutePath().getParent();
+        }
+        return null;
     }
 
 

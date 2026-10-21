@@ -10,14 +10,15 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -30,8 +31,10 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.Constants.SequenceInput;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls.SequenceInputMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReadInspectStageOutput;
+import com.xjtlu.bio.analysisPipeline.taskrunner.util.LongReadPlatformDetector;
 import com.xjtlu.bio.analysisPipeline.taskrunner.util.SequenceFileUtil;
 
 // class FastQIO {
@@ -75,6 +78,12 @@ public class ReadInspectStageExecutor
     private static final double NON_INTERLEAVED_MAX_RATIO = 0.1;
 
     private static final int LONG_READ_THRESHOLD = 500;
+
+    // Match an explicit negative diagnostic line, not filenames, positive messages
+    // or keywords assembled across multiple lines. Allow harmless formatting variants.
+    private static final Pattern NOT_PAIRED_MESSAGE = Pattern.compile(
+            "^\\h*Names\\h+do\\h+not\\h+appear\\h+to\\h+be\\h+(?:correctly\\h+)?paired\\h*[.!]?\\h*$",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     @Value(value = "${analysis-pipeline.tools.bbmapPath}")
     private String bbmapPath;
@@ -166,20 +175,13 @@ public class ReadInspectStageExecutor
             return false;
         }
 
-        String lower = log.toLowerCase(Locale.ROOT);
-
-        return lower.contains("not paired")
-                || lower.contains("not appear to be paired")
-                || lower.contains("do not appear to be paired")
-                || lower.contains("names do not appear to be correctly paired")
-                || lower.contains("do not appear to be correctly paired")
-                || lower.contains("not appear to be correctly paired")
-                || lower.contains("correctly paired");
+        return NOT_PAIRED_MESSAGE.matcher(log).find();
     }
 
     private StageRunResult<ReadInspectStageOutput> inspect(
             Path originalSequenceLocalPath,
-            StageExecutionInput stageExecutionInput) {
+            StageExecutionInput stageExecutionInput,
+            boolean detectPlatform) {
 
         int qualityEncoding = Constants.SequenceInput.QUALITY_ENCODING_33;
         int readLenType = Constants.SequenceInput.READ_LEN_TYPE_SHORT;
@@ -188,6 +190,7 @@ public class ReadInspectStageExecutor
         int minQualAscii = Integer.MAX_VALUE;
         int maxQualAscii = Integer.MIN_VALUE;
         int recordCount = 0;
+        List<String> sampledHeaders = detectPlatform ? new ArrayList<>(checksNum) : null;
 
         try (BufferedReader bf = SequenceFileUtil.getReader(originalSequenceLocalPath)) {
 
@@ -241,6 +244,9 @@ public class ReadInspectStageExecutor
                 }
 
                 readLenBuf[recordCount] = sequence.length();
+                if (sampledHeaders != null) {
+                    sampledHeaders.add(header);
+                }
 
                 for (int i = 0; i < quality.length(); i++) {
                     int ascii = quality.charAt(i);
@@ -264,8 +270,6 @@ public class ReadInspectStageExecutor
 
             if (medianReadLen >= LONG_READ_THRESHOLD) {
                 readLenType = Constants.SequenceInput.READ_LEN_TYPE_LONG;
-                ReadInspectStageOutput readInspectStageOutput = new ReadInspectStageOutput(qualityEncoding, readLenType,
-                        true, stageExecutionInput.input.getRead1Url(), null, null, originalSequenceLocalPath);
             } else {
                 readLenType = Constants.SequenceInput.READ_LEN_TYPE_SHORT;
             }
@@ -283,6 +287,11 @@ public class ReadInspectStageExecutor
                     stageExecutionInput.workDir);
         }
 
+        int detectedPlatform = Constants.SequencingPlatform.UNKNOWN;
+        if (detectPlatform && readLenType == Constants.SequenceInput.READ_LEN_TYPE_LONG) {
+            detectedPlatform = LongReadPlatformDetector.detect(sampledHeaders);
+        }
+
         String originalFormat = getFormatPostFix(originalSequenceLocalPath.getFileName().toString(), -1);
 
         Path bbmapReformatSHLog = stageExecutionInput.workDir.resolve("bbmapReformatSH.log");
@@ -297,26 +306,19 @@ public class ReadInspectStageExecutor
 
         deinterleavedCmd.add("vint=t");
         deinterleavedCmd.add("ain=t");
+        // Only split records; preserve their original quality scores, including N bases.
+        deinterleavedCmd.add("changequality=f");
         deinterleavedCmd.add("ow=t");
 
         ExecuteResult executeResult = _execute(deinterleavedCmd, stageExecutionInput.workDir, null, bbmapReformatSHLog);
 
-        if (executeResult.ex != null) {
-
-            String failReason = "BBMap reformat.sh 执行异常，无法判断 FASTQ 是否为 interleaved。"
-                    + "错误信息：" + executeResult.ex.getMessage();
-
-            logger.error(
-                    "BBMap reformat.sh execution exception, stage = {}, cmd = {}, workDir = {}, logPath = {}, log = {}",
-                    stageExecutionInput.stageContext.getRunStageId(),
-                    String.join(" ", deinterleavedCmd),
-                    stageExecutionInput.workDir,
-                    bbmapReformatSHLog,
-                    executeResult.ex);
-
+        if (executeResult.ex instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+            return this.runFail(stageExecutionInput.stageContext,
+                    "BBMap reformat.sh 执行被中断，不再进行本地判断",
+                    executeResult.ex, stageExecutionInput.workDir);
         }
 
-        if (executeResult.runCode != 0) {
+        if (executeResult.ex != null || executeResult.runCode != 0) {
             // check the log.
             String bbmapLog = "";
             try {
@@ -331,44 +333,49 @@ public class ReadInspectStageExecutor
                         e);
             }
 
-            if (containsNotPairedMessage(bbmapLog)) {
+            if (executeResult.ex == null && containsNotPairedMessage(bbmapLog)) {
                 // FASTQ 基础格式前面已经检查过；
                 // BBMap 只是判断它不是 interleaved paired-end。
                 // 所以按 single-end 保持原文件。
-                return OK(
-                        new ReadInspectStageOutput(
-                                qualityEncoding,
-                                readLenType,
-                                true,
-                                stageExecutionInput.input.getRead1Url(),
-                                null,
-                                null,
-                                stageExecutionInput.workDir),
-                        stageExecutionInput);
-            } else {
-                // real execution problem:
-                // 可能是 BBMap 路径错误、Java 环境问题、权限问题、gzip 损坏、文件格式异常等。
-                String failReason = "BBMap reformat.sh 执行失败，无法判断是否为 interleaved FASTQ。"
-                        + " exitCode=" + executeResult.runCode;
-
-                if (executeResult.ex != null) {
-                    return this.runFail(
-                            stageExecutionInput.stageContext,
-                            failReason,
-                            executeResult.ex,
-                            stageExecutionInput.workDir);
-                }
-
-                return this.runFail(
-                        stageExecutionInput.stageContext,
-                        failReason,
+                ReadInspectStageOutput output = new ReadInspectStageOutput(
+                        qualityEncoding,
+                        readLenType,
+                        true,
+                        stageExecutionInput.input.getRead1Url(),
+                        null,
+                        null,
                         stageExecutionInput.workDir);
+                output.getReadMeta().setSequencingPlatform(detectedPlatform);
+                return OK(output, stageExecutionInput);
             }
 
+            logger.warn("BBMap inspection failed; falling back to local inspection, stage = {}, exitCode = {}, logPath = {}",
+                    stageExecutionInput.stageContext.getRunStageId(), executeResult.runCode,
+                    bbmapReformatSHLog, executeResult.ex);
+            StageRunResult<ReadInspectStageOutput> fallback = inspect(
+                    originalSequenceLocalPath, true, stageExecutionInput);
+            if (fallback.isSuccess()) {
+                // Keep the metadata already detected by the main inspection path.
+                ReadInspectStageOutput output = fallback.getStageOutput();
+                output.setQualityEncoding(qualityEncoding);
+                output.setReadLenType(readLenType);
+                output.getReadMeta().setSequencingPlatform(detectedPlatform);
+            } else {
+                fallback.setFailReason("BBMap 检查失败（exitCode=" + executeResult.runCode
+                        + "），本地判断也失败：" + fallback.getFailReason());
+            }
+            return fallback;
         }
 
-        return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, false, originalFormat, r1Path, r2Path,
-                stageExecutionInput.workDir), stageExecutionInput);
+        if (!Files.isRegularFile(r1Path) || !Files.isRegularFile(r2Path)) {
+            return this.runFail(stageExecutionInput.stageContext,
+                    "BBMap 返回成功但缺少拆分后的 R1/R2 文件", stageExecutionInput.workDir);
+        }
+
+        ReadInspectStageOutput output = new ReadInspectStageOutput(qualityEncoding, readLenType, false, originalFormat,
+                r1Path, r2Path, stageExecutionInput.workDir);
+        output.getReadMeta().setSequencingPlatform(detectedPlatform);
+        return OK(output, stageExecutionInput);
 
     }
 
@@ -427,6 +434,15 @@ public class ReadInspectStageExecutor
                     break;
                 }
 
+                if (Thread.currentThread().isInterrupted()) {
+                    return this.runFail(stageExecutionInput.stageContext, "本地判断被中断",
+                            stageExecutionInput.workDir);
+                }
+                if (!header.startsWith("@")) {
+                    return this.runFail(stageExecutionInput.stageContext, "FASTQ header 格式错误",
+                            stageExecutionInput.workDir);
+                }
+
                 if (possibleInterleaved) {
                     recordBuffer[recordBufferIndex][0] = header;
                 }
@@ -447,6 +463,12 @@ public class ReadInspectStageExecutor
 
                         if (i == 0) {
                             currentRecordLen = followingLine.length();
+                        } else if (i == 1 && !followingLine.startsWith("+")) {
+                            return this.runFail(stageExecutionInput.stageContext, "FASTQ plus line 格式错误",
+                                    stageExecutionInput.workDir);
+                        } else if (i == 2 && followingLine.length() != currentRecordLen) {
+                            return this.runFail(stageExecutionInput.stageContext, "FASTQ sequence 和 quality 长度不一致",
+                                    stageExecutionInput.workDir);
                         }
                     }
 
@@ -493,7 +515,7 @@ public class ReadInspectStageExecutor
                         } else {
                             // not paired with previous, probably start of new pair. Discard old and start a
                             // new one.
-                            recordBuffer[0] = recordBuffer[1];
+                            recordBuffer[0] = recordBuffer[1].clone();
                             recordBufferIndex = 0;
                             r1HeaderId = substractedId;
                         }
@@ -545,6 +567,10 @@ public class ReadInspectStageExecutor
             if (possibleInterleaved) {
 
                 if (checkedInterleaved) {
+                    if (recordTravered > paired * 2) {
+                        logger.warn("Local inspection skipped {} unpaired reads while splitting, stage = {}",
+                                recordTravered - paired * 2, stageExecutionInput.stageContext.getRunStageId());
+                    }
                     return OK(
                             new ReadInspectStageOutput(qualityEncoding, readLenType, false, null, r1, r2,
                                     stageExecutionInput.workDir),
@@ -572,8 +598,12 @@ public class ReadInspectStageExecutor
                         }
                     }
 
-                    return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, true, originalSequenceUrl, null,
-                            null,
+                    if (recordTravered > paired * 2) {
+                        logger.warn("Local inspection skipped {} unpaired reads while splitting, stage = {}",
+                                recordTravered - paired * 2, stageExecutionInput.stageContext.getRunStageId());
+                    }
+                    return OK(new ReadInspectStageOutput(qualityEncoding, readLenType, false, null, r1,
+                            r2,
                             stageExecutionInput.workDir), stageExecutionInput);
                 }
             } else {
@@ -601,25 +631,65 @@ public class ReadInspectStageExecutor
 
         String read1Url = readInspectStageInputUrls.getRead1Url();
         String read2Url = readInspectStageInputUrls.getRead2Url();
+        SequenceInputMeta declaredMeta = readInspectStageInputUrls.getSequenceInputMeta();
+        Integer declaredPlatform = declaredMeta == null ? null : declaredMeta.getSequencingPlatform();
+        boolean hasDeclaredPlatform = declaredPlatform != null
+                && declaredPlatform != Constants.SequencingPlatform.UNKNOWN;
 
-        if (StringUtils.isNotBlank(read2Url)) {
-            return OK(new ReadInspectStageOutput(
-                    Constants.SequenceInput.QUALITY_ENCODING_33,
-                    Constants.SequenceInput.READ_LEN_TYPE_SHORT,
-                    true,
-                    read1Url,
-                    null, null,
-                    stageExecutionInput.workDir),
-                    stageExecutionInput);
+        StageRunResult<ReadInspectStageOutput> result;
+        try {
+            if (StringUtils.isNotBlank(read2Url)) {
+                Path r1Path = unpackReadSlot(read1Url, "r1", stageExecutionInput);
+                Path r2Path = unpackReadSlot(read2Url, "r2", stageExecutionInput);
+                result = OK(new ReadInspectStageOutput(
+                        Constants.SequenceInput.QUALITY_ENCODING_33,
+                        Constants.SequenceInput.READ_LEN_TYPE_SHORT,
+                        r1Path == null && r2Path == null,
+                        read1Url,
+                        r1Path, r2Path,
+                        stageExecutionInput.workDir),
+                        stageExecutionInput);
+            } else {
+                Path readLocalPath = stageExecutionInput.inputDir.resolve(
+                        read1Url.substring(read1Url.lastIndexOf("/") + 1));
+                loadInput(Map.of(read1Url, readLocalPath));
+
+                Path inspectedPath = SequenceFileUtil.unpackZipIfNeeded(readLocalPath, ".fastq");
+                result = this.inspect(inspectedPath, stageExecutionInput, !hasDeclaredPlatform);
+                if (result.isSuccess() && !inspectedPath.equals(readLocalPath)
+                        && result.getStageOutput().getR1Path() == null) {
+                    // Inputs are deleted before DoneHandler runs; keep published reads in workDir.
+                    Path outputRead = stageExecutionInput.workDir.resolve("r1.fastq");
+                    Files.copy(inspectedPath, outputRead, StandardCopyOption.REPLACE_EXISTING);
+                    result.getStageOutput().setR1Path(outputRead);
+                    result.getStageOutput().setUseOriginalSequence(false);
+                }
+            }
+        } catch (IOException e) {
+            return runFail(stageExecutionInput.stageContext, "Failed to unpack ZIP read input",
+                    e, stageExecutionInput.workDir);
         }
 
-        Path readLocalPath = stageExecutionInput.inputDir.resolve(read1Url.substring(read1Url.lastIndexOf("/") + 1));
+        if (result.isSuccess() && hasDeclaredPlatform) {
+            // 明确指定的平台直接采用；null、未传和 UNKNOWN 均保留 inspect 的检测结果。
+            // 不读取 parameters.readMeta 中的预设值。
+            result.getStageOutput().getReadMeta().setSequencingPlatform(declaredPlatform);
+        }
+        return result;
 
-        Map<String, Path> loadMap = Map.of(read1Url, readLocalPath);
-        loadInput(loadMap);
+    }
 
-        return this.inspect(readLocalPath, stageExecutionInput);
-
+    private Path unpackReadSlot(String objectName, String mate, StageExecutionInput input)
+            throws IOException, LoadFailException {
+        if (!SequenceFileUtil.isZip(objectName)) {
+            return null;
+        }
+        Path archive = input.inputDir.resolve(mate + ".fastq.zip");
+        loadInput(Map.of(objectName, archive));
+        Path extracted = SequenceFileUtil.unpackZipIfNeeded(archive, ".fastq");
+        Path published = input.workDir.resolve(mate + ".fastq");
+        Files.copy(extracted, published, StandardCopyOption.REPLACE_EXISTING);
+        return published;
     }
 
     @Override
