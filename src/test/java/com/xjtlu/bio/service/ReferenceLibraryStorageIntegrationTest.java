@@ -76,7 +76,7 @@ class ReferenceLibraryStorageIntegrationTest {
         ReflectionTestUtils.setField(storage, "base", storageRoot.toString());
         transactionManager = new DiskLifecycleTransactionManager();
         attemptedInsert = new AtomicReference<>();
-        service = new ReferenceLibraryService(mapper, storage, transactionManager);
+        service = new ReferenceLibraryService(mapper, storage, transactionManager, mock(ReferenceTargetScopeService.class));
         ReflectionTestUtils.setField(service, "maxUploadBytes", 4096L);
         when(mapper.insertSelective(any(BioReferenceSequence.class))).thenAnswer(invocation -> {
             BioReferenceSequence row = invocation.getArgument(0);

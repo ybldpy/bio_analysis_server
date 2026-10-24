@@ -248,10 +248,27 @@ public class PipelineService {
             String serializedParameters = null;
 
             try{
+                if (analysisPipelineParameters != null
+                        && analysisPipelineParameters.get("enabledReferenceIds") != null) {
+                    AnalysisPipelineParameters parameters;
+                    try {
+                        parameters = JsonUtil.mapToPojo(analysisPipelineParameters, AnalysisPipelineParameters.class);
+                    } catch (IllegalArgumentException e) {
+                        return new Result<>(Result.PARAMETER_NOT_VALID, null,
+                                "流水线参数无效，enabledReferenceIds 必须为整数 ID 数组");
+                    }
+                    findCandidateReferences(batchCreateAnalysisPipelineRequest.getPipelineType(),
+                            parameters.getTaxId(), parameters.getEnabledReferenceIds());
+                }
                 serializedParameters = JsonUtil.toJson(analysisPipelineParameters);
+            } catch (IllegalArgumentException e) {
+                return new Result<>(Result.PARAMETER_NOT_VALID, null, e.getMessage());
             }catch(JsonProcessingException e){
                 logger.error("基因分析流水线参数 JSON 序列化失败。参数对象内容: {}", analysisPipelineParameters, e);
                 return new Result<List<Long>>(Result.INTERNAL_FAIL, null, "创建流水线失败");
+            } catch (Exception e) {
+                logger.error("Failed to validate batch pipeline reference candidates", e);
+                return new Result<>(Result.INTERNAL_FAIL, null, "参考范围校验失败，请稍后重试");
             }
             bioAnalysisPipeline.setPipelineParameters(serializedParameters);
             bioAnalysisPipelines.add(bioAnalysisPipeline);
@@ -381,11 +398,24 @@ public class PipelineService {
     public Result<Long> createPipeline(CreateAnalysisPipelineRequest createAnalysisPipelineRequest) {
 
         String serializedStageParameters = null;
+        PipelineStageParameters parameters = createAnalysisPipelineRequest.getPipelineStageParameters() == null
+                ? new PipelineStageParameters() : createAnalysisPipelineRequest.getPipelineStageParameters();
+
+        // Validate explicit scope before inserting anything. Defaults remain resolved at startup.
+        if (parameters.getEnabledReferenceIds() != null) {
+            try {
+                findCandidateReferences(createAnalysisPipelineRequest.getPipelineType(), parameters.getTaxId(),
+                        parameters.getEnabledReferenceIds());
+            } catch (IllegalArgumentException e) {
+                return new Result<>(Result.PARAMETER_NOT_VALID, -1L, e.getMessage());
+            } catch (Exception e) {
+                logger.error("Failed to validate pipeline reference candidates", e);
+                return new Result<>(Result.INTERNAL_FAIL, -1L, "参考范围校验失败，请稍后重试");
+            }
+        }
 
         try {
-            serializedStageParameters = JsonUtil.toJson(
-                    createAnalysisPipelineRequest.getPipelineStageParameters() == null ? new PipelineStageParameters()
-                            : createAnalysisPipelineRequest.getPipelineStageParameters());
+            serializedStageParameters = JsonUtil.toJson(parameters);
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             logger.error("[Creating pipeline] serializing pipeline stage parameters expcetion", e);
@@ -588,6 +618,17 @@ public class PipelineService {
     private Result startSNPAnalysisPipeline(BioAnalysisPipeline bioAnalysisPipeline, List<BioPipelineInputFile> inputs)
             throws JsonProcessingException {
 
+        try {
+            AnalysisPipelineParameters parameters = JsonUtil.toObject(bioAnalysisPipeline.getPipelineParameters(),
+                    AnalysisPipelineParameters.class);
+            validateEnabledReferenceIds(bioAnalysisPipeline.getPipelineType(),
+                    parameters == null ? null : parameters.getEnabledReferenceIds());
+        } catch (IllegalArgumentException e) {
+            return new Result(Result.PARAMETER_NOT_VALID, null, e.getMessage());
+        } catch (JsonProcessingException e) {
+            return new Result(Result.PARAMETER_NOT_VALID, null, "流水线参数格式无效，请检查 enabledReferenceIds 等配置");
+        }
+
         List<PipelineSampleInput> pipelineSampleInputs = paritionSubPipelineSampleInputFiles(inputs);
         PipelineConfigurations pipelineConfigurations = new PipelineConfigurations();
 
@@ -754,21 +795,22 @@ public class PipelineService {
             return new Result(Result.BUSINESS_FAIL, null, "新冠污水分析仅支持一个 READ 样本，请上传新冠扩增子 FASTQ");
         }
 
-        AnalysisPipelineParameters pipelineParameters = JsonUtil.toObject(bioAnalysisPipeline.getPipelineParameters(),
-                AnalysisPipelineParameters.class);
-        if (covidWastewater && pipelineParameters == null) {
-            pipelineParameters = new AnalysisPipelineParameters();
+        AnalysisPipelineParameters pipelineParameters;
+        List<BioReferenceSequence> refseqList;
+        try {
+            pipelineParameters = JsonUtil.toObject(bioAnalysisPipeline.getPipelineParameters(),
+                    AnalysisPipelineParameters.class);
+            if (pipelineParameters == null) {
+                pipelineParameters = new AnalysisPipelineParameters();
+            }
+            // Revalidate saved IDs at startup; disabled/missing references must not trigger fallback.
+            refseqList = findCandidateReferences(bioAnalysisPipeline.getPipelineType(), pipelineParameters.getTaxId(),
+                    pipelineParameters.getEnabledReferenceIds());
+        } catch (IllegalArgumentException e) {
+            return new Result(Result.PARAMETER_NOT_VALID, null, e.getMessage());
+        } catch (JsonProcessingException e) {
+            return new Result(Result.PARAMETER_NOT_VALID, null, "流水线参数格式无效，请检查 enabledReferenceIds 等配置");
         }
-
-
-
-        if(bioAnalysisPipeline.getPipelineType() == PIPELINE_METAGENOME_SHOTGUN || bioAnalysisPipeline.getPipelineType() == PIPELINE_METAGENOME_AMPLicon16s){
-
-
-        }
-
-        List<BioReferenceSequence> refseqList = covidWastewater ? Collections.emptyList() : findCandidateReferences(
-                bioAnalysisPipeline.getPipelineType(), pipelineParameters.getTaxId());
 
         boolean requiresReferenceSelection = bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS
                 || bioAnalysisPipeline.getPipelineType() == PipelineType.PIPELINE_VIRUS_COVID;
@@ -1070,12 +1112,42 @@ public class PipelineService {
     }
 
     private List<BioReferenceSequence> findCandidateReferences(int pipelineType, Integer taxId) {
+        return findCandidateReferences(pipelineType, taxId, null);
+    }
+
+    private void validateEnabledReferenceIds(int pipelineType, List<Long> enabledReferenceIds) {
+        if (enabledReferenceIds == null) {
+            return;
+        }
+        if (pipelineType != PipelineType.PIPELINE_VIRUS && pipelineType != PipelineType.PIPELINE_VIRUS_COVID) {
+            throw new IllegalArgumentException("enabledReferenceIds 仅支持普通病毒和新冠流水线（100、101）");
+        }
+        if (enabledReferenceIds.isEmpty()) {
+            throw new IllegalArgumentException("enabledReferenceIds 不能为空数组；不指定范围时请不传或传 null");
+        }
+        Set<Long> uniqueIds = new HashSet<>();
+        for (Long id : enabledReferenceIds) {
+            if (id == null || id <= 0) {
+                throw new IllegalArgumentException("enabledReferenceIds 中的 ID 必须为正整数");
+            }
+            if (!uniqueIds.add(id)) {
+                throw new IllegalArgumentException("enabledReferenceIds 中存在重复 ID：" + id);
+            }
+        }
+    }
+
+    private List<BioReferenceSequence> findCandidateReferences(int pipelineType, Integer taxId,
+            List<Long> enabledReferenceIds) {
+        validateEnabledReferenceIds(pipelineType, enabledReferenceIds);
         if (pipelineType == PipelineType.PIPELINE_VIRUS_COVID_WASTEWATER) {
             // Wastewater resources are managed by backend configuration, not target selection.
             return Collections.emptyList();
         }
         if (pipelineType == PipelineType.PIPELINE_VIRUS_COVID) {
             taxId = COVID_19_TAX_ID;
+        }
+        if (enabledReferenceIds != null && (taxId == null || taxId <= 0)) {
+            throw new IllegalArgumentException("指定 enabledReferenceIds 时仍需提供有效的目标 taxId");
         }
         if (taxId == null) {
             return Collections.emptyList();
@@ -1095,7 +1167,28 @@ public class PipelineService {
         } else {
             criteria.andTaxIdEqualTo(taxId);
         }
-        return bioReferenceSequenceMapper.selectByExampleWithBLOBs(example);
+        if (enabledReferenceIds != null) {
+            criteria.andReferenceIdIn(enabledReferenceIds);
+        }
+        List<BioReferenceSequence> candidates = bioReferenceSequenceMapper.selectByExampleWithBLOBs(example);
+        if (enabledReferenceIds == null) {
+            return candidates;
+        }
+        if (candidates == null) {
+            throw new IllegalStateException("Reference candidate query returned null");
+        }
+        Map<Long, BioReferenceSequence> candidatesById = new HashMap<>();
+        for (BioReferenceSequence candidate : candidates) {
+            candidatesById.put(candidate.getReferenceId(), candidate);
+        }
+        List<Long> unavailable = enabledReferenceIds.stream()
+                .filter(id -> !candidatesById.containsKey(id)).toList();
+        if (!unavailable.isEmpty()) {
+            throw new IllegalArgumentException("enabledReferenceIds 中存在不可用的参考 ID（不存在、全局禁用或不属于所选目标）："
+                    + unavailable);
+        }
+        // Honor the exact whitelist and its order; never silently broaden or partially accept it.
+        return enabledReferenceIds.stream().map(candidatesById::get).toList();
     }
 
     private List<BioPipelineStage> buildRegularPipelineStages(long pipelineId, int pipelineType,

@@ -1,13 +1,26 @@
 package com.xjtlu.bio.requestParameters;
 
 import java.util.Map;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 public class AnalysisPipelineParameters {
 
     private Long referenceId;
     private Integer taxId;
+    // 创建时保存 ID；启动时重新校验并生成 Stage 的参考快照。
+    @JsonDeserialize(using = EnabledReferenceIdsDeserializer.class)
+    private List<Long> enabledReferenceIds;
+
+    public List<Long> getEnabledReferenceIds() {
+        return enabledReferenceIds;
+    }
+
+    public void setEnabledReferenceIds(List<Long> enabledReferenceIds) {
+        this.enabledReferenceIds = enabledReferenceIds;
+    }
     // 用户的平台声明；null、未传和 UNKNOWN（0）均表示未指定平台，允许自动检测。
     private Integer sequencingPlatform;
 

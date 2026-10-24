@@ -41,8 +41,8 @@ public class RefSeqService {
     @Value("${refSeqService.virusRefseqsDir}")
     private String virusRefseqsDir;
 
-    public final static int VIRUS_TYPE = 1;
-    public final static int BACTERIA_TYPE = 2;
+    public final static int VIRUS_TYPE = 0;
+    public final static int BACTERIA_TYPE = 1;
 
     public String getVirusRefSeqObjectName(BioRefseq bioRefseq) {
         return PREFIX_VIRUS_REFSEQ_OBJECT_NAME + bioRefseq.getRefseqPath();

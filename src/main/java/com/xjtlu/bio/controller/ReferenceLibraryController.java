@@ -28,7 +28,8 @@ public class ReferenceLibraryController {
 
     @InitBinder("uploadReferenceRequest")
     public void bindUploadMetadata(WebDataBinder binder) {
-        binder.setAllowedFields("accession", "taxId", "orgType", "organismName", "segment", "completeness", "enabled");
+        binder.setAllowedFields("accession", "taxId", "orgType", "organismName", "segment", "completeness", "enabled",
+                "targetTaxId", "pipelineType", "confirmAddTaxonomyMember");
     }
 
     @PostMapping("/query")

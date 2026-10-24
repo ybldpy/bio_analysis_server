@@ -34,6 +34,9 @@ import com.xjtlu.bio.requestParameters.ReferenceLibraryQuery;
 import com.xjtlu.bio.requestParameters.UploadReferenceRequest;
 import com.xjtlu.bio.response.ReferenceLibraryItem;
 import com.xjtlu.bio.response.ReferenceLibraryPage;
+import com.xjtlu.bio.response.ReferenceMembershipConfirmationResult;
+import com.xjtlu.bio.service.ReferenceTargetScopeService.MembershipConfirmationRequiredException;
+import com.xjtlu.bio.service.ReferenceTargetScopeService.Scope;
 import com.xjtlu.bio.service.reference.ReferenceFastaUpload;
 import com.xjtlu.bio.utils.JsonUtil;
 
@@ -44,14 +47,16 @@ public class ReferenceLibraryService {
     private final BioReferenceSequenceMapper mapper;
     private final StorageService storage;
     private final TransactionTemplate transactions;
+    private final ReferenceTargetScopeService targetScopes;
 
     @Value("${reference-library.max-upload-bytes:268435456}")
     private long maxUploadBytes = 268435456L;
 
     public ReferenceLibraryService(BioReferenceSequenceMapper mapper, StorageService storage,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager, ReferenceTargetScopeService targetScopes) {
         this.mapper = mapper;
         this.storage = storage;
+        this.targetScopes = targetScopes;
         transactions = new TransactionTemplate(transactionManager);
         transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         // File cleanup must follow this import's actual completion, not an outer transaction.
@@ -71,8 +76,10 @@ public class ReferenceLibraryService {
                 return invalid("orgType 仅支持 1（病毒）或 2（细菌）");
             }
             String accession = optionalText(query.getAccession(), 64, "accession");
+            Scope scope = resolveScope(query.getTargetTaxId(), query.getPipelineType());
             BioReferenceSequenceExample example = new BioReferenceSequenceExample();
             var criteria = example.createCriteria();
+            if (scope != null) criteria.andTaxIdIn(scope.memberTaxIds());
             if (query.getTaxId() != null) criteria.andTaxIdEqualTo(query.getTaxId());
             if (query.getOrgType() != null) criteria.andOrgTypeEqualTo(query.getOrgType());
             if (query.getEnabled() != null) criteria.andEnabledEqualTo(query.getEnabled());
@@ -131,7 +138,7 @@ public class ReferenceLibraryService {
         Path temporary = null;
         String objectKey = null;
         boolean stored = false;
-        AtomicBoolean insertAttempted = new AtomicBoolean(false);
+        AtomicBoolean databaseAttempted = new AtomicBoolean(false);
         AtomicInteger completion = new AtomicInteger(TransactionSynchronization.STATUS_UNKNOWN);
         BioReferenceSequence row = null;
         try {
@@ -139,6 +146,18 @@ public class ReferenceLibraryService {
             if (file == null || file.isEmpty()) return invalid("请上传非空 FASTA 文件");
             if (maxUploadBytes < 1) throw new IllegalStateException("Reference upload size limit is not configured correctly");
             if (file.getSize() > maxUploadBytes) return invalid("上传文件超过服务端大小限制");
+
+            Scope scope = resolveScope(request.getTargetTaxId(), request.getPipelineType());
+            boolean confirmed = Boolean.TRUE.equals(request.getConfirmAddTaxonomyMember());
+            if (scope == null && confirmed) {
+                return invalid("confirmAddTaxonomyMember=true 时必须指定 targetTaxId 和 pipelineType");
+            }
+            if (scope != null) {
+                if (row.getOrgType() != RefSeqService.VIRUS_TYPE) {
+                    return invalid("病毒专项上传的 orgType 必须为 1（病毒）");
+                }
+                targetScopes.checkMembership(scope, row.getTaxId(), confirmed);
+            }
 
             BioReferenceSequenceExample duplicate = new BioReferenceSequenceExample();
             duplicate.createCriteria().andAccessionEqualTo(row.getAccession());
@@ -177,7 +196,13 @@ public class ReferenceLibraryService {
                     @Override
                     public void afterCompletion(int result) { completion.set(result); }
                 });
-                insertAttempted.set(true);
+                // Membership writes also belong to this transaction; track uncertain outcomes
+                // before attempting them, even if the reference insert has not been reached.
+                databaseAttempted.set(true);
+                if (scope != null) {
+                    targetScopes.ensureMembership(request.getTargetTaxId(), request.getPipelineType(),
+                            record.getTaxId(), confirmed);
+                }
                 if (mapper.insertSelective(record) != 1 || record.getReferenceId() == null) {
                     throw new IllegalStateException("Reference insert did not return exactly one generated ID");
                 }
@@ -186,8 +211,12 @@ public class ReferenceLibraryService {
         } catch (Exception e) {
             // The transaction outcome takes precedence over exception type. An
             // uncertain commit must not be reported as a safe retry.
-            boolean uncertainCommit = insertAttempted.get()
+            boolean uncertainCommit = databaseAttempted.get()
                     && completion.get() == TransactionSynchronization.STATUS_UNKNOWN;
+            if (!uncertainCommit && e instanceof MembershipConfirmationRequiredException confirmation) {
+                return new ReferenceMembershipConfirmationResult(confirmation.getTargetTaxId(),
+                        confirmation.getPipelineType(), confirmation.getTaxId());
+            }
             if (!uncertainCommit && e instanceof IllegalArgumentException) return invalid(e.getMessage());
             if (!uncertainCommit && e instanceof DuplicateKeyException) return duplicate();
             logger.error("Reference import failed, accession={}, objectKey={}, transactionStatus={}",
@@ -197,7 +226,7 @@ public class ReferenceLibraryService {
             }
             return internal("参考导入失败，请稍后重试");
         } finally {
-            if (stored && (!insertAttempted.get() || completion.get() == TransactionSynchronization.STATUS_ROLLED_BACK)) {
+            if (stored && (!databaseAttempted.get() || completion.get() == TransactionSynchronization.STATUS_ROLLED_BACK)) {
                 cleanupStoredFile(objectKey);
             }
             if (temporary != null) {
@@ -205,6 +234,16 @@ public class ReferenceLibraryService {
                 catch (IOException e) { logger.error("Failed to clean owned reference import directory: {}", temporary, e); }
             }
         }
+    }
+
+    private Scope resolveScope(Integer targetTaxId, Integer pipelineType) {
+        if (targetTaxId == null && pipelineType == null) return null;
+        Scope scope = targetScopes.resolve(targetTaxId, pipelineType);
+        if (scope == null || scope.memberTaxIds().isEmpty()) {
+            // A malformed resolver result must never turn a scoped request into a global query.
+            throw new IllegalStateException("Target scope resolution returned no scope");
+        }
+        return scope;
     }
 
     private static BioReferenceSequence importMetadata(UploadReferenceRequest request) {

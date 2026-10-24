@@ -76,7 +76,7 @@ class ReferenceLibraryServiceTest {
         mapper = mock(BioReferenceSequenceMapper.class);
         storage = mock(StorageService.class);
         transactions = new RecordingTransactionManager();
-        service = new ReferenceLibraryService(mapper, storage, transactions);
+        service = new ReferenceLibraryService(mapper, storage, transactions, mock(ReferenceTargetScopeService.class));
         objects = new LinkedHashMap<>();
         objects.put(EXISTING_KEY, EXISTING_BYTES);
         when(storage.putObject(anyString(), any(InputStream.class), any(StorageService.PutOptions.class)))

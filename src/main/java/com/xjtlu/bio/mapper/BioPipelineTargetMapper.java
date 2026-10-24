@@ -4,7 +4,9 @@ import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
@@ -33,4 +35,24 @@ public interface BioPipelineTargetMapper {
     List<BioPipelineTarget> selectEnabledVirusTargets(
             @Param("virusPipelineType") int virusPipelineType,
             @Param("covidPipelineType") int covidPipelineType);
+
+    /** Enabled controls the target picker, not whether a registered scope remains valid. */
+    @Select("""
+            SELECT id, label, tax_id, pipeline_type, enabled, sort_order, created_at, updated_at
+            FROM bio_pipeline_target
+            WHERE tax_id = #{taxId} AND pipeline_type = #{pipelineType}
+            """)
+    @ResultMap("BioPipelineTargetResult")
+    BioPipelineTarget selectByTaxIdAndPipelineType(
+            @Param("taxId") int taxId, @Param("pipelineType") int pipelineType);
+
+    /** Membership belongs to taxId, so every pipeline type sharing it takes the same locks. */
+    @Select("""
+            SELECT id
+            FROM bio_pipeline_target
+            WHERE tax_id = #{taxId}
+            ORDER BY id FOR UPDATE
+            """)
+    @Options(flushCache = Options.FlushCachePolicy.TRUE, useCache = false)
+    List<Long> lockIdsByTaxId(@Param("taxId") int taxId);
 }

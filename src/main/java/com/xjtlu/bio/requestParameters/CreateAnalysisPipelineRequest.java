@@ -2,12 +2,26 @@ package com.xjtlu.bio.requestParameters;
 
 
 import jakarta.validation.constraints.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.util.List;
 import java.util.Map;
 
 public class CreateAnalysisPipelineRequest {
 
     public static class PipelineStageParameters {
         private Integer taxId;
+
+        /** null 沿用全局启用范围；非 null 为本次流水线明确允许使用的参考 ID。 */
+        @JsonDeserialize(using = EnabledReferenceIdsDeserializer.class)
+        private List<Long> enabledReferenceIds;
+
+        public List<Long> getEnabledReferenceIds() {
+            return enabledReferenceIds;
+        }
+
+        public void setEnabledReferenceIds(List<Long> enabledReferenceIds) {
+            this.enabledReferenceIds = enabledReferenceIds;
+        }
 
         /**
          * 平台编码见 Constants.SequencingPlatform；null、未传或 UNKNOWN（0）均表示未声明，
