@@ -601,16 +601,17 @@ class ReferenceSelectionAggregationTest {
     }
 
     @Test
-    void rejectsWhenAllSegmentGroupsAreUnmatched() {
+    void retainsEmptySelectionAndDiagnosticsWhenAllSegmentGroupsAreUnmatched() {
         List<ReferenceCandidateScore> scores = new ArrayList<>(List.of(
                 score("SEG1", "SEGMENT_1", 0.0d, 0L),
                 score("SEG2", "SEGMENT_2", 0.0d, 0L)));
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> ReferenceSelectionStageExecutor.selectBestCandidatesBySegment(scores));
+        ReferenceSelectionStageExecutor.CandidateSelection selection =
+                ReferenceSelectionStageExecutor.selectBestCandidatesBySegment(scores);
 
-        assertTrue(exception.getMessage().contains("any candidate reference group"));
+        assertTrue(selection.winners().isEmpty());
+        assertEquals(2, selection.orderedScores().size());
+        assertEquals(List.of("SEGMENT_1", "SEGMENT_2"), selection.unmatchedSegmentKeys());
     }
 
     @Test

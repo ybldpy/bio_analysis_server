@@ -23,6 +23,7 @@ import com.xjtlu.bio.analysisPipeline.Constants.SequenceInput;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceCandidateScore;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceCandidateScore.EvidenceSource;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSelectionOutcome;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.SegmentOrdinalResolver;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceSelectionStageInputUrls;
@@ -225,18 +226,13 @@ public class ReferenceSelectionStageExecutor extends
                     "Failed to write reference-selection report", e);
         }
 
-        if (selectedSequences.isEmpty()) {
-            return runFail(stageExecutionInput.stageContext,
-                    "Minimap2 did not find a usable match for any candidate reference group. "
-                            + "readFallbackStatus=" + readFallbackMetrics.status()
-                            + ", report=" + selectionReportPath,
-                    stageExecutionInput.workDir);
-        }
-        ReferenceGenome selectedGenome;
-        try {
-            selectedGenome = ReferenceGenome.fromSelectedSequences(selectedSequences);
-        } catch (IllegalArgumentException e) {
-            return runFail(stageExecutionInput.stageContext, e.getMessage(), stageExecutionInput.workDir);
+        ReferenceGenome selectedGenome = null;
+        if (!selectedSequences.isEmpty()) {
+            try {
+                selectedGenome = ReferenceGenome.fromSelectedSequences(selectedSequences);
+            } catch (IllegalArgumentException e) {
+                return runFail(stageExecutionInput.stageContext, e.getMessage(), stageExecutionInput.workDir);
+            }
         }
 
         ReferenceSelectionStageOutput output = new ReferenceSelectionStageOutput(
@@ -245,6 +241,12 @@ public class ReferenceSelectionStageExecutor extends
                 selectionReportPath,
                 selection.unmatchedSegmentKeys());
         output.setReadFallbackMetrics(readFallbackMetrics);
+        output.setOutcome(selectedGenome == null ? ReferenceSelectionOutcome.NO_MATCH
+                : output.isPartial() ? ReferenceSelectionOutcome.PARTIAL : ReferenceSelectionOutcome.MATCHED);
+        if (selectedGenome == null) {
+            logger.info("Reference selection completed without a usable reference, stageId={}, readFallbackStatus={}",
+                    stageExecutionInput.stageContext.getRunStageId(), readFallbackMetrics.status());
+        }
         return OK(output, stageExecutionInput);
     }
 
@@ -483,12 +485,8 @@ public class ReferenceSelectionStageExecutor extends
 
     static CandidateSelection selectBestCandidatesBySegment(
             List<ReferenceCandidateScore> candidateScores) {
-        CandidateSelection selection = orderCandidatesBySegment(candidateScores);
-        if (selection.winners().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Minimap2 did not find a usable match for any candidate reference group");
-        }
-        return selection;
+        // An empty winner list is a valid business outcome, not an execution failure.
+        return orderCandidatesBySegment(candidateScores);
     }
 
     private static CandidateSelection orderCandidatesBySegment(List<ReferenceCandidateScore> candidateScores) {

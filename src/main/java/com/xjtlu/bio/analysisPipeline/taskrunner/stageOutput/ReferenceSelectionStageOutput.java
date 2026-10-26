@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceCandidateScore;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSelectionOutcome;
 import com.xjtlu.bio.analysisPipeline.stageMetrics.ReferenceSelectionReadFallbackMetrics;
 
 public class ReferenceSelectionStageOutput implements StageOutput {
@@ -14,6 +15,7 @@ public class ReferenceSelectionStageOutput implements StageOutput {
     private Path comparisonReportPath;
     private List<String> unmatchedSegmentKeys = new ArrayList<>();
     private ReferenceSelectionReadFallbackMetrics readFallbackMetrics;
+    private ReferenceSelectionOutcome outcome;
 
     public ReferenceSelectionStageOutput() {
     }
@@ -69,7 +71,16 @@ public class ReferenceSelectionStageOutput implements StageOutput {
     }
 
     public boolean isPartial() {
-        return !unmatchedSegmentKeys.isEmpty();
+        return selectedReference != null && !selectedReference.getSequences().isEmpty()
+                && !unmatchedSegmentKeys.isEmpty();
+    }
+
+    public ReferenceSelectionOutcome getOutcome() {
+        return outcome;
+    }
+
+    public void setOutcome(ReferenceSelectionOutcome outcome) {
+        this.outcome = outcome;
     }
 
     public ReferenceSelectionReadFallbackMetrics getReadFallbackMetrics() {

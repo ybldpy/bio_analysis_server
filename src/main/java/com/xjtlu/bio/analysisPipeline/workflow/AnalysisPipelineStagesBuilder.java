@@ -23,7 +23,6 @@ import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.MappingInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.QcStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
-import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceSelectionStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls.SequenceInputMeta;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.StageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.TaxonomyStageInputUrls;
@@ -485,45 +484,20 @@ public class AnalysisPipelineStagesBuilder {
         boolean isInputRead = pipelineInput.getSequenceLevel() == Constants.SequenceInput.SEQUENCE_LEVEL_READ;
         BioPipelineStage startStage = null;
 
-        // qc: 如果sample为read 就做
-        // 如果不是就直接reference comparsion
+        // FASTA inputs compare all configured references directly; reads retain selection.
         if (!isInputRead) {
-            BioPipelineStage referenceSelectionStage = createStage(PIPELINE_STAGE_REFERENCE_SELECTION);
-
             BioPipelineStage referenceComparisonStage = createStage(PIPELINE_STAGE_REFERENCE_COMPARISON);
-
-            ReferenceSelectionStageInputUrls selectionInputUrls = new ReferenceSelectionStageInputUrls();
-            selectionInputUrls.setContigsUrl(pipelineInput.getR1());
-
             ReferenceComparisonStageInputUrls comparisonInputUrls = new ReferenceComparisonStageInputUrls();
             comparisonInputUrls.setFastaUrl(pipelineInput.getR1());
-
-            ReferenceSelectionStageParameters selectionParameters = (ReferenceSelectionStageParameters) stageParams(
-                    PIPELINE_STAGE_REFERENCE_SELECTION, pipelineConfigurations);
-
-            List<ReferenceSequence> candidates = pipelineConfigurations.getCandidateReferenceSequences();
-
-            selectionParameters.setCandidateReferences(candidates);
-
-            referenceSelectionStage.setParameters(
-                    JsonUtil.toJson(selectionParameters));
-
-            referenceSelectionStage.setInputUrl(
-                    JsonUtil.toJson(selectionInputUrls));
-
-            referenceComparisonStage.setInputUrl(
-                    JsonUtil.toJson(comparisonInputUrls));
-
-            referenceSelectionStage.setStageIndex(0);
-            referenceComparisonStage.setStageIndex(-1);
-
-            stages.add(referenceSelectionStage);
+            ReferenceComparisonStageParameters comparisonParameters = (ReferenceComparisonStageParameters) stageParams(
+                    PIPELINE_STAGE_REFERENCE_COMPARISON, pipelineConfigurations);
+            comparisonParameters.setCandidateReferences(pipelineConfigurations.getCandidateReferenceSequences());
+            referenceComparisonStage.setParameters(JsonUtil.toJson(comparisonParameters));
+            referenceComparisonStage.setInputUrl(JsonUtil.toJson(comparisonInputUrls));
+            referenceComparisonStage.setStageIndex(0);
+            initializeStageParameters(referenceComparisonStage, pipelineInput, pipelineConfigurations,
+                    BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS);
             stages.add(referenceComparisonStage);
-            for (BioPipelineStage stage : stages) {
-                initializeStageParameters(stage, pipelineInput, pipelineConfigurations,
-                        BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS);
-            }
-
             return stages;
         }
 

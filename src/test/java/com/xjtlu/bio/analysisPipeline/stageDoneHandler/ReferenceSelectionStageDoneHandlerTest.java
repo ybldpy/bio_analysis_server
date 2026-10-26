@@ -4,11 +4,13 @@ import static com.xjtlu.bio.analysisPipeline.Constants.StageStatus.PIPELINE_STAG
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_ASSEMBLY;
 import static com.xjtlu.bio.analysisPipeline.Constants.StageType.PIPELINE_STAGE_REFERENCE_SELECTION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -27,9 +29,12 @@ import org.mockito.ArgumentCaptor;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceCandidateScore;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSelectionOutcome;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageResult.AssemblyResult;
 import com.xjtlu.bio.analysisPipeline.stageResult.ReferenceSelectionStageResult;
+import com.xjtlu.bio.analysisPipeline.stageMetrics.ReferenceSelectionReadFallbackMetrics;
+import com.xjtlu.bio.analysisPipeline.stageMetrics.ReferenceSelectionReadFallbackMetrics.Status;
 import com.xjtlu.bio.analysisPipeline.taskrunner.StageRunResult;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReferenceSelectionStageOutput;
 import com.xjtlu.bio.entity.BioPipelineStage;
@@ -88,6 +93,43 @@ class ReferenceSelectionStageDoneHandlerTest {
         assertEquals(List.of("SEGMENT_2"), restored.getUnmatchedSegmentKeys());
         assertTrue(restored.isPartial());
         verify(pipelineService).pipelineStageDone(42L, true);
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void persistsNoMatchAsFinishedWithDiagnosticsAndSuccessfulCallback() throws Exception {
+        Path workDir = Files.createDirectory(tempDir.resolve("no-match"));
+        ReferenceCandidateScore score = new ReferenceCandidateScore(
+                "TEST_REFERENCE_1", "SEGMENT_1", 0.0d, 0.0d,
+                0L, 100L, 0L, 0L, 0, 0.0d);
+        score.setRejectionReason("NO_ALIGNMENT_PASSING_MAPPING_QUALITY");
+        ReferenceSelectionStageOutput output = new ReferenceSelectionStageOutput(
+                null, List.of(score), workDir.resolve("reference_selection.tsv"), List.of("SEGMENT_1"));
+        output.setOutcome(ReferenceSelectionOutcome.NO_MATCH);
+        ReferenceSelectionReadFallbackMetrics metrics = new ReferenceSelectionReadFallbackMetrics(
+                Status.COMPLETED, "TEST_POLICY", 0.5d, 80.0d, 20, 1, 0);
+        output.setReadFallbackMetrics(metrics);
+        StageRunResult<ReferenceSelectionStageOutput> runResult = StageRunResult.OK(
+                output, new StageContext(42L, 3, PIPELINE_STAGE_REFERENCE_SELECTION, 7), workDir);
+
+        handler.handleStageDone(runResult);
+
+        BioPipelineStage patch = capturedUpdate().getUpdateStage();
+        assertEquals(PIPELINE_STAGE_STATUS_FINISHED, patch.getStatus());
+        assertEquals(4, patch.getVersion());
+        assertNotNull(patch.getEndTime());
+        assertNull(patch.getOutputUrl());
+        ReferenceSelectionStageResult restored = JsonUtil.toObject(
+                patch.getOutputInline(), ReferenceSelectionStageResult.class);
+        assertEquals(ReferenceSelectionOutcome.NO_MATCH, restored.getOutcome());
+        assertNull(restored.getSelectedReference());
+        assertFalse(restored.isPartial());
+        assertEquals(List.of("SEGMENT_1"), restored.getUnmatchedSegmentKeys());
+        assertEquals(metrics, restored.getReadFallbackMetrics());
+        assertEquals("NO_ALIGNMENT_PASSING_MAPPING_QUALITY", restored.getCandidateScores().get(0).getRejectionReason());
+        assertFalse(Files.exists(workDir));
+        verify(pipelineService).pipelineStageDone(42L, true);
+        verify(pipelineService, never()).recordStageFailure(any(), any());
         verifyNoInteractions(storageService);
     }
 

@@ -136,9 +136,12 @@ class AssemblyInputFormatIntegrationTest {
                         new ReferenceComparisonStageInputUrls(key), comparisonParams));
                 row.put("referenceComparisonSuccess", aligned.isSuccess());
                 assertTrue(aligned.isSuccess(), aligned.getErrorLog());
+                assertEquals(1, aligned.getStageOutput().getComparisons().size());
+                var compared = aligned.getStageOutput().getComparisons().get(0);
                 Map<String, Path> artifacts = Map.of("serotypeTsv", typed.getStageOutput().getResultPath(),
-                        "alignmentPaf", aligned.getStageOutput().getAlignmentPafPath(),
-                        "differenceTsv", aligned.getStageOutput().getDifferenceTsvPath());
+                        "alignmentPaf", compared.alignmentPafPath(),
+                        "differenceTsv", compared.differenceTsvPath(),
+                        "comparisonTsv", aligned.getStageOutput().getComparisonTsvPath());
                 Map<String, String> normalized = new LinkedHashMap<>(), hashes = new LinkedHashMap<>();
                 for (var artifact : artifacts.entrySet()) {
                     assertTrue(Files.size(artifact.getValue()) > 0, artifact.getKey());

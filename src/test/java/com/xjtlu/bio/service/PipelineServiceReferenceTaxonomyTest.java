@@ -269,7 +269,10 @@ class PipelineServiceReferenceTaxonomyTest {
     @Test
     void restartingExistingStageUsesSavedReferencesWithoutLoadingAvailabilityAgain() throws Exception {
         BioReferenceSequence first = reference(901L, UNCONFIGURED_TAX_ID, "SAVED", "Fixture saved");
-        BioPipelineStage selection = buildSelection(List.of(first), SEQUENCE_LEVEL_ASSEMBLY, UNCONFIGURED_TAX_ID);
+        BioPipelineStage selection = buildSelection(List.of(first), SEQUENCE_LEVEL_READ, UNCONFIGURED_TAX_ID);
+        // Simulate a saved legacy Selection entry. New assembly pipelines now
+        // create Comparison directly, so that builder cannot supply this fixture.
+        selection.setStageIndex(0);
         selection.setStageId(410L);
         selection.setVersion(5);
         selection.setStatus(PIPELINE_STAGE_STATUS_FAIL);

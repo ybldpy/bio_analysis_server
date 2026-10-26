@@ -334,7 +334,8 @@ class PipelineStagePollerPendingTest {
         UpdateStageCommand command = assertSinglePersistedSkip(serotype);
         assertEquals(4, command.getUpdateStage().getVersion());
         assertNotNull(command.getUpdateStage().getEndTime());
-        assertEquals(Map.of("skipReason", "Taxonomy is OUT_PANEL; serotyping is not applicable"),
+        assertEquals(Map.of("skipReason", "Taxonomy is OUT_PANEL; serotyping is not applicable",
+                "causeStageId", 2, "causeStatus", PIPELINE_STAGE_STATUS_NOT_APPLICABLE),
                 JsonUtil.toMap(command.getUpdateStage().getOutputInline()));
         assertNull(command.getUpdateStage().getInputUrl());
         assertNull(command.getUpdateStage().getParameters());

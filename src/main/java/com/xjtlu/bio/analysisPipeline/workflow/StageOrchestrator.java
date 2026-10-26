@@ -6,6 +6,7 @@ import com.mysql.cj.x.protobuf.MysqlxCrud.OrderOrBuilder;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.context.domain.TaxonomyContext;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSelectionOutcome;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AMRInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.AssemblyInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ConsensusStageInputUrls;
@@ -59,6 +60,8 @@ public class StageOrchestrator {
             Map.entry(PIPELINE_STAGE_QC, Set.of(PIPELINE_STAGE_READ_INSPECT)),
             Map.entry(PIPELINE_STAGE_ASSEMBLY, Set.of(PIPELINE_STAGE_QC)),
             Map.entry(PIPELINE_STAGE_REFERENCE_SELECTION, Set.of(PIPELINE_STAGE_ASSEMBLY)),
+            // Persisted two-stage FASTA pipelines still require selection. New comparison
+            // entries use stageIndex=0 and bypass these dependencies in makePlan.
             Map.entry(PIPELINE_STAGE_REFERENCE_COMPARISON, Set.of(PIPELINE_STAGE_REFERENCE_SELECTION)),
             Map.entry(PIPELINE_STAGE_MAPPING, Set.of(PIPELINE_STAGE_REFERENCE_SELECTION)),
             Map.entry(PIPELINE_STAGE_VARIANT_CALL, Set.of(PIPELINE_STAGE_MAPPING)),
@@ -233,14 +236,35 @@ public class StageOrchestrator {
             BioPipelineStage referenceSelectionStage)
             throws JsonProcessingException, MissingUpstreamException {
 
-        BioPipelineStage referenceComparisonStage = findStageFromStages(
-                allStages, PIPELINE_STAGE_REFERENCE_COMPARISON);
-        if (referenceComparisonStage != null) {
-            return makePlan(allStages, referenceComparisonStage.getStageId());
+        List<BioPipelineStage> dependentStages = allStages.stream()
+                .filter(stage -> requiresDirectUpstream(stage, PIPELINE_STAGE_REFERENCE_SELECTION)).toList();
+        if (dependentStages.isEmpty()) {
+            return noDownstreamPlan();
+        }
+        if (isNoMatchReferenceSelection(referenceSelectionStage)) {
+            OrchestratePlan plan = new OrchestratePlan();
+            for (BioPipelineStage dependentStage : dependentStages) {
+                plan.updateStageCommands.addAll(
+                        skipForNoReference(dependentStage, referenceSelectionStage).updateStageCommands);
+            }
+            return plan;
         }
 
-        BioPipelineStage mappingStage = findStageFromStages(allStages, PIPELINE_STAGE_MAPPING);
-        return makePlan(allStages, mappingStage.getStageId());
+        BioPipelineStage referenceComparisonStage = findStageFromStages(
+                dependentStages, PIPELINE_STAGE_REFERENCE_COMPARISON);
+        if (referenceComparisonStage != null) {
+            return Objects.equals(referenceComparisonStage.getStatus(), PIPELINE_STAGE_STATUS_PENDING)
+                    ? makePlan(allStages, referenceComparisonStage.getStageId())
+                    : new OrchestratePlan();
+        }
+
+        BioPipelineStage mappingStage = findStageFromStages(dependentStages, PIPELINE_STAGE_MAPPING);
+        if (mappingStage == null) {
+            return noDownstreamPlan();
+        }
+        return Objects.equals(mappingStage.getStatus(), PIPELINE_STAGE_STATUS_PENDING)
+                ? makePlan(allStages, mappingStage.getStageId())
+                : new OrchestratePlan();
     }
 
     // 病毒才做mapping后续阶段
@@ -577,6 +601,15 @@ public class StageOrchestrator {
 
         BioPipelineStage referenceSelectionStage = findStageFromStages(
                 stages, PIPELINE_STAGE_REFERENCE_SELECTION);
+        ReferenceSelectionStageResult selectionResult = referenceSelectionResult(referenceSelectionStage);
+        if (selectionResult.getSelectedReference() == null) {
+            throw new MissingUpstreamException("Selected reference genome does not exist");
+        }
+        return selectionResult.getSelectedReference();
+    }
+
+    private ReferenceSelectionStageResult referenceSelectionResult(BioPipelineStage referenceSelectionStage)
+            throws JsonProcessingException, MissingUpstreamException {
         if (referenceSelectionStage == null) {
             throw new MissingUpstreamException("Reference selection result does not exist");
         }
@@ -592,11 +625,72 @@ public class StageOrchestrator {
 
         ReferenceSelectionStageResult selectionResult = JsonUtil.toObject(
                 serializedResult, ReferenceSelectionStageResult.class);
-        if (selectionResult == null || selectionResult.getSelectedReference() == null) {
+        if (selectionResult == null
+                || (selectionResult.getSelectedReference() == null
+                        && selectionResult.getOutcome() != ReferenceSelectionOutcome.NO_MATCH)) {
             throw new MissingUpstreamException("Selected reference genome does not exist");
         }
+        if (selectionResult.getOutcome() == ReferenceSelectionOutcome.NO_MATCH
+                && selectionResult.getSelectedReference() != null) {
+            throw new MissingUpstreamException("NO_MATCH reference selection result contains a selected reference");
+        }
 
-        return selectionResult.getSelectedReference();
+        return selectionResult;
+    }
+
+    private boolean isNoMatchReferenceSelection(BioPipelineStage referenceSelectionStage)
+            throws JsonProcessingException, MissingUpstreamException {
+        return referenceSelectionStage != null
+                && Objects.equals(referenceSelectionStage.getStatus(), PIPELINE_STAGE_STATUS_FINISHED)
+                && referenceSelectionResult(referenceSelectionStage).getOutcome() == ReferenceSelectionOutcome.NO_MATCH;
+    }
+
+    private boolean requiresDirectUpstream(BioPipelineStage stage, int upstreamType) {
+        // Entry stages have their own inputs and do not inherit REQUIRES.
+        return stage != null && !Objects.equals(stage.getStageIndex(), 0)
+                && REQUIRES.getOrDefault(stage.getStageType(), Set.of()).contains(upstreamType);
+    }
+
+    private OrchestratePlan skipForNoReference(BioPipelineStage stage, BioPipelineStage selectionStage)
+            throws JsonProcessingException {
+        return skipForUnavailableUpstream(stage, Map.of(
+                "skipReason", "Reference selection returned NO_MATCH; a usable reference is required",
+                "causeStageId", selectionStage.getStageId(),
+                "causeOutcome", ReferenceSelectionOutcome.NO_MATCH));
+    }
+
+    private OrchestratePlan skipForNotApplicableUpstream(BioPipelineStage stage, BioPipelineStage upstream)
+            throws JsonProcessingException {
+        String reason = "Required upstream stage is NOT_APPLICABLE";
+        if (stage.getStageType() == PIPELINE_STAGE_SEROTYPE
+                && upstream.getStageType() == PIPELINE_STAGE_TAXONOMY && isOutOfPanelTaxonomy(upstream)) {
+            reason = "Taxonomy is OUT_PANEL; serotyping is not applicable";
+        }
+        return skipForUnavailableUpstream(stage, Map.of(
+                "skipReason", reason,
+                "causeStageId", upstream.getStageId(),
+                "causeStatus", PIPELINE_STAGE_STATUS_NOT_APPLICABLE));
+    }
+
+    private OrchestratePlan skipForUnavailableUpstream(BioPipelineStage stage, Map<String, Object> reason)
+            throws JsonProcessingException {
+        OrchestratePlan plan = new OrchestratePlan();
+        if (!Objects.equals(stage.getStatus(), PIPELINE_STAGE_STATUS_PENDING)) {
+            return plan;
+        }
+
+        int currentVersion = stage.getVersion();
+        Date endTime = new Date();
+        String outputInline = JsonUtil.toJson(reason);
+        BioPipelineStage patch = new BioPipelineStage();
+        applyUpdatesToUpdateStage(patch, stage, null, null,
+                PIPELINE_STAGE_STATUS_NOT_APPLICABLE, currentVersion);
+        patch.setEndTime(endTime);
+        patch.setOutputInline(outputInline);
+        stage.setEndTime(endTime);
+        stage.setOutputInline(outputInline);
+        plan.updateStageCommands.add(new UpdateStageCommand(patch, stage.getStageId(), currentVersion));
+        return plan;
     }
 
     private String selectedReferenceAnnotationUrl(ReferenceGenome referenceGenome) {
@@ -613,7 +707,7 @@ public class StageOrchestrator {
             throws JsonMappingException, JsonProcessingException, MissingUpstreamException {
 
         if (!Objects.equals(taxonomyStage.getStatus(), PIPELINE_STAGE_STATUS_FINISHED)
-                && !isOutOfPanelTaxonomy(taxonomyStage)) {
+                && !Objects.equals(taxonomyStage.getStatus(), PIPELINE_STAGE_STATUS_NOT_APPLICABLE)) {
             return new OrchestratePlan();
         }
 
@@ -629,13 +723,19 @@ public class StageOrchestrator {
 
     }
 
-    private boolean isOutOfPanelTaxonomy(BioPipelineStage taxonomyStage) throws JsonProcessingException {
+    private boolean isOutOfPanelTaxonomy(BioPipelineStage taxonomyStage) {
         if (taxonomyStage == null
                 || !Objects.equals(taxonomyStage.getStatus(), PIPELINE_STAGE_STATUS_NOT_APPLICABLE)) {
             return false;
         }
-        TaxonomyResult result = JsonUtil.toObject(taxonomyStage.getOutputInline(), TaxonomyResult.class);
-        return result != null && result.getStatus() == Constants.TaxonomyClassification.STATUS_OUT_PANEL;
+        try {
+            TaxonomyResult result = JsonUtil.toObject(taxonomyStage.getOutputInline(), TaxonomyResult.class);
+            return result != null && result.getStatus() == Constants.TaxonomyClassification.STATUS_OUT_PANEL;
+        } catch (JsonProcessingException e) {
+            // Optional detail only: a persisted NOT_APPLICABLE dependency is enough
+            // to skip its consumer, even if no usable result payload was saved.
+            return false;
+        }
     }
 
     private OrchestratePlan planForReferenceSelection(List<BioPipelineStage> stages,
@@ -967,14 +1067,16 @@ public class StageOrchestrator {
             }
         }
 
-        // Resolve this terminal dependency before readiness checks, so callbacks
-        // and polling both skip Serotype without treating skipped stages as ready
-        // for execution elsewhere in the DAG.
-        if (runStage.getStageType() == PIPELINE_STAGE_SEROTYPE
-                && isOutOfPanelTaxonomy(findStageFromStages(stages, PIPELINE_STAGE_TAXONOMY))) {
-            return Objects.equals(runStage.getStatus(), PIPELINE_STAGE_STATUS_PENDING)
-                    ? skipSerotype(runStage, "Taxonomy is OUT_PANEL; serotyping is not applicable")
-                    : new OrchestratePlan();
+        if (runStage == null) {
+            throw new MissingUpstreamException("Stage does not exist: " + runStageId);
+        }
+        // Normal polling only supplies PENDING stages. The service also calls this
+        // planner for a QUEUING entry's first dispatch and an explicit FAIL retry.
+        // Skip propagation itself remains PENDING-only in skipForUnavailableUpstream.
+        if (!Objects.equals(runStage.getStatus(), PIPELINE_STAGE_STATUS_PENDING)
+                && !Objects.equals(runStage.getStatus(), PIPELINE_STAGE_STATUS_QUEUING)
+                && !Objects.equals(runStage.getStatus(), PIPELINE_STAGE_STATUS_FAIL)) {
+            return new OrchestratePlan();
         }
 
         // pipeline entrance stage
@@ -988,6 +1090,21 @@ public class StageOrchestrator {
             plan.updateStageCommands.add(new UpdateStageCommand(patch, runStageId, currentVersion));
             plan.runStages.add(runStage);
             return plan;
+        }
+
+        // Only immediate consumers interpret Selection's business outcome.
+        // Later descendants inherit their own required upstream's skip status.
+        if (requiresDirectUpstream(runStage, PIPELINE_STAGE_REFERENCE_SELECTION)) {
+            BioPipelineStage selection = findStageFromStages(stages, PIPELINE_STAGE_REFERENCE_SELECTION);
+            if (isNoMatchReferenceSelection(selection)) {
+                return skipForNoReference(runStage, selection);
+            }
+        }
+        for (BioPipelineStage upstream : stages) {
+            if (requiresDirectUpstream(runStage, upstream.getStageType())
+                    && Objects.equals(upstream.getStatus(), PIPELINE_STAGE_STATUS_NOT_APPLICABLE)) {
+                return skipForNotApplicableUpstream(runStage, upstream);
+            }
         }
 
         this.validateUpstreamStages(stages, runStageId);

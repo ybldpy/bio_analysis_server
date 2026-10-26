@@ -30,11 +30,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.Constants;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReadInspectStageInputUrls;
-import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceSelectionStageInputUrls;
+import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.VarientCallParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.MappingParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.QcParameters;
+import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceSelectionStageParameters;
 import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder.PipelineConfigurations;
 import com.xjtlu.bio.analysisPipeline.workflow.AnalysisPipelineStagesBuilder.PipelineSampleInput;
@@ -44,6 +45,25 @@ import com.xjtlu.bio.requestParameters.CreateAnalysisPipelineRequest.PipelineSta
 import com.xjtlu.bio.utils.JsonUtil;
 
 class AnalysisPipelineStagesBuilderTest {
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void allStagesHaveNamesForReadAndAssemblyInputs(boolean virus) throws Exception {
+        PipelineSampleInput assemblyInput = new PipelineSampleInput("sample.contigs.fasta", null);
+        assemblyInput.setSequenceLevel(SEQUENCE_LEVEL_ASSEMBLY);
+
+        for (PipelineSampleInput input : List.of(readsInput(), assemblyInput)) {
+            List<BioPipelineStage> stages = buildStages(virus, input, emptyConfigurations());
+
+            assertFalse(stages.isEmpty());
+            for (BioPipelineStage stage : stages) {
+                String context = "virus=" + virus + ", sequenceLevel=" + input.getSequenceLevel()
+                        + ", stageType=" + stage.getStageType();
+                assertNotNull(stage.getStageName(), context);
+                assertFalse(stage.getStageName().isBlank(), context);
+            }
+        }
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
@@ -393,9 +413,8 @@ class AnalysisPipelineStagesBuilderTest {
         assertNotNull(restored.getExtraParams().get(EXTRA_PARAM_STAGE_PARAMS));
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {SEQUENCE_LEVEL_READ, SEQUENCE_LEVEL_ASSEMBLY})
-    void writesConfiguredSelectionParametersForBothInputLevels(int sequenceLevel) throws Exception {
+    @Test
+    void writesConfiguredSelectionParametersForReads() throws Exception {
         ReferenceSequence candidate = new ReferenceSequence();
         candidate.setAccession("CANDIDATE_1");
         PipelineConfigurations configurations = new PipelineConfigurations();
@@ -408,7 +427,7 @@ class AnalysisPipelineStagesBuilderTest {
                         "minimumReadSequenceIdentity", 92.0d,
                         "minimumReadMappingQuality", 25))));
         PipelineSampleInput input = new PipelineSampleInput("sample.input", null);
-        input.setSequenceLevel(sequenceLevel);
+        input.setSequenceLevel(SEQUENCE_LEVEL_READ);
 
         BioPipelineStage selection = AnalysisPipelineStagesBuilder.buildVirusStages(input, configurations)
                 .stream().filter(stage -> stage.getStageType() == PIPELINE_STAGE_REFERENCE_SELECTION)
@@ -416,6 +435,7 @@ class AnalysisPipelineStagesBuilderTest {
         ReferenceSelectionStageParameters parameters = JsonUtil.toObject(
                 selection.getParameters(), ReferenceSelectionStageParameters.class);
 
+        assertEquals(Constants.StageType.PIPELINE_STAGE_NAME_REFERENCE_SELECTION, selection.getStageName());
         assertEquals(6, parameters.getThreads());
         assertFalse(parameters.isReadFallbackEnabled());
         assertEquals(0.75d, parameters.getMinimumReadReferenceCoverage());
@@ -425,13 +445,12 @@ class AnalysisPipelineStagesBuilderTest {
                 .map(ReferenceSequence::getAccession).toList());
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {SEQUENCE_LEVEL_READ, SEQUENCE_LEVEL_ASSEMBLY})
-    void absentSelectionConfigurationUsesDefaults(int sequenceLevel) throws Exception {
+    @Test
+    void absentSelectionConfigurationUsesDefaultsForReads() throws Exception {
         PipelineConfigurations configurations = new PipelineConfigurations();
         configurations.setCandidateReferenceSequences(List.of());
         PipelineSampleInput input = new PipelineSampleInput("sample.input", null);
-        input.setSequenceLevel(sequenceLevel);
+        input.setSequenceLevel(SEQUENCE_LEVEL_READ);
 
         BioPipelineStage selection = AnalysisPipelineStagesBuilder.buildVirusStages(input, configurations)
                 .stream().filter(stage -> stage.getStageType() == PIPELINE_STAGE_REFERENCE_SELECTION)
@@ -445,24 +464,80 @@ class AnalysisPipelineStagesBuilderTest {
         assertEquals(20, parameters.getMinimumReadMappingQuality());
     }
 
-    @Test
-    void assemblyInputStartsAtSelectionWithoutReadStagesOrReadUrls() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"sample.contigs.fasta", "sample.contigs.fasta.gz"})
+    void assemblyInputContainsOnlyComparisonWithAllCandidateSnapshots(String fastaUrl) throws Exception {
+        ReferenceSequence first = new ReferenceSequence();
+        first.setAccession("CANDIDATE_1");
+        first.setPath("references/candidate-1.fasta");
+        first.setRawMetadata("first candidate snapshot");
+        ReferenceSequence second = new ReferenceSequence();
+        second.setAccession("CANDIDATE_2");
+        second.setPath("references/candidate-2.fasta");
+        second.setAnnotationFile("references/candidate-2.gff");
         PipelineConfigurations configurations = new PipelineConfigurations();
-        configurations.setCandidateReferenceSequences(List.of());
-        PipelineSampleInput input = new PipelineSampleInput("sample.contigs.fasta", null);
+        configurations.setCandidateReferenceSequences(List.of(first, second));
+        PipelineSampleInput input = new PipelineSampleInput(fastaUrl, null);
         input.setSequenceLevel(SEQUENCE_LEVEL_ASSEMBLY);
 
         List<BioPipelineStage> stages = AnalysisPipelineStagesBuilder.buildVirusStages(input, configurations);
 
-        assertEquals(List.of(PIPELINE_STAGE_REFERENCE_SELECTION, PIPELINE_STAGE_REFERENCE_COMPARISON),
+        assertEquals(List.of(PIPELINE_STAGE_REFERENCE_COMPARISON),
+                stages.stream().map(BioPipelineStage::getStageType).toList());
+        BioPipelineStage comparison = stages.get(0);
+        assertEquals(Constants.StageType.PIPELINE_STAGE_NAME_REFERENCE_COMPARISON, comparison.getStageName());
+        assertEquals(0, comparison.getStageIndex());
+        assertEquals(Constants.StageStatus.PIPELINE_STAGE_STATUS_PENDING, comparison.getStatus());
+        ReferenceComparisonStageInputUrls comparisonInput = JsonUtil.toObject(
+                comparison.getInputUrl(), ReferenceComparisonStageInputUrls.class);
+        assertEquals(fastaUrl, comparisonInput.getFastaUrl());
+        ReferenceComparisonStageParameters parameters = JsonUtil.toObject(
+                comparison.getParameters(), ReferenceComparisonStageParameters.class);
+        assertEquals(JsonUtil.toJson(List.of(first, second)), JsonUtil.toJson(parameters.getCandidateReferences()));
+        assertNull(parameters.getReferenceGenome(), "FASTA comparison must not preselect a reference");
+        assertEquals(BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS, parameters.getAnalysisTargetType());
+        assertEquals(SEQUENCE_LEVEL_ASSEMBLY, parameters.getReadMeta().getSequenceLevel());
+    }
+
+    @Test
+    void assemblyComparisonPreservesStage43OverridesAndInitializesAuthoritativeMetadata() throws Exception {
+        ReferenceSequence candidate = new ReferenceSequence();
+        candidate.setAccession("CONFIGURED_CANDIDATE");
+        PipelineConfigurations configurations = new PipelineConfigurations();
+        configurations.setCandidateReferenceSequences(List.of(candidate));
+        configurations.setExtraParams(Map.of(EXTRA_PARAM_STAGE_PARAMS,
+                Map.of(Integer.toString(PIPELINE_STAGE_REFERENCE_COMPARISON), Map.of(
+                        "taxonomyContext", Map.of("taxid", 1234, "speciesName", "Configured context"),
+                        "analysisTargetType", BaseStageParams.ANALYSIS_TARGET_TYPE_BACTERIA,
+                        "readMeta", Map.of("sequenceLevel", SEQUENCE_LEVEL_READ),
+                        "candidateReferences", List.of(Map.of("accession", "IGNORED_OVERRIDE"))),
+                        Integer.toString(PIPELINE_STAGE_REFERENCE_SELECTION), "unused selection settings")));
+        PipelineSampleInput input = new PipelineSampleInput("sample.contigs.fasta", null);
+        input.setSequenceLevel(SEQUENCE_LEVEL_ASSEMBLY);
+
+        BioPipelineStage comparison = AnalysisPipelineStagesBuilder.buildVirusStages(input, configurations).get(0);
+        ReferenceComparisonStageParameters parameters = JsonUtil.toObject(
+                comparison.getParameters(), ReferenceComparisonStageParameters.class);
+
+        assertEquals(1234, parameters.getTaxonomyContext().getTaxid());
+        assertEquals("Configured context", parameters.getTaxonomyContext().getSpeciesName());
+        assertEquals(List.of("CONFIGURED_CANDIDATE"), parameters.getCandidateReferences().stream()
+                .map(ReferenceSequence::getAccession).toList());
+        assertEquals(BaseStageParams.ANALYSIS_TARGET_TYPE_VIRUS, parameters.getAnalysisTargetType());
+        assertEquals(SEQUENCE_LEVEL_ASSEMBLY, parameters.getReadMeta().getSequenceLevel());
+    }
+
+    @Test
+    void readsStillUseSelectionAndMappingWithoutComparison() throws Exception {
+        List<BioPipelineStage> stages = AnalysisPipelineStagesBuilder.buildVirusStages(
+                readsInput(), emptyConfigurations());
+
+        assertEquals(List.of(PIPELINE_STAGE_READ_INSPECT, PIPELINE_STAGE_QC, PIPELINE_STAGE_ASSEMBLY,
+                PIPELINE_STAGE_REFERENCE_SELECTION, PIPELINE_STAGE_MAPPING, PIPELINE_STAGE_VARIANT_CALL,
+                Constants.StageType.PIPELINE_STAGE_CONSENSUS, Constants.StageType.PIPELINE_STAGE_SNP_ANNOTATION),
                 stages.stream().map(BioPipelineStage::getStageType).toList());
         assertEquals(0, stages.get(0).getStageIndex());
-        assertEquals(-1, stages.get(1).getStageIndex());
-        ReferenceSelectionStageInputUrls selectionInput = JsonUtil.toObject(
-                stages.get(0).getInputUrl(), ReferenceSelectionStageInputUrls.class);
-        assertEquals("sample.contigs.fasta", selectionInput.getContigsUrl());
-        assertNull(selectionInput.getR1Url());
-        assertNull(selectionInput.getR2Url());
+        assertTrue(stages.stream().skip(1).allMatch(stage -> stage.getStageIndex() == -1));
     }
 
     private static VarientCallParameters buildVariantParameters(

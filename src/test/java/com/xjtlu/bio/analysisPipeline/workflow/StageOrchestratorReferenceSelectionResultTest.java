@@ -28,6 +28,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSelectionOutcome;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.BaseStageParams;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ConsensusStageParameters;
@@ -57,6 +58,22 @@ class StageOrchestratorReferenceSelectionResultTest {
         fixture.selection().setOutputInline(selectionJson("INLINE"));
 
         assertScheduledReference(consumer, fixture, "INLINE");
+    }
+
+    @ParameterizedTest
+    @MethodSource("consumersWithSuccessfulOutcome")
+    void schedulesEveryConsumerForExplicitSuccessfulOutcome(Consumer consumer,
+            ReferenceSelectionOutcome outcome) throws Exception {
+        Fixture fixture = fixture(consumer);
+        ReferenceSelectionStageResult result = JsonUtil.toObject(selectionJson("SELECTED"),
+                ReferenceSelectionStageResult.class);
+        result.setOutcome(outcome);
+        if (outcome == ReferenceSelectionOutcome.PARTIAL) {
+            result.setUnmatchedSegmentKeys(List.of("unmatched-segment"));
+        }
+        fixture.selection().setOutputInline(JsonUtil.toJson(result));
+
+        assertScheduledReference(consumer, fixture, "SELECTED");
     }
 
     @ParameterizedTest
@@ -166,6 +183,12 @@ class StageOrchestratorReferenceSelectionResultTest {
         return Stream.of(Consumer.values()).flatMap(consumer ->
                 Stream.of((String) null, "", " \t\n")
                         .map(inline -> Arguments.of(consumer, inline)));
+    }
+
+    private static Stream<Arguments> consumersWithSuccessfulOutcome() {
+        return Stream.of(Consumer.values()).flatMap(consumer ->
+                Stream.of(ReferenceSelectionOutcome.MATCHED, ReferenceSelectionOutcome.PARTIAL)
+                        .map(outcome -> Arguments.of(consumer, outcome)));
     }
 
     private static String selectionJson(String accession) throws Exception {

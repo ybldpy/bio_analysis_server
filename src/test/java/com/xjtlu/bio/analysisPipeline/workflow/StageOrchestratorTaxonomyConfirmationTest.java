@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -264,23 +265,27 @@ class StageOrchestratorTaxonomyConfirmationTest {
     }
 
     @Test
-    void notApplicableTaxonomyWithoutOutOfPanelResultDoesNotBypassPrerequisites() throws Exception {
-        for (String outputInline : List.of(
+    void notApplicableTaxonomySkipsSerotypeWithoutRequiringOutOfPanelPayload() throws Exception {
+        for (String outputInline : Arrays.asList(
                 taxonomyStage(STATUS_CONFIDENT, taxon(562)).getOutputInline(),
                 taxonomyStage(STATUS_AMBIGUOUS, taxon(562)).getOutputInline(),
                 taxonomyStage(STATUS_LOW_CONFIDENCE, taxon(562)).getOutputInline(),
-                "")) {
-            BioPipelineStage taxonomy = outOfPanelTaxonomyStage();
-            taxonomy.setOutputInline(outputInline);
-            BioPipelineStage serotype = serotypeStage(PIPELINE_STAGE_STATUS_PENDING);
+                "", null, "null", "not valid JSON")) {
+            for (boolean callback : List.of(true, false)) {
+                BioPipelineStage taxonomy = outOfPanelTaxonomyStage();
+                taxonomy.setOutputInline(outputInline);
+                BioPipelineStage serotype = serotypeStage(PIPELINE_STAGE_STATUS_PENDING);
+                serotype.setParameters("not parsed for a skipped stage");
 
-            assertNoWork(downstreamPlan(taxonomy, serotype));
-            assertThrows(MissingUpstreamException.class,
-                    () -> orchestrator.makePlan(List.of(taxonomy, serotype), serotype.getStageId()));
+                OrchestratePlan plan = callback
+                        ? downstreamPlan(taxonomy, serotype)
+                        : orchestrator.makePlan(List.of(taxonomy, serotype), serotype.getStageId());
 
-            assertEquals(PIPELINE_STAGE_STATUS_PENDING, serotype.getStatus());
-            assertEquals(3, serotype.getVersion());
-            assertNull(serotype.getEndTime());
+                assertRequiredUpstreamSkipped(plan, serotype, taxonomy);
+                assertEquals("not parsed for a skipped stage", serotype.getParameters());
+                assertEquals(outputInline, taxonomy.getOutputInline());
+                assertEquals(4, taxonomy.getVersion());
+            }
         }
     }
 
@@ -307,23 +312,44 @@ class StageOrchestratorTaxonomyConfirmationTest {
     }
 
     @Test
-    void unrelatedNotApplicableAssemblyDoesNotSatisfyStagePrerequisites() throws Exception {
+    void requiredNotApplicableAssemblySkipsItsPendingConsumers() throws Exception {
         BioPipelineStage assembly = assemblyStage(PIPELINE_STAGE_STATUS_NOT_APPLICABLE);
         BioPipelineStage taxonomy = taxonomyStage(STATUS_CONFIDENT, taxon(562));
         BioPipelineStage serotype = serotypeStage(PIPELINE_STAGE_STATUS_PENDING);
 
-        assertThrows(MissingUpstreamException.class,
-                () -> orchestrator.makePlan(List.of(assembly, taxonomy, serotype), serotype.getStageId()));
-        assertEquals(PIPELINE_STAGE_STATUS_PENDING, serotype.getStatus());
+        assertRequiredUpstreamSkipped(orchestrator.makePlan(
+                List.of(assembly, taxonomy, serotype), serotype.getStageId()), serotype, assembly);
 
         for (int stageType : List.of(PIPELINE_STAGE_AMR, PIPELINE_STAGE_VIRULENCE, PIPELINE_STAGE_MLST)) {
-            BioPipelineStage independent = pendingStage(4L, stageType);
-            List<BioPipelineStage> stages = List.of(assembly, outOfPanelTaxonomyStage(), independent);
+            BioPipelineStage consumer = pendingStage(4L, stageType);
+            List<BioPipelineStage> stages = List.of(assembly, outOfPanelTaxonomyStage(), consumer);
 
-            assertThrows(MissingUpstreamException.class,
-                    () -> orchestrator.makePlan(stages, independent.getStageId()));
-            assertEquals(PIPELINE_STAGE_STATUS_PENDING, independent.getStatus());
-            assertEquals(3, independent.getVersion());
+            assertRequiredUpstreamSkipped(orchestrator.makePlan(
+                    stages, consumer.getStageId()), consumer, assembly);
+        }
+        assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, assembly.getStatus());
+        assertEquals(3, assembly.getVersion());
+    }
+
+    @Test
+    void unrelatedNotApplicableTaxonomyDoesNotSkipAssemblyConsumersDuringPolling() throws Exception {
+        for (int stageType : List.of(PIPELINE_STAGE_AMR, PIPELINE_STAGE_VIRULENCE, PIPELINE_STAGE_MLST)) {
+            BioPipelineStage assembly = assemblyStage(PIPELINE_STAGE_STATUS_FINISHED);
+            BioPipelineStage taxonomy = outOfPanelTaxonomyStage();
+            taxonomy.setOutputInline("not required by this branch");
+            BioPipelineStage independent = pendingStage(4L, stageType);
+
+            OrchestratePlan plan = orchestrator.makePlan(
+                    List.of(assembly, taxonomy, independent), independent.getStageId());
+
+            assertEquals(List.of(independent), plan.getRunStages());
+            assertEquals(1, plan.getUpdateStageCommands().size());
+            assertEquals(PIPELINE_STAGE_STATUS_QUEUING, independent.getStatus());
+            assertEquals(4, independent.getVersion());
+            assertNull(independent.getEndTime());
+            assertNull(independent.getOutputInline());
+            assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, taxonomy.getStatus());
+            assertEquals(4, taxonomy.getVersion());
         }
     }
 
@@ -410,13 +436,39 @@ class StageOrchestratorTaxonomyConfirmationTest {
         assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, serotype.getStatus());
         assertNotNull(patch.getEndTime());
         assertEquals(patch.getEndTime(), serotype.getEndTime());
-        assertEquals(Map.of("skipReason", "Taxonomy is OUT_PANEL; serotyping is not applicable"),
+        assertEquals(Map.of("skipReason", "Taxonomy is OUT_PANEL; serotyping is not applicable",
+                "causeStageId", 1, "causeStatus", PIPELINE_STAGE_STATUS_NOT_APPLICABLE),
                 JsonUtil.toMap(patch.getOutputInline()));
         assertEquals(patch.getOutputInline(), serotype.getOutputInline());
         assertNull(patch.getInputUrl());
         assertNull(patch.getParameters());
         assertNull(patch.getStartTime());
         assertNull(serotype.getStartTime());
+    }
+
+    private static void assertRequiredUpstreamSkipped(OrchestratePlan plan,
+            BioPipelineStage stage, BioPipelineStage upstream) throws Exception {
+        assertTrue(plan.getRunStages().isEmpty());
+        assertEquals(1, plan.getUpdateStageCommands().size());
+        UpdateStageCommand command = plan.getUpdateStageCommands().get(0);
+        BioPipelineStage patch = command.getUpdateStage();
+        assertEquals(stage.getStageId().longValue(), command.getStageId());
+        assertEquals(3, command.getCurrentVersion());
+        assertEquals(4, patch.getVersion());
+        assertEquals(4, stage.getVersion());
+        assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, patch.getStatus());
+        assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, stage.getStatus());
+        assertNotNull(patch.getEndTime());
+        assertEquals(patch.getEndTime(), stage.getEndTime());
+        assertEquals(patch.getOutputInline(), stage.getOutputInline());
+        Map<String, Object> reason = JsonUtil.toMap(patch.getOutputInline());
+        assertEquals("Required upstream stage is NOT_APPLICABLE", reason.get("skipReason"));
+        assertEquals(upstream.getStageId().longValue(), ((Number) reason.get("causeStageId")).longValue());
+        assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, reason.get("causeStatus"));
+        assertNull(patch.getInputUrl());
+        assertNull(patch.getParameters());
+        assertNull(patch.getStartTime());
+        assertNull(stage.getStartTime());
     }
 
     private static void assertNoWork(OrchestratePlan plan) {

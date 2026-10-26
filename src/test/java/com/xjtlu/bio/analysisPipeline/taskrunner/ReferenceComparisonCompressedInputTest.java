@@ -23,11 +23,10 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.xjtlu.bio.analysisPipeline.BioStageUtil;
-import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceGenome;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceComparisonStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceComparisonStageParameters;
@@ -71,10 +70,12 @@ class ReferenceComparisonCompressedInputTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { ".zip", ".ZIP", ".gz", ".gzip", "" })
-    void queryAndReferenceArePlainFastaAtTheToolBoundaryAndSourcesAreUnchanged(String suffix) throws Exception {
-        String queryKey = writeObject("samples/source with spaces.fasta" + suffix, QUERY);
-        String referenceKey = writeObject("references/source with spaces.fasta" + suffix, REFERENCE);
+    @CsvSource({".zip, .zip", ".ZIP, .ZIP", ".gz, .gz", ".gzip, .gzip", "'', ''",
+            ".gz, ''", "'', .gz", ".zip, ''", "'', .zip", ".gz, .zip", ".zip, .gz"})
+    void queryAndReferenceArePlainFastaAtTheToolBoundaryAndSourcesAreUnchanged(
+            String querySuffix, String referenceSuffix) throws Exception {
+        String queryKey = writeObject("samples/source with spaces.fasta" + querySuffix, QUERY);
+        String referenceKey = writeObject("references/source with spaces.fasta" + referenceSuffix, REFERENCE);
         byte[] originalQuery = Files.readAllBytes(storageRoot.resolve(queryKey));
         byte[] originalReference = Files.readAllBytes(storageRoot.resolve(referenceKey));
 
@@ -88,15 +89,22 @@ class ReferenceComparisonCompressedInputTest {
         assertTrue(command.contains("--cs=long"));
         assertTrue(command.contains("--secondary=no"));
         assertEquals(inputDir.resolve("query_source with spaces.fasta"), executor.queryPath);
-        assertEquals(inputDir.resolve("reference_genome.fasta"), executor.referencePath);
+        assertEquals(inputDir.resolve("candidate_1/reference_source with spaces.fasta"), executor.referencePath);
         assertEquals(QUERY, executor.queryContents);
         assertEquals(REFERENCE, executor.referenceContents);
-        assertEquals(workDir, executor.processDirectory);
+        assertEquals(workDir.resolve("candidate_1"), executor.processDirectory);
         assertNotNull(result.getStageOutput());
-        assertEquals(workDir.resolve("alignment.paf"), result.getStageOutput().getAlignmentPafPath());
-        assertEquals(workDir.resolve("reference_difference.tsv"), result.getStageOutput().getDifferenceTsvPath());
-        assertEquals(PAF, Files.readString(result.getStageOutput().getAlignmentPafPath()));
-        assertTrue(Files.readString(result.getStageOutput().getDifferenceTsvPath()).startsWith("reference_name\tquery_name\t"));
+        assertEquals(1, result.getStageOutput().getComparisons().size());
+        var comparison = result.getStageOutput().getComparisons().get(0);
+        assertEquals(workDir.resolve("candidate_1/alignment.paf"), comparison.alignmentPafPath());
+        assertEquals(workDir.resolve("candidate_1/reference_difference.tsv"), comparison.differenceTsvPath());
+        assertEquals(PAF, Files.readString(comparison.alignmentPafPath()));
+        assertTrue(Files.readString(comparison.differenceTsvPath()).startsWith("reference_name\tquery_name\t"));
+        assertEquals("fixture_reference", comparison.metrics().referenceAccession());
+        assertEquals(100.0d, comparison.metrics().sequenceIdentity());
+        assertEquals(1.0d, comparison.metrics().referenceCoverage());
+        assertEquals(workDir.resolve("reference_comparison.tsv"), result.getStageOutput().getComparisonTsvPath());
+        assertTrue(Files.isRegularFile(result.getStageOutput().getComparisonTsvPath()));
         assertArrayEquals(originalQuery, Files.readAllBytes(storageRoot.resolve(queryKey)));
         assertArrayEquals(originalReference, Files.readAllBytes(storageRoot.resolve(referenceKey)));
         assertFalse(Files.exists(inputDir), "Only staged copies should be removed by the executor lifecycle");
@@ -107,7 +115,7 @@ class ReferenceComparisonCompressedInputTest {
         reference.setAccession("fixture_reference");
         reference.setPath(referenceKey);
         ReferenceComparisonStageParameters parameters = new ReferenceComparisonStageParameters();
-        parameters.setReferenceGenome(ReferenceGenome.fromSingleSequence(reference));
+        parameters.setCandidateReferences(List.of(reference));
         BioPipelineStage stage = new BioPipelineStage();
         stage.setStageId(42L);
         stage.setPipelineId(1L);

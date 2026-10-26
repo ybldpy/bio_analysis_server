@@ -1,6 +1,6 @@
 # 病毒和细菌流水线结果展示接入说明
 
-更新日期：2026-10-21。
+更新日期：2026-10-25。
 
 面向前端开发，覆盖病毒流水线（`pipelineType=100/101`）、常规细菌流水线（`pipelineType=200`）以及新冠污水独立入口（`pipelineType=102`，见第 11 节）的结果页面。页面需要根据实际阶段列表，读取内联结果或报告文件，展示运行状态、统计指标、分类结果和下载入口。
 
@@ -17,7 +17,7 @@
 | 流水线 | 输入类型 | 当前阶段范围 |
 | --- | --- | --- |
 | 病毒 | Reads | 输入检查、QC、Assembly、参考选择、Mapping、Variant Call、Consensus、SNP 注释 |
-| 病毒 | Assembly | 参考选择、参考比较 |
+| 病毒 | Assembly / FASTA | 单阶段参考比较：逐条比较本次全部候选，不选择最优参考 |
 | 细菌 | Reads | 输入检查、QC、Assembly、物种分类、AMR、VF、MLST、血清分型 |
 | 细菌 | Assembly | 物种分类、AMR、VF、MLST、血清分型 |
 
@@ -25,7 +25,8 @@
 
 - 以接口实际返回的阶段列表为准；某些输入或条件下会省略或跳过阶段。
 - 没有创建的阶段不显示为失败，也不能填充零值。
-- 病毒 Assembly 输入没有 reads Mapping、Variant Call、Consensus 结果，不应显示为这些阶段异常缺失。
+- 新建病毒 Assembly / FASTA 任务只有 `ReferenceComparison`（`43`）阶段，没有参考选择、reads Mapping、Variant Call、Consensus；不应显示为这些阶段异常缺失。Reads 路线保持不变。
+- 历史病毒 Assembly 任务可能仍有参考选择阶段，以实际阶段列表和结果版本为准，不强制改写旧任务展示。
 - 可选文件、旧版本指标和不适用阶段需要有空态。
 - 当前 `stageIndex` 常用于标记入口，值可能为 `0/-1`，不是完整的展示顺序；按 `stageType` 和对应流程组织页面，不直接依赖接口返回顺序或 `stageIndex` 排序。
 
@@ -77,7 +78,7 @@
 | Mapping | `20` | `outputUrl` | BAM、深度文件、指标 JSON 的对象键 |
 | Variant Call | `40` | `outputUrl` | VCF、索引、指标 JSON 的对象键 |
 | Consensus | `41` | `outputUrl` | FASTA、遮罩 BED、指标 JSON 的对象键 |
-| 参考比较 | `43` | `outputUrl` | PAF 与差异 TSV 的对象键 |
+| 参考比较 | `43` | `outputUrl` | schema-v2 的候选计数、JSON/TSV 汇总对象键；历史结果为 PAF 与差异 TSV |
 | SNP 注释 | `72` | `outputUrl` | 注释 VCF 对象键 |
 | 物种分类 | `10` | `outputInline` | 分类、候选、分箱指标以及部分报告对象键 |
 | AMR | `60` | `outputUrl` | AMR 报告对象键 |
@@ -157,6 +158,7 @@ async function readMetricsJson(fileKey) {
 | 输入信息 | 测序平台、长短读、质量编码、输入布局 | 输入检查结果的 `readMeta` 和 R1/R2 字段 |
 | QC | 过滤前后 reads、保留比例、质量统计、过滤原因 | 获取 `reportJSON`，适配实际报告字段 |
 | 病毒参考选择 | 选中参考表、候选比较、未匹配节段提示 | `outputInline` |
+| 病毒 FASTA 参考比较 | 全部候选、匹配状态、覆盖率与一致性 | 从 `outputUrl.comparisonJsonUrl` 下载 JSON，见第 5.5 节 |
 | 病毒 Mapping | 比对率、覆盖率、深度指标卡、分参考统计图 | 获取 `metricsUrl` |
 | 病毒变异检测 | 变异类型、过滤状态、分参考数量 | 获取 `metricsUrl` |
 | 病毒 Consensus | 深度遮罩与未遮罩比例、分参考统计 | 获取 `metricsUrl` |
@@ -174,7 +176,7 @@ async function readMetricsJson(fileKey) {
 | MLST 结果卡片 | `mlst` | 提取 scheme、ST、等位基因结果 |
 | 血清分型结果卡片 | 分型 TXT/TSV | 按实际工具格式解析，不能共用固定列定义 |
 | Assembly 数量和长度指标 | `contigsUrl` | 统计 FASTA；当前没有现成的 contig 数、N50 等汇总字段 |
-| 参考比较图和差异表 | `pafPath` / `differenceTsv` | 解析并聚合 PAF / TSV |
+| 参考比较图和差异表 | schema-v2 各候选的 `alignmentPafUrl` / `differenceTsvUrl`；历史结果的 `pafPath` / `differenceTsv` | 解析并聚合 PAF / TSV |
 | 最终 Consensus 的实际长度和 N 数 | `consensusUrl` | 扫描最终 FASTA；不能直接替代为遮罩 metrics |
 
 第一版可先实现上一节的结构化展示，并为所有已发布文件提供下载。解析较大报告或需要统一格式时，宜由后端增加解析和分页能力；当前接口尚未提供这些能力。
@@ -226,14 +228,15 @@ async function readMetricsJson(fileKey) {
 
 ### 5.1 参考基因组选择
 
-`stageType=44`，结果主要取自 `outputInline`。
+`stageType=44`，结果主要取自 `outputInline`。用于病毒 Reads 路线及可能包含此阶段的历史 Assembly 任务；新建 FASTA 任务不再创建此阶段。
 
 | 顶层字段 | 展示用途 |
 | --- | --- |
-| `selectedReference` | 本次选择的参考集合 |
+| `outcome` | 业务结果：`MATCHED`、`PARTIAL` 或 `NO_MATCH`；旧结果可能没有此字段 |
+| `selectedReference` | 本次选择的参考集合；`NO_MATCH` 时为 `null` |
 | `candidateScores` | 候选比较表和分数图 |
 | `unmatchedSegmentKeys` | 本次候选范围内未选出参考的节段 |
-| `partial` | 是否存在上述未匹配节段 |
+| `partial` | 已选出可用参考，但仍有未匹配节段；全部未匹配时为 `false` |
 | `readFallbackMetrics` | Reads 补充检查的状态和已使用配置，可折叠展示 |
 
 选中参考使用 `selectedReference.taxId`、`organismName` 及 `sequences[]`。每条序列可展示 `accession`、`sourceDb`、`genomeLength`、`segment`、`segmentOrdinal`、`segmentKey`、`completeness`、`isAnnotated`。原始数据库元信息 `rawMetadata` 不作为默认展示内容。
@@ -253,14 +256,24 @@ async function readMetricsJson(fileKey) {
 | `score` | 排序分数，不是统计置信概率 |
 | `rejectionReason` | 若提供则展示未接受原因 |
 
-候选没有独立的 `selected` 字段。用 `selectedReference.sequences[].accession` 构建集合，与 `candidateScores[].referenceAccession` 关联，渲染“已选中”标记。节段展示优先使用 `segmentOrdinal` 数值顺序，未知顺序保留名称，不对字符串做 `1,10,2` 式排序。
+候选没有独立的 `selected` 字段。用 `selectedReference.sequences[].accession` 构建集合，与 `candidateScores[].referenceAccession` 关联，渲染“已选中”标记。`selectedReference=null` 时选中集合为空，不能直接解引用。节段展示优先使用 `segmentOrdinal` 数值顺序，未知顺序保留名称，不对字符串做 `1,10,2` 式排序。
+
+正常执行但没有选出可用参考时，Selection 阶段为 `FINISHED=4`，`outputInline.outcome=NO_MATCH`。展示“参考选择已完成，未找到可用参考”，不是“工具执行失败”或“分析质量通过”。仍可展示 `candidateScores`、`rejectionReason`、`unmatchedSegmentKeys` 和 `readFallbackMetrics`；不再依赖已清理的临时 TSV 排查。仅缺失 `selectedReference` 或结果字段，不足以认定 `NO_MATCH`。
+
+此时下游按依赖链逐阶段变为 `NOT_APPLICABLE=6`，并非必须一次批量更新：
+
+- 直接依赖 Selection 的 Mapping、旧版下游 Reference Comparison 检查 `NO_MATCH`，其 `outputInline` 提供 `skipReason`、`causeStageId`（Selection 的阶段 ID）和 `causeOutcome=NO_MATCH`。
+- Variant Call、Consensus、SNP Annotation 等后续阶段不再追溯 Selection 的业务结果；只要自己的任一必需直接上游为 `NOT_APPLICABLE`，就跳过自己。其 `outputInline` 提供 `skipReason`、`causeStageId`（直接上游的阶段 ID）和 `causeStatus=6`，不要求存在 `causeOutcome`。
+- 只更新待运行阶段；可选或无依赖关系的阶段不会触发该传播。独立的 FASTA Comparison 入口不受影响。
+
+回调和轮询使用相同的依赖判断。受轮询顺序影响，传播可能需要后续轮询才能完成，前端不能因为首个下游已跳过就要求所有后代立即同时变更。流水线在其余阶段也结束后按执行完成收尾；完成不等于获得了有效参考结果。工具非零退出、文件读取/解析错误等仍为 `FAIL=3`，不会伪装成 `NO_MATCH` 或自动向下传播为跳过。
 
 `readFallbackMetrics.status` 支持 `NO_READS`、`DISABLED`、`NOT_NEEDED`、`COMPLETED`、`UNSUPPORTED_READ_TYPE`。这些表示补充检查状态，不等于阶段失败；原始配置字段可在详情中按需展开。
 
 重要解释边界：
 
 - 参考名称表示使用的比对参考，不等于确定样本就是该参考菌株或分离株。
-- `partial=false` 只表示本次候选分组中没有未匹配项，不是独立的全基因组完整性证明。
+- `partial=false` 可能表示已匹配全部候选分组，也可能表示 `NO_MATCH`；先看 `outcome` 和 `selectedReference`，不能作为全基因组完整性证明。
 - `selectedReference.complete` 不是样本完整度；当前多序列聚合会得到 `false`，不能据此显示“缺节段”。
 - `compositionStatus=UNKNOWN` 不表示已发现混样；当前多序列结果未据此确认是否来自同一分离株。
 - 参考选择执行器的比较 TSV 当前没有通过结果 handler 发布下载对象键，不应生成不存在的下载入口。
@@ -339,12 +352,123 @@ explicitPassCount + filteredCount + unfilteredCount = variantRecords
 
 ### 5.5 参考比较
 
-`stageType=43`，病毒 Assembly 输入使用此阶段，结果取自 `outputUrl`。
+`stageType=43`，新建病毒 Assembly / FASTA 任务的唯一阶段。后端对本次候选快照中的每一条参考独立比较，不进行最优参考选择，也不按节段只保留一条。Reads 路线不受此变更影响。
 
-- `pafPath`：比对 PAF 对象键，虽然字段名带 Path，仍通过文件接口获取。
-- `differenceTsv`：差异 TSV 对象键。
+首先解析 `stage.outputUrl`。schema-v2 仅保存小型文件索引，不在此字段或 `outputInline` 内嵌完整候选列表：
 
-当前可直接展示阶段状态和文件下载。比对图、差异数量、类型统计需要解析文件；没有独立 metrics JSON。不要把参考选择阶段的候选分数当成参考比较阶段自己的汇总指标。
+```json
+{
+  "schemaVersion": 2,
+  "candidateCount": 3,
+  "matchedCandidateCount": 2,
+  "unmatchedCandidateCount": 1,
+  "comparisonJsonUrl": "stageOutput/588/reference_comparison.json",
+  "comparisonTsvUrl": "stageOutput/588/reference_comparison.tsv"
+}
+```
+
+通过第 2.3 节的下载接口获取 `comparisonJsonUrl`，得到 `schemaVersion`、相同的三个计数及 `comparisons[]`。每个候选包含以下平铺字段：
+
+| 字段 | 含义和展示规则 |
+| --- | --- |
+| `referenceId` / `referenceAccession` | 参考记录 ID / accession；以 ID 关联记录，不假定 accession 唯一 |
+| `sourceDb` / `taxId` / `organismName` | 来源、该参考实际分类、名称；可能为空，不用目标 taxId 覆盖实际 taxId |
+| `segment` / `segmentKey` | 节段标签 / 分组键；可分组展示，但不合并或隐藏同组候选 |
+| `status` | `MATCHED` 或 `NO_MATCH`；必须保留未匹配行 |
+| `sequenceIdentity` | 0–100 百分数，例如 `98.75` 显示 `98.75%`，不要再次乘 100 |
+| `referenceCoverage` | 0–1 比例，例如 `0.8` 显示 `80%` |
+| `alignedReferenceBases` / `referenceBases` | 对齐参考位置数 / 参考总长度，单位 bp |
+| `matchingBases` / `alignmentBlockBases` | 匹配碱基数 / 比对块总长度，单位 bp |
+| `alignmentCount` | 比对记录数 |
+| `alignmentPafUrl` / `differenceTsvUrl` | 该候选独立的 PAF / 差异 TSV 对象键 |
+
+完整 JSON 报告样例如下，来自隔离 HTTP 集成测试的实际下载结果，仅整理缩进。测试数据为固定种子生成的软件测试数据；`taxId=2000000000` 不是实际分类，ID、名称和对象键仅用于示例，临时测试服务已关闭，不能把这些值用于当前联调请求。
+
+```json
+{
+  "schemaVersion": 2,
+  "candidateCount": 3,
+  "matchedCandidateCount": 2,
+  "unmatchedCandidateCount": 1,
+  "comparisons": [
+    {
+      "referenceId": 37180,
+      "referenceAccession": "CUSTOM_865f8f6fd14b48daba995b53c046b377",
+      "sourceDb": "USER_UPLOAD",
+      "taxId": 2000000000,
+      "organismName": "COMPARISON_TEST_ONLY_f1a3e01562874e16b7fa018a74741550_exact",
+      "segment": "1",
+      "segmentKey": "SEGMENT_1",
+      "status": "MATCHED",
+      "sequenceIdentity": 100,
+      "referenceCoverage": 1,
+      "alignedReferenceBases": 6000,
+      "referenceBases": 6000,
+      "matchingBases": 6000,
+      "alignmentBlockBases": 6000,
+      "alignmentCount": 1,
+      "alignmentPafUrl": "stageOutput/588/candidates/0001/alignment.paf",
+      "differenceTsvUrl": "stageOutput/588/candidates/0001/reference_difference.tsv"
+    },
+    {
+      "referenceId": 37181,
+      "referenceAccession": "CUSTOM_5a8113926f25419d9b365196947b119f",
+      "sourceDb": "USER_UPLOAD",
+      "taxId": 2000000000,
+      "organismName": "COMPARISON_TEST_ONLY_f1a3e01562874e16b7fa018a74741550_partial",
+      "segment": "1",
+      "segmentKey": "SEGMENT_1",
+      "status": "MATCHED",
+      "sequenceIdentity": 99.775,
+      "referenceCoverage": 0.5,
+      "alignedReferenceBases": 4000,
+      "referenceBases": 8000,
+      "matchingBases": 3991,
+      "alignmentBlockBases": 4000,
+      "alignmentCount": 1,
+      "alignmentPafUrl": "stageOutput/588/candidates/0002/alignment.paf",
+      "differenceTsvUrl": "stageOutput/588/candidates/0002/reference_difference.tsv"
+    },
+    {
+      "referenceId": 37182,
+      "referenceAccession": "CUSTOM_3ff7eb2486494d67baa01cf100a5e59a",
+      "sourceDb": "USER_UPLOAD",
+      "taxId": 2000000000,
+      "organismName": "COMPARISON_TEST_ONLY_f1a3e01562874e16b7fa018a74741550_unrelated",
+      "segment": "1",
+      "segmentKey": "SEGMENT_1",
+      "status": "NO_MATCH",
+      "sequenceIdentity": 0,
+      "referenceCoverage": 0,
+      "alignedReferenceBases": 0,
+      "referenceBases": 6000,
+      "matchingBases": 0,
+      "alignmentBlockBases": 0,
+      "alignmentCount": 0,
+      "alignmentPafUrl": "stageOutput/588/candidates/0003/alignment.paf",
+      "differenceTsvUrl": "stageOutput/588/candidates/0003/reference_difference.tsv"
+    }
+  ]
+}
+```
+
+注意指标在每个候选对象上**平铺**，没有 `metrics` 子对象。JSON 文件顶层也没有 `data` 包装；下载接口为 `GET /stageOutput/download?outputUrl=<URL编码后的对象键>`，返回 `application/octet-stream` 原始文件内容。此阶段没有 `metricsUrl`，指标已经包含在 `comparisonJsonUrl` 指向的报告中。
+
+上述样例的三个候选应分别显示一致性/参考覆盖率为 `100% / 100%`、`99.775% / 50%`、`0% / 0%`。候选 `status` 是字符串，不是外层 Stage 的数值状态。完整的索引字段表、17 个候选字段及读取示意见[独立增量交接第 9 节](./pipeline-reference-selection-update.md#9-fasta-全候选比较与结果版本)。
+
+`comparisons[]` 按候选快照顺序返回，不是质量排名。每条报告对象键使用独立序号目录，即使 accession 或 segment 相同也不会合并。只使用接口返回的对象键，不拼接服务器临时路径。
+
+`NO_MATCH` 表示没有可用比对，相关匹配数值为 0，参考长度仍可保留；对应 PAF 可以为空、差异 TSV 可以只有表头。全部候选均为 `NO_MATCH` 时，阶段仍可执行成功，应展示“比较完成，未获得匹配”，不能表示为工具失败，也不能表示样本质量合格。`MATCHED` 同样不等于通过质量阈值、确认病毒身份或确认完整基因组。
+
+`comparisonTsvUrl` 是全部候选的汇总表，表头为：
+
+```text
+reference_id  reference_accession  source_db  tax_id  organism_name  segment  segment_key  status  sequence_identity_percent  reference_coverage  aligned_reference_bases  reference_bases  matching_bases  alignment_block_bases  alignment_count
+```
+
+实际文件使用制表符分隔。汇总表用于下载和表格导出，逐位置比对图与差异明细仍需按候选解析 PAF / 差异 TSV，不从汇总指标猜测变异数量。页面不显示“最终参考”“最优候选”“已选中”标记，也不从这些指标自行推导选择结果。
+
+历史兼容：当 `schemaVersion` 缺失且带有旧字段 `pafPath` / `differenceTsv` 时，提供单份文件下载。这两个值仍是存储对象键。旧结果没有候选计数或上述汇总指标时显示“历史结果未提供”，不要伪造 0 或补出候选列表；不要要求历史任务存在 `comparisonJsonUrl`。未知的显式版本（如未来的 `schemaVersion=3`）应提示版本不支持，不要自动进入历史格式分支；坏 JSON 或下载失败也不能表示为 `NO_MATCH`。
 
 ### 5.6 SNP 注释
 

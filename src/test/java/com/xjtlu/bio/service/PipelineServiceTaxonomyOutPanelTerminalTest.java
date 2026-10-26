@@ -113,7 +113,10 @@ class PipelineServiceTaxonomyOutPanelTerminalTest {
                 assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, patch.getStatus());
                 assertEquals(VERSION + 1, patch.getVersion());
                 assertNotNull(patch.getEndTime());
-                assertEquals(Map.of("skipReason", SKIP_REASON), JsonUtil.toMap(patch.getOutputInline()));
+                Map<String, Object> output = JsonUtil.toMap(patch.getOutputInline());
+                assertEquals(SKIP_REASON, output.get("skipReason"));
+                assertEquals(TAXONOMY_ID, ((Number) output.get("causeStageId")).longValue());
+                assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, output.get("causeStatus"));
                 assertNull(patch.getInputUrl());
                 assertNull(patch.getParameters());
                 if (batchResult == 0) {
@@ -218,7 +221,10 @@ class PipelineServiceTaxonomyOutPanelTerminalTest {
         assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, serotype.getStatus());
         assertEquals(VERSION + 1, serotype.getVersion());
         assertNotNull(serotype.getEndTime());
-        assertEquals(Map.of("skipReason", SKIP_REASON), JsonUtil.toMap(serotype.getOutputInline()));
+        Map<String, Object> output = JsonUtil.toMap(serotype.getOutputInline());
+        assertEquals(SKIP_REASON, output.get("skipReason"));
+        assertEquals(TAXONOMY_ID, ((Number) output.get("causeStageId")).longValue());
+        assertEquals(PIPELINE_STAGE_STATUS_NOT_APPLICABLE, output.get("causeStatus"));
         assertEquals(SEROTYPE_ID, serotype.getStageId());
         assertEquals(PIPELINE_ID, serotype.getPipelineId());
         assertEquals(PIPELINE_STAGE_SEROTYPE, serotype.getStageType());

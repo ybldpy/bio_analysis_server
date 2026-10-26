@@ -36,6 +36,7 @@ public class ReferenceSelectionStageDoneHandler
                 stageOutput.getCandidateScores(),
                 stageOutput.getUnmatchedSegmentKeys());
         result.setReadFallbackMetrics(stageOutput.getReadFallbackMetrics());
+        result.setOutcome(stageOutput.getOutcome());
 
         return Pair.of(Map.of(), result);
     }

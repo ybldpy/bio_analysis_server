@@ -21,11 +21,13 @@ import com.xjtlu.bio.analysisPipeline.Constants.SequenceInput;
 import com.xjtlu.bio.analysisPipeline.context.runtime.StageContext;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceCandidateScore;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceCandidateScore.EvidenceSource;
+import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSelectionOutcome;
 import com.xjtlu.bio.analysisPipeline.referenceGenome.ReferenceSequence;
 import com.xjtlu.bio.analysisPipeline.stageInputs.inputUrls.ReferenceSelectionStageInputUrls;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.ReferenceSelectionStageParameters;
 import com.xjtlu.bio.analysisPipeline.stageInputs.parameters.common.SequenceMeta;
 import com.xjtlu.bio.analysisPipeline.stageMetrics.ReferenceSelectionReadFallbackMetrics.Status;
+import com.xjtlu.bio.analysisPipeline.taskrunner.AbstractPipelineStageExector.LoadFailException;
 import com.xjtlu.bio.analysisPipeline.taskrunner.stageOutput.ReferenceSelectionStageOutput;
 import com.xjtlu.bio.configuration.AnalysisPipelineToolsConfig;
 import com.xjtlu.bio.utils.JsonUtil;
@@ -44,6 +46,7 @@ class ReferenceSelectionReadFallbackTest {
         ReferenceSelectionStageOutput output = success(fixture);
 
         assertEquals(List.of("A"), selected(output));
+        assertEquals(ReferenceSelectionOutcome.PARTIAL, output.getOutcome());
         assertEquals(List.of("SEGMENT_2"), output.getUnmatchedSegmentKeys());
         assertEquals(Status.NO_READS, output.getReadFallbackMetrics().status());
         assertTrue(fixture.executor.readCommands.isEmpty());
@@ -64,6 +67,7 @@ class ReferenceSelectionReadFallbackTest {
 
         assertEquals(List.of("A", "C"), selected(output));
         assertFalse(output.isPartial());
+        assertEquals(ReferenceSelectionOutcome.MATCHED, output.getOutcome());
         assertEquals(EvidenceSource.CONTIGS, score(output, "A").getEvidenceSource());
         assertEquals(0.8d, score(output, "A").getReferenceCoverage());
         assertEquals(EvidenceSource.READS, score(output, "C").getEvidenceSource());
@@ -155,18 +159,104 @@ class ReferenceSelectionReadFallbackTest {
     }
 
     @Test
-    void allRejectedLeavesDiagnosticsAndFailsInsteadOfInventingAReference() throws Exception {
+    void allRejectedReturnsSuccessfulNoMatchWithDiagnosticsInsteadOfInventingAReference() throws Exception {
         Fixture fixture = fixture(true, false, reference("A", 1));
         fixture.executor.readPafs.put("A", paf("A", 0, 100, 100, 60));
 
         StageRunResult<ReferenceSelectionStageOutput> result = fixture.run();
 
-        assertFalse(result.isSuccess());
-        assertTrue(result.getErrorLog().contains("readFallbackStatus=COMPLETED"));
+        assertTrue(result.isSuccess());
+        assertNull(result.getFailReason());
+        assertNull(result.getE());
+        ReferenceSelectionStageOutput output = result.getStageOutput();
+        assertEquals(ReferenceSelectionOutcome.NO_MATCH, output.getOutcome());
+        assertNull(output.getSelectedReference());
+        assertFalse(output.isPartial());
+        assertEquals(List.of("SEGMENT_1"), output.getUnmatchedSegmentKeys());
+        assertEquals(Status.COMPLETED, output.getReadFallbackMetrics().status());
+        assertEquals(0, output.getReadFallbackMetrics().acceptedGroups());
+        assertEquals("REFERENCE_COVERAGE_BELOW_THRESHOLD", score(output, "A").getRejectionReason());
         assertTrue(Files.readString(tempDir.resolve("work/reference_selection.tsv"))
                 .contains("REFERENCE_COVERAGE_BELOW_THRESHOLD"));
         assertTrue(Files.readString(tempDir.resolve("work/reference_selection_read_fallback.json"))
                 .contains("\"acceptedGroups\":0"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void emptyContigAlignmentsReturnNoMatchForWholeAndSegmentedReferences(boolean segmented) throws Exception {
+        Fixture fixture = fixture(false, false, reference("A", segmented ? 1 : null));
+
+        ReferenceSelectionStageOutput output = success(fixture);
+
+        assertEquals(ReferenceSelectionOutcome.NO_MATCH, output.getOutcome());
+        assertNull(output.getSelectedReference());
+        assertFalse(output.isPartial());
+        assertEquals(Status.NO_READS, output.getReadFallbackMetrics().status());
+        assertEquals(1, output.getCandidateScores().size());
+        assertEquals(0L, score(output, "A").getAlignedReferenceBases());
+        assertTrue(Files.isRegularFile(output.getComparisonReportPath()));
+    }
+
+    @Test
+    void emptyReadAndContigAlignmentsReturnNoMatchNotToolFailure() throws Exception {
+        ReferenceSelectionStageOutput output = success(fixture(true, false, reference("A", null)));
+
+        assertEquals(ReferenceSelectionOutcome.NO_MATCH, output.getOutcome());
+        assertEquals(Status.COMPLETED, output.getReadFallbackMetrics().status());
+        assertEquals("NO_ALIGNMENT_PASSING_MAPPING_QUALITY", score(output, "A").getRejectionReason());
+    }
+
+    @Test
+    void disabledFallbackWithNoContigMatchPreservesDisabledStatus() throws Exception {
+        Fixture fixture = fixture(true, false, reference("A", null));
+        fixture.parameters.setReadFallbackEnabled(false);
+
+        ReferenceSelectionStageOutput output = success(fixture);
+
+        assertEquals(ReferenceSelectionOutcome.NO_MATCH, output.getOutcome());
+        assertEquals(Status.DISABLED, output.getReadFallbackMetrics().status());
+        assertTrue(fixture.executor.readCommands.isEmpty());
+    }
+
+    @Test
+    void contigToolFailureRemainsExecutionFailure() throws Exception {
+        Fixture fixture = fixture(false, false, reference("A", null));
+        fixture.executor.failContigCommand = true;
+
+        StageRunResult<ReferenceSelectionStageOutput> result = fixture.run();
+
+        assertFalse(result.isSuccess());
+        assertNull(result.getStageOutput());
+        assertTrue(result.getFailReason().contains("exitCode=9"));
+    }
+
+    @Test
+    void malformedAlignmentRemainsExecutionFailure() throws Exception {
+        Fixture fixture = fixture(false, false, reference("A", null));
+        fixture.executor.contigPafs.put("A", "not a PAF record\n");
+
+        StageRunResult<ReferenceSelectionStageOutput> result = fixture.run();
+
+        assertFalse(result.isSuccess());
+        assertNull(result.getStageOutput());
+        assertTrue(result.getFailReason().contains("Failed to parse minimap2 PAF"));
+    }
+
+    @Test
+    void missingReferenceInputStillRaisesLoadFailure() throws Exception {
+        Fixture fixture = fixture(false, false, reference("A", null));
+        fixture.executor.objects.remove("references/A.fa");
+
+        assertThrows(LoadFailException.class, fixture::run);
+    }
+
+    @Test
+    void emptyCandidateConfigurationIsNotABusinessNoMatch() throws Exception {
+        StageRunResult<ReferenceSelectionStageOutput> result = fixture(false, false).run();
+
+        assertFalse(result.isSuccess());
+        assertNull(result.getStageOutput());
     }
 
     @Test
@@ -365,6 +455,7 @@ class ReferenceSelectionReadFallbackTest {
         final Set<String> loaded = new HashSet<>();
         final List<List<String>> readCommands = new ArrayList<>();
         boolean failReadCommand;
+        boolean failContigCommand;
 
         StubExecutor() {
             analysisPipelineToolsConfig = new AnalysisPipelineToolsConfig();
@@ -402,6 +493,9 @@ class ReferenceSelectionReadFallbackTest {
         @Override
         protected ExecuteResult _execute(List<String> command, Path workDir) {
             boolean reads = !"asm20".equals(command.get(command.indexOf("-x") + 1));
+            if (!reads && failContigCommand) {
+                return new ExecuteResult(9, null);
+            }
             if (reads) {
                 readCommands.add(List.copyOf(command));
                 if (failReadCommand) {
